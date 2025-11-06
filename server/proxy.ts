@@ -25,15 +25,14 @@ async function generateDiagram(description: string): Promise<string> {
   try {
     console.log('Generating diagram:', description);
     const response = await openai.images.generate({
-      model: "dall-e-3",
+      model: "gpt-image-1",
       prompt: `Create a clear, educational diagram for a student: ${description}. Style: Clean whiteboard drawing with black lines on white background, clearly labeled, simple and easy to understand, no text explanations - just the visual diagram with labels and measurements.`,
       size: "1024x1024",
-      quality: "standard",
       n: 1,
     });
     
     const imageUrl = response.data?.[0]?.url || '';
-    console.log('Diagram generated successfully');
+    console.log('Diagram generated successfully:', imageUrl);
     return imageUrl;
   } catch (error) {
     console.error('Error generating diagram:', error);

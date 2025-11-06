@@ -207,6 +207,11 @@ The proxy server (`server/proxy.ts`) provides:
 - [ ] Offline mode with cached solutions
 
 ## Recent Changes
+- November 6, 2025: **DIAGRAM GENERATION FIX v3 - CRITICAL** - Fixed incorrect image model name:
+  - Changed from `dall-e-3` (not supported) to `gpt-image-1` (Replit AI Integrations model)
+  - AI was generating [DIAGRAM NEEDED: ...] markers correctly all along
+  - Issue was that the diagram generation function was calling the wrong model
+  - Diagrams should now generate successfully for geometry problems
 - November 6, 2025: **DIAGRAM GENERATION FIX v2** - Made diagram instructions impossible to ignore:
   - Moved diagram section to **VERY TOP** of formatting rules (immediately after JSON response format)
   - Added emoji alerts (🚨) and visual prominence to catch AI's attention
