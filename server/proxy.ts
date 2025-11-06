@@ -238,6 +238,23 @@ app.post('/api/analyze-image', async (req, res) => {
 
 ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multiple problems exist, solve the most prominent one.'}
 
+**CRITICAL OCR ACCURACY INSTRUCTIONS:**
+1. CAREFULLY transcribe the EXACT problem from the image - pay close attention to:
+   - Fraction coefficients (1/8, 1/4, 2/5, etc.)
+   - Variables and their positions
+   - Parentheses placement
+   - Signs (+ vs -)
+2. DOUBLE-CHECK your transcription before solving
+3. Common OCR errors to AVOID:
+   - Misreading fractions (1/8 vs 1/3, 1/4 vs 1/9)
+   - Confusing coefficients with denominators
+   - Missing parentheses
+4. Use the SIMPLEST appropriate method:
+   - Linear equations → basic algebra (multiply, distribute, solve)
+   - Quadratic equations → only if ax² + bx + c = 0 form exists
+   - Don't use quadratic formula for linear equations!
+5. In "problem" field: Write the EXACT transcribed equation as it appears in the image
+
 RESPONSE FORMAT (JSON):
 {
   "problem": "Extracted problem text",
