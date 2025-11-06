@@ -62,6 +62,56 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000); // Run every 5 minutes
 
+// Background diagram generation function
+async function generateDiagramsInBackground(
+  solutionId: string,
+  diagrams: DiagramStatus[],
+  steps: any[]
+): Promise<void> {
+  console.log(`🎨 Starting background generation of ${diagrams.length} diagrams for solution ${solutionId}`);
+  
+  const solutionData = solutionDiagramStore.get(solutionId);
+  if (!solutionData) {
+    console.error(`Solution ${solutionId} not found in store`);
+    return;
+  }
+  
+  // Generate all diagrams in parallel
+  const promises = diagrams.map(async (diagram, index) => {
+    try {
+      // Update status to generating
+      solutionData.diagrams[index].status = 'generating';
+      
+      const diagramDescription = diagram.type === 'legacy' 
+        ? diagram.description
+        : `type=${diagram.type} - ${diagram.description}`;
+      
+      console.log(`🎨 Generating diagram ${index + 1}/${diagrams.length}: ${diagramDescription}`);
+      
+      const imageUrl = await generateDiagram(diagramDescription);
+      
+      if (imageUrl) {
+        solutionData.diagrams[index].status = 'ready';
+        solutionData.diagrams[index].imageUrl = imageUrl;
+        console.log(`✅ Diagram ${index + 1}/${diagrams.length} ready: ${imageUrl}`);
+      } else {
+        solutionData.diagrams[index].status = 'failed';
+        solutionData.diagrams[index].error = 'Failed to generate image';
+        console.error(`❌ Diagram ${index + 1}/${diagrams.length} failed`);
+      }
+    } catch (error) {
+      solutionData.diagrams[index].status = 'failed';
+      solutionData.diagrams[index].error = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`❌ Error generating diagram ${index + 1}/${diagrams.length}:`, error);
+    }
+  });
+  
+  await Promise.all(promises);
+  
+  solutionData.complete = true;
+  console.log(`✅ All diagrams complete for solution ${solutionId}`);
+}
+
 // Serve diagram images from public/diagrams
 app.use('/diagrams', express.static(path.join(process.cwd(), 'public', 'diagrams')));
 
@@ -747,77 +797,56 @@ Grade-appropriate language based on difficulty level.`
       }
     );
     
-    // ⚡ ASYNC DIAGRAM GENERATION: Return solution immediately, generate diagrams in background
-    const diagramPromises: Promise<void>[] = [];
+    // ⚡ ASYNC DIAGRAM GENERATION: Generate unique solution ID
+    const solutionId = crypto.randomBytes(16).toString('hex');
+    const diagrams: DiagramStatus[] = [];
     
-    // Process visualAids array to generate diagrams (in parallel, AFTER response sent)
+    // Collect all diagram requirements from visualAids array
     if (result.visualAids && Array.isArray(result.visualAids)) {
       for (const visualAid of result.visualAids) {
         const { type, stepId, description } = visualAid;
-        const diagramDescription = `type=${type} - ${description}`;
-        
-        diagramPromises.push(
-          generateDiagram(diagramDescription)
-            .then(diagramUrl => {
-              if (diagramUrl) {
-                const step = result.steps.find((s: any) => s.id === stepId);
-                if (step) {
-                  step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
-                }
-              }
-            })
-            .catch(err => {
-              console.error(`Failed to generate diagram for step ${stepId}:`, err);
-              // Continue without diagram - don't break the user experience
-            })
-        );
+        diagrams.push({
+          stepId,
+          type,
+          description,
+          status: 'pending'
+        });
       }
     }
     
-    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags (in parallel)
+    // Legacy support: Check for old-style [DIAGRAM NEEDED: ...] tags
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
-        const diagramDescription = diagramMatch[1];
-        
-        diagramPromises.push(
-          generateDiagram(diagramDescription)
-            .then(diagramUrl => {
-              if (diagramUrl) {
-                step.content = step.content.replace(
-                  diagramMatch[0],
-                  `(IMAGE: ${diagramDescription}](${diagramUrl})`
-                );
-              } else {
-                step.content = step.content.replace(diagramMatch[0], '');
-              }
-            })
-            .catch(err => {
-              console.error('Failed to generate legacy diagram:', err);
-              step.content = step.content.replace(diagramMatch[0], '');
-            })
-        );
+        diagrams.push({
+          stepId: step.id,
+          type: 'legacy',
+          description: diagramMatch[1],
+          status: 'pending'
+        });
       }
     }
     
-    // Wait for all diagrams to complete in parallel
-    await Promise.all(diagramPromises);
+    // Initialize diagram store for this solution
+    if (diagrams.length > 0) {
+      solutionDiagramStore.set(solutionId, {
+        diagrams,
+        timestamp: Date.now(),
+        complete: false
+      });
+      console.log(`📊 Initialized ${diagrams.length} pending diagrams for solution ${solutionId}`);
+    }
     
-    // CLEANUP: Remove any remaining [DIAGRAM NEEDED] tags (from failed generations or unprocessed tags)
-    // Must use bracket-depth counting because simple regex fails with nested brackets like [angle], [force], etc.
+    // CLEANUP: Remove all [DIAGRAM NEEDED] tags - diagrams will load asynchronously
     for (const step of result.steps) {
       if (step.content) {
-        const beforeCleanup = step.content;
         let content = step.content;
-        let changed = false;
         
-        // Find and remove all [DIAGRAM NEEDED: ...] tags with proper bracket matching
         while (true) {
           const startIndex = content.indexOf('[DIAGRAM NEEDED:');
           if (startIndex === -1) break;
           
-          // Track bracket depth to find the matching closing bracket
-          let depth = 1; // We've seen the opening '['
+          let depth = 1;
           let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
           
           while (depth > 0 && endIndex < content.length) {
@@ -826,22 +855,27 @@ Grade-appropriate language based on difficulty level.`
             endIndex++;
           }
           
-          // Remove the entire tag (from startIndex to endIndex)
           content = content.substring(0, startIndex) + content.substring(endIndex);
-          changed = true;
         }
         
         step.content = content;
-        if (changed) {
-          console.log(`⚠️ Removed [DIAGRAM NEEDED] placeholder(s) from step ${step.id} (diagram generation likely failed)`);
-        }
       }
     }
     
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
-    // ⚡ PERFORMANCE OPTIMIZATION: Validation runs in background (non-blocking)
+    // Add solutionId to response for diagram polling
+    const responseWithId = {
+      ...formattedResult,
+      solutionId: diagrams.length > 0 ? solutionId : undefined
+    };
+    
+    // ⚡ RETURN IMMEDIATELY - No waiting for diagrams!
+    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately (<8s target)`);
+    res.json(responseWithId);
+    
+    // ⚡ BACKGROUND TASKS: Validation and diagram generation (non-blocking)
     void validateSolution(question, formattedResult)
       .then(({ validationPassed, validationDetails }) => {
         if (!validationPassed) {
@@ -854,8 +888,10 @@ Grade-appropriate language based on difficulty level.`
         console.error('⚠️ Background validation error (non-blocking):', err);
       });
     
-    console.log('✅ Analysis successful - returning with diagrams');
-    res.json(formattedResult);
+    // Generate diagrams in background if any exist
+    if (diagrams.length > 0) {
+      void generateDiagramsInBackground(solutionId, diagrams, result.steps);
+    }
   } catch (error) {
     console.error('Error analyzing text:', error);
     res.status(500).json({ error: 'Failed to analyze question' });
@@ -1190,78 +1226,56 @@ Grade-appropriate language based on difficulty level.`
     }
     console.log('========================\n');
     
-    // ⚡ ASYNC DIAGRAM GENERATION: Return solution immediately, generate diagrams in background
-    const diagramPromises: Promise<void>[] = [];
+    // ⚡ ASYNC DIAGRAM GENERATION: Generate unique solution ID
+    const solutionId = crypto.randomBytes(16).toString('hex');
+    const diagrams: DiagramStatus[] = [];
     
-    // Process visualAids array to generate diagrams (in parallel, AFTER response sent)
+    // Collect all diagram requirements from visualAids array
     if (result.visualAids && Array.isArray(result.visualAids)) {
       for (const visualAid of result.visualAids) {
         const { type, stepId, description } = visualAid;
-        const diagramDescription = `type=${type} - ${description}`;
-        
-        diagramPromises.push(
-          generateDiagram(diagramDescription)
-            .then(diagramUrl => {
-              if (diagramUrl) {
-                const step = result.steps.find((s: any) => s.id === stepId);
-                if (step) {
-                  step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
-                  console.log('✓ Diagram embedded:', diagramUrl);
-                }
-              }
-            })
-            .catch(err => {
-              console.error(`Failed to generate diagram for step ${stepId}:`, err);
-              // Continue without diagram - don't break the user experience
-            })
-        );
+        diagrams.push({
+          stepId,
+          type,
+          description,
+          status: 'pending'
+        });
       }
     }
     
-    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags (in parallel)
+    // Legacy support: Check for old-style [DIAGRAM NEEDED: ...] tags
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
-        const diagramDescription = diagramMatch[1];
-        
-        diagramPromises.push(
-          generateDiagram(diagramDescription)
-            .then(diagramUrl => {
-              if (diagramUrl) {
-                step.content = step.content.replace(
-                  diagramMatch[0],
-                  `(IMAGE: ${diagramDescription}](${diagramUrl})`
-                );
-              } else {
-                step.content = step.content.replace(diagramMatch[0], '');
-              }
-            })
-            .catch(err => {
-              console.error('Failed to generate legacy diagram:', err);
-              step.content = step.content.replace(diagramMatch[0], '');
-            })
-        );
+        diagrams.push({
+          stepId: step.id,
+          type: 'legacy',
+          description: diagramMatch[1],
+          status: 'pending'
+        });
       }
     }
     
-    // Wait for all diagrams to complete in parallel
-    await Promise.all(diagramPromises);
+    // Initialize diagram store for this solution
+    if (diagrams.length > 0) {
+      solutionDiagramStore.set(solutionId, {
+        diagrams,
+        timestamp: Date.now(),
+        complete: false
+      });
+      console.log(`📊 Initialized ${diagrams.length} pending diagrams for solution ${solutionId}`);
+    }
     
-    // CLEANUP: Remove any remaining [DIAGRAM NEEDED] tags (from failed generations or unprocessed tags)
-    // Must use bracket-depth counting because simple regex fails with nested brackets like [angle], [force], etc.
+    // CLEANUP: Remove all [DIAGRAM NEEDED] tags - diagrams will load asynchronously
     for (const step of result.steps) {
       if (step.content) {
-        const beforeCleanup = step.content;
         let content = step.content;
-        let changed = false;
         
-        // Find and remove all [DIAGRAM NEEDED: ...] tags with proper bracket matching
         while (true) {
           const startIndex = content.indexOf('[DIAGRAM NEEDED:');
           if (startIndex === -1) break;
           
-          // Track bracket depth to find the matching closing bracket
-          let depth = 1; // We've seen the opening '['
+          let depth = 1;
           let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
           
           while (depth > 0 && endIndex < content.length) {
@@ -1270,22 +1284,69 @@ Grade-appropriate language based on difficulty level.`
             endIndex++;
           }
           
-          // Remove the entire tag (from startIndex to endIndex)
           content = content.substring(0, startIndex) + content.substring(endIndex);
-          changed = true;
         }
         
         step.content = content;
-        if (changed) {
-          console.log(`⚠️ Removed [DIAGRAM NEEDED] placeholder(s) from step ${step.id} (diagram generation likely failed)`);
-        }
       }
     }
     
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
-    // ⚡ PERFORMANCE OPTIMIZATION: Skip validation for speed (adds 5+ seconds)
+    // Add solutionId to response for diagram polling
+    const responseWithId = {
+      ...formattedResult,
+      solutionId: diagrams.length > 0 ? solutionId : undefined
+    };
+    
+    // ⚡ RETURN IMMEDIATELY - No waiting for diagrams!
+    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately (<8s target)`);
+    res.json(responseWithId);
+    
+    // ⚡ BACKGROUND TASKS: Validation and diagram generation (non-blocking)
+    void validateSolution(result.problem || 'Image-based question', formattedResult)
+      .then(({ validationPassed, validationDetails }) => {
+        if (!validationPassed) {
+          console.warn('⚠️ Background validation failed:', validationDetails);
+        } else {
+          console.log('✅ Background validation passed');
+        }
+      })
+      .catch(err => {
+        console.error('⚠️ Background validation error (non-blocking):', err);
+      });
+    
+    // Generate diagrams in background if any exist
+    if (diagrams.length > 0) {
+      void generateDiagramsInBackground(solutionId, diagrams, result.steps);
+    }
+  } catch (error) {
+    console.error('Error analyzing image:', error);
+    res.status(500).json({ error: 'Failed to analyze image' });
+  }
+});
+
+// Polling endpoint for diagram status
+app.get('/api/diagrams/:solutionId', async (req, res) => {
+  try {
+    const { solutionId } = req.params;
+    
+    const solutionData = solutionDiagramStore.get(solutionId);
+    
+    if (!solutionData) {
+      return res.status(404).json({ error: 'Solution not found' });
+    }
+    
+    res.json({
+      diagrams: solutionData.diagrams,
+      complete: solutionData.complete
+    });
+  } catch (error) {
+    console.error('Error fetching diagrams:', error);
+    res.status(500).json({ error: 'Failed to fetch diagrams' });
+  }
+});
     // Validation runs in background for monitoring/logging only
     // Using void operator to explicitly ignore promise and prevent unhandled rejection warnings
     const problemText = `${formattedResult.problem}${problemNumber ? ` (Problem #${problemNumber})` : ''}`;
