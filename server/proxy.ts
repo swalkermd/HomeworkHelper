@@ -55,8 +55,8 @@ async function generateDiagram(description: string): Promise<string> {
       const buffer = Buffer.from(b64Data, 'base64');
       fs.writeFileSync(filepath, buffer);
       
-      // Return a URL path (served by static middleware)
-      const url = `/diagrams/${filename}`;
+      // Return absolute URL (relative paths resolve to Expo dev server, not our API server)
+      const url = `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/diagrams/${filename}`;
       console.log('✓ Diagram saved:', url);
       return url;
     }
@@ -551,11 +551,18 @@ Grade-appropriate language based on difficulty level.`
     }
     console.log('========================\n');
     
-    // Remove diagram markers (feature disabled due to React Native Web rendering issues)
+    // Check if any step needs a diagram and generate it
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
-        step.content = step.content.replace(diagramMatch[0], '');
+        const diagramDescription = diagramMatch[1];
+        const diagramUrl = await generateDiagram(diagramDescription);
+        if (diagramUrl) {
+          // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
+          const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
+          step.content = step.content.replace(diagramMatch[0], imageTag);
+          console.log('✓ Diagram embedded:', diagramUrl);
+        }
       }
     }
     
