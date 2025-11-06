@@ -48,14 +48,41 @@ export default function MathText({ content, fontSize = 14, color = colors.textPr
     );
   }
   
-  // Otherwise use View with flex layout (for fractions/images)
+  // For content with fractions/images: group consecutive text parts together
+  const groupedElements: React.ReactNode[] = [];
+  let currentTextGroup: ParsedPart[] = [];
+  
+  parsedContent.forEach((part, index) => {
+    if (part.type === 'fraction' || part.type === 'image') {
+      // Flush accumulated text group first
+      if (currentTextGroup.length > 0) {
+        groupedElements.push(
+          <Text key={`text-group-${groupedElements.length}`} style={{ fontSize, color }}>
+            {currentTextGroup.map((textPart, i) => renderTextPart(textPart, i, fontSize, color, isOnGreenBackground))}
+          </Text>
+        );
+        currentTextGroup = [];
+      }
+      // Add the fraction/image
+      groupedElements.push(renderPart(part, index, fontSize, color, isOnGreenBackground));
+    } else {
+      // Accumulate text parts
+      currentTextGroup.push(part);
+    }
+  });
+  
+  // Flush any remaining text group
+  if (currentTextGroup.length > 0) {
+    groupedElements.push(
+      <Text key={`text-group-${groupedElements.length}`} style={{ fontSize, color }}>
+        {currentTextGroup.map((textPart, i) => renderTextPart(textPart, i, fontSize, color, isOnGreenBackground))}
+      </Text>
+    );
+  }
+  
   return (
     <View style={styles.lineContainer}>
-      {parsedContent.map((part, index) => (
-        <React.Fragment key={index}>
-          {renderPart(part, index, fontSize, color, isOnGreenBackground)}
-        </React.Fragment>
-      ))}
+      {groupedElements}
     </View>
   );
 }
