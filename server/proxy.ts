@@ -29,10 +29,39 @@ const openai = new OpenAI({
 
 async function generateDiagram(description: string): Promise<string> {
   try {
-    console.log('Generating diagram for:', description.substring(0, 100) + '...');
+    // Extract visual type from description if provided
+    const typeMatch = description.match(/type=(\w+)/);
+    const visualType = typeMatch ? typeMatch[1] : 'diagram';
+    
+    // Remove type tag from description for cleaner prompt
+    const cleanDescription = description.replace(/type=\w+\s*-\s*/, '');
+    
+    console.log(`Generating ${visualType} for:`, cleanDescription.substring(0, 100) + '...');
+    
+    // Customize prompt based on visual type
+    const styleGuides: { [key: string]: string } = {
+      geometry: 'Clean geometric diagram with clear angles, labeled vertices, precise measurements, and dimension annotations. Use a ruler-and-compass style with clean black lines on white background.',
+      graph: 'Coordinate plane with clearly marked axes, grid lines, labeled points, and plotted function/equation. Include axis labels (x, y) and key coordinates. Mathematical graph style.',
+      chart: 'Clean data visualization chart with clear labels, legend if needed, and easy-to-read values. Professional infographic style with simple colors.',
+      physics: 'Physics diagram with labeled components, force arrows with magnitude indicators, clear directional vectors, and relevant measurements. Technical diagram style.',
+      illustration: 'Step-by-step visual illustration showing process or transformation clearly with arrows indicating sequence and labeled stages. Educational illustration style.',
+    };
+    
+    const styleGuide = styleGuides[visualType] || 'Clean educational diagram with clear labels and simple presentation';
+    
     const response = await openai.images.generate({
       model: "gpt-image-1",
-      prompt: `Create a clear, educational diagram for a student: ${description}. Style: Clean whiteboard drawing with black lines on white background, clearly labeled, simple and easy to understand, no text explanations - just the visual diagram with labels and measurements.`,
+      prompt: `Create a clear, educational ${visualType} for a student: ${cleanDescription}. 
+
+Style requirements: ${styleGuide}
+
+Key principles:
+- White background, black/dark lines for maximum clarity
+- All components clearly labeled with text
+- Include all measurements, dimensions, and values mentioned
+- Simple, uncluttered design focused on understanding
+- No decorative elements - purely educational
+- Large enough text to be readable`,
       size: "1024x1024",
       n: 1,
     });
@@ -46,9 +75,9 @@ async function generateDiagram(description: string): Promise<string> {
         fs.mkdirSync(diagramsDir, { recursive: true });
       }
       
-      // Generate unique filename
+      // Generate unique filename with type prefix
       const hash = crypto.createHash('md5').update(description).digest('hex').substring(0, 8);
-      const filename = `diagram-${hash}.png`;
+      const filename = `${visualType}-${hash}.png`;
       const filepath = path.join(diagramsDir, filename);
       
       // Convert base64 to buffer and save
@@ -58,7 +87,7 @@ async function generateDiagram(description: string): Promise<string> {
       // Return absolute URL (relative paths resolve to Expo dev server, not our API server)
       const domain = process.env.REPLIT_DEV_DOMAIN || `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
       const url = `https://${domain}/diagrams/${filename}`;
-      console.log('✓ Diagram saved:', url);
+      console.log(`✓ ${visualType} saved:`, url);
       return url;
     }
     
@@ -182,24 +211,59 @@ RESPONSE FORMAT (JSON):
   "finalAnswer": "Plain text final answer"
 }
 
-🚨 STEP 1 REQUIREMENT - DIAGRAMS ARE MANDATORY FOR VISUAL PROBLEMS 🚨
+📊 INTELLIGENT VISUAL AIDS - WHEN AND WHAT TYPE TO CREATE 📊
 
-If the problem involves ANY of the following, you MUST include [DIAGRAM NEEDED: ...] in Step 1:
-✓ Rectangles, triangles, circles, or ANY geometric shapes
-✓ Graphs, coordinate planes, or plotted points
-✓ Physics diagrams (forces, circuits, motion)
-✓ Any spatial or visual relationship
+**SCREENING CRITERIA - Only create visuals when they SIGNIFICANTLY enhance understanding:**
 
-FORMAT: [DIAGRAM NEEDED: detailed description with ALL dimensions, labels, and spatial relationships]
+Consider creating a visual aid when:
+✓ The problem involves spatial relationships that are hard to describe in words alone
+✓ Lower grade levels (K-5, 6-8) - visuals help younger students grasp concepts better
+✓ Complex multi-step processes benefit from a visual roadmap
+✓ The visual would clarify confusion, not just repeat what words already convey
 
-EXAMPLE FOR GEOMETRY PROBLEM:
-Problem: "Rectangle PQRS with triangle OPQ where PQ = 6 units"
-Step 1 Content MUST include:
-"[DIAGRAM NEEDED: Rectangle PQRS with horizontal base PQ = 6 units at bottom, vertical height PS on left side. Isosceles triangle OPQ with base PQ (6 units) on bottom edge of rectangle, vertex O above PQ, equal sides OP and OQ forming triangle inside rectangle. Label all corners P, Q, R, S clockwise, and point O at triangle apex.]
+**TYPES OF VISUALS TO CONSIDER:**
 
-We are given that PQRS is a rectangle..."
+1. **GEOMETRIC DIAGRAMS** - For shapes, angles, spatial relationships
+   - When: Geometry problems with rectangles, triangles, circles, polygons
+   - Example: Rectangle with inscribed triangle, overlapping shapes, angle measurements
+   - Tag: [DIAGRAM NEEDED: type=geometry - detailed description with ALL dimensions, labels, spatial relationships]
 
-NO EXCEPTIONS. If geometry/visual problem → Step 1 MUST have [DIAGRAM NEEDED: ...]
+2. **GRAPHS & COORDINATE PLANES** - For plotting, functions, data visualization
+   - When: Graphing linear/quadratic equations, plotting points, showing intersections
+   - Example: Plot y = 2x + 3, show where lines intersect, coordinate grid
+   - Tag: [DIAGRAM NEEDED: type=graph - equation/function with axes, labels, key points]
+
+3. **CHARTS & DATA VISUALIZATION** - For comparing quantities, showing proportions
+   - When: Percentage problems, comparing values, showing parts of a whole
+   - Example: Pie chart showing budget breakdown, bar chart comparing quantities
+   - Tag: [DIAGRAM NEEDED: type=chart - data values, labels, chart type (bar/pie/line)]
+
+4. **PHYSICS DIAGRAMS** - For forces, motion, circuits, energy
+   - When: Force diagrams, velocity vectors, circuit schematics, projectile motion
+   - Example: Free body diagram with force arrows, circuit with resistors and battery
+   - Tag: [DIAGRAM NEEDED: type=physics - physical setup, forces/components, labels]
+
+5. **PROCESS ILLUSTRATIONS** - For sequential steps or transformations
+   - When: Chemical reactions, life cycles, step-by-step transformations
+   - Example: Before/after states, reaction arrows, stage progressions
+   - Tag: [DIAGRAM NEEDED: type=illustration - what's shown, key elements, relationships]
+
+**WHEN NOT TO CREATE VISUALS:**
+✗ Pure algebraic manipulation where symbols are clear enough
+✗ Word problems that are straightforward without spatial elements
+✗ Upper-level abstract concepts where visualization doesn't add value
+✗ When the description in words is already perfectly clear
+
+**PLACEMENT:** Visual aids can appear in ANY step where they'd be most helpful, not just Step 1. Place them where understanding would benefit most.
+
+**FORMAT EXAMPLE:**
+"[DIAGRAM NEEDED: type=geometry - Rectangle PQRS with horizontal base PQ = 6 units at bottom, vertical height PS on left side. Isosceles triangle OPQ with base PQ (6 units) on bottom edge of rectangle, vertex O above PQ, equal sides OP and OQ forming triangle inside rectangle. Label all corners P, Q, R, S clockwise, and point O at triangle apex.]"
+
+**DECISION FRAMEWORK:**
+Ask yourself: "Would a student understand this BETTER with a visual, or is it already clear?"
+- If visual is essential for understanding → CREATE IT
+- If visual would be nice but not necessary → SKIP IT
+- If visual would just repeat what's already clear → SKIP IT
 
 CRITICAL MATHEMATICAL FORMATTING RULES:
 
@@ -397,24 +461,59 @@ RESPONSE FORMAT (JSON):
   "finalAnswer": "Plain text final answer"
 }
 
-🚨 STEP 1 REQUIREMENT - DIAGRAMS ARE MANDATORY FOR VISUAL PROBLEMS 🚨
+📊 INTELLIGENT VISUAL AIDS - WHEN AND WHAT TYPE TO CREATE 📊
 
-If the problem involves ANY of the following, you MUST include [DIAGRAM NEEDED: ...] in Step 1:
-✓ Rectangles, triangles, circles, or ANY geometric shapes
-✓ Graphs, coordinate planes, or plotted points
-✓ Physics diagrams (forces, circuits, motion)
-✓ Any spatial or visual relationship
+**SCREENING CRITERIA - Only create visuals when they SIGNIFICANTLY enhance understanding:**
 
-FORMAT: [DIAGRAM NEEDED: detailed description with ALL dimensions, labels, and spatial relationships]
+Consider creating a visual aid when:
+✓ The problem involves spatial relationships that are hard to describe in words alone
+✓ Lower grade levels (K-5, 6-8) - visuals help younger students grasp concepts better
+✓ Complex multi-step processes benefit from a visual roadmap
+✓ The visual would clarify confusion, not just repeat what words already convey
 
-EXAMPLE FOR THIS EXACT TYPE OF PROBLEM:
-Problem: "Rectangle PQRS with triangle OPQ where PQ = 6 units"
-Step 1 Content MUST include:
-"[DIAGRAM NEEDED: Rectangle PQRS with horizontal base PQ = 6 units at bottom, vertical height PS on left side. Isosceles triangle OPQ with base PQ (6 units) on bottom edge of rectangle, vertex O above PQ, equal sides OP and OQ forming triangle inside rectangle. Label all corners P, Q, R, S clockwise, and point O at triangle apex.]
+**TYPES OF VISUALS TO CONSIDER:**
 
-We are given that PQRS is a rectangle..."
+1. **GEOMETRIC DIAGRAMS** - For shapes, angles, spatial relationships
+   - When: Geometry problems with rectangles, triangles, circles, polygons
+   - Example: Rectangle with inscribed triangle, overlapping shapes, angle measurements
+   - Tag: [DIAGRAM NEEDED: type=geometry - detailed description with ALL dimensions, labels, spatial relationships]
 
-NO EXCEPTIONS. If geometry/visual problem → Step 1 MUST have [DIAGRAM NEEDED: ...]
+2. **GRAPHS & COORDINATE PLANES** - For plotting, functions, data visualization
+   - When: Graphing linear/quadratic equations, plotting points, showing intersections
+   - Example: Plot y = 2x + 3, show where lines intersect, coordinate grid
+   - Tag: [DIAGRAM NEEDED: type=graph - equation/function with axes, labels, key points]
+
+3. **CHARTS & DATA VISUALIZATION** - For comparing quantities, showing proportions
+   - When: Percentage problems, comparing values, showing parts of a whole
+   - Example: Pie chart showing budget breakdown, bar chart comparing quantities
+   - Tag: [DIAGRAM NEEDED: type=chart - data values, labels, chart type (bar/pie/line)]
+
+4. **PHYSICS DIAGRAMS** - For forces, motion, circuits, energy
+   - When: Force diagrams, velocity vectors, circuit schematics, projectile motion
+   - Example: Free body diagram with force arrows, circuit with resistors and battery
+   - Tag: [DIAGRAM NEEDED: type=physics - physical setup, forces/components, labels]
+
+5. **PROCESS ILLUSTRATIONS** - For sequential steps or transformations
+   - When: Chemical reactions, life cycles, step-by-step transformations
+   - Example: Before/after states, reaction arrows, stage progressions
+   - Tag: [DIAGRAM NEEDED: type=illustration - what's shown, key elements, relationships]
+
+**WHEN NOT TO CREATE VISUALS:**
+✗ Pure algebraic manipulation where symbols are clear enough
+✗ Word problems that are straightforward without spatial elements
+✗ Upper-level abstract concepts where visualization doesn't add value
+✗ When the description in words is already perfectly clear
+
+**PLACEMENT:** Visual aids can appear in ANY step where they'd be most helpful, not just Step 1. Place them where understanding would benefit most.
+
+**FORMAT EXAMPLE:**
+"[DIAGRAM NEEDED: type=geometry - Rectangle PQRS with horizontal base PQ = 6 units at bottom, vertical height PS on left side. Isosceles triangle OPQ with base PQ (6 units) on bottom edge of rectangle, vertex O above PQ, equal sides OP and OQ forming triangle inside rectangle. Label all corners P, Q, R, S clockwise, and point O at triangle apex.]"
+
+**DECISION FRAMEWORK:**
+Ask yourself: "Would a student understand this BETTER with a visual, or is it already clear?"
+- If visual is essential for understanding → CREATE IT
+- If visual would be nice but not necessary → SKIP IT
+- If visual would just repeat what's already clear → SKIP IT
 
 CRITICAL MATHEMATICAL FORMATTING RULES:
 
