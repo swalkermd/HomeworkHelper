@@ -31,8 +31,9 @@ async function generateDiagram(description: string): Promise<string> {
       n: 1,
     });
     
+    console.log('Full response from image generation:', JSON.stringify(response, null, 2));
     const imageUrl = response.data?.[0]?.url || '';
-    console.log('Diagram generated successfully:', imageUrl);
+    console.log('Extracted imageUrl:', imageUrl);
     return imageUrl;
   } catch (error) {
     console.error('Error generating diagram:', error);
