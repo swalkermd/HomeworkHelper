@@ -3,6 +3,9 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import cors from 'cors';
 import OpenAI from 'openai';
 import pRetry, { AbortError } from 'p-retry';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 
 const app = express();
 const PORT = 5000;
@@ -15,6 +18,9 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '50mb' }));
+
+// Serve diagram images from public/diagrams
+app.use('/diagrams', express.static(path.join(process.cwd(), 'public', 'diagrams')));
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -34,10 +40,25 @@ async function generateDiagram(description: string): Promise<string> {
     // Replit AI Integrations returns base64 data by default
     const b64Data = response.data?.[0]?.b64_json;
     if (b64Data) {
-      // Convert base64 to data URL for embedding
-      const dataUrl = `data:image/png;base64,${b64Data}`;
-      console.log('✓ Diagram generated successfully');
-      return dataUrl;
+      // Save to file instead of returning data URL (data URLs crash React Native Web)
+      const diagramsDir = path.join(process.cwd(), 'public', 'diagrams');
+      if (!fs.existsSync(diagramsDir)) {
+        fs.mkdirSync(diagramsDir, { recursive: true });
+      }
+      
+      // Generate unique filename
+      const hash = crypto.createHash('md5').update(description).digest('hex').substring(0, 8);
+      const filename = `diagram-${hash}.png`;
+      const filepath = path.join(diagramsDir, filename);
+      
+      // Convert base64 to buffer and save
+      const buffer = Buffer.from(b64Data, 'base64');
+      fs.writeFileSync(filepath, buffer);
+      
+      // Return a URL path (served by static middleware)
+      const url = `/diagrams/${filename}`;
+      console.log('✓ Diagram saved:', url);
+      return url;
     }
     
     console.log('✗ No image data returned');
@@ -530,13 +551,18 @@ Grade-appropriate language based on difficulty level.`
     }
     console.log('========================\n');
     
-    // TEMPORARILY DISABLED: Check if any step needs a diagram and generate it
+    // Check if any step needs a diagram and generate it
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
-        // Remove the diagram marker for now to prevent crashes
-        step.content = step.content.replace(diagramMatch[0], '');
-        console.log('ℹ Diagram generation temporarily disabled');
+        const diagramDescription = diagramMatch[1];
+        const diagramUrl = await generateDiagram(diagramDescription);
+        if (diagramUrl) {
+          // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
+          const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
+          step.content = step.content.replace(diagramMatch[0], imageTag);
+          console.log('✓ Diagram embedded:', diagramUrl);
+        }
       }
     }
     
