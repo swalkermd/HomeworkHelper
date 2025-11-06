@@ -31,7 +31,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         </View>
         
         <Text style={styles.title}>Homework Helper</Text>
-        <Text style={styles.subtitle}>Your dedicated AI teacher for all subjects</Text>
       </View>
 
       <View style={styles.buttonsContainer}>
@@ -119,11 +118,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   title: {
-    fontSize: typography.displayLarge.fontSize,
-    lineHeight: typography.displayLarge.lineHeight,
+    fontSize: 48,
+    lineHeight: 56,
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xl,
   },
   subtitle: {
     fontSize: typography.bodyLarge.fontSize,
