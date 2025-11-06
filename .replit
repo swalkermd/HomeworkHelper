@@ -63,5 +63,5 @@ localPort = 42311
 externalPort = 3000
 
 [deployment]
-deploymentTarget = "autoscale"
-run = ["bash", "-c", "PORT=8081 npx expo start --web --port 8081 & sleep 3 && npx tsx server/proxy.ts"]
+deploymentTarget = "cloudrun"
+run = ["sh", "-c", "npx tsx server/proxy.ts"]
