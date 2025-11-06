@@ -149,6 +149,25 @@ RESPONSE FORMAT (JSON):
   "finalAnswer": "Plain text final answer"
 }
 
+🚨 STEP 1 REQUIREMENT - DIAGRAMS ARE MANDATORY FOR VISUAL PROBLEMS 🚨
+
+If the problem involves ANY of the following, you MUST include [DIAGRAM NEEDED: ...] in Step 1:
+✓ Rectangles, triangles, circles, or ANY geometric shapes
+✓ Graphs, coordinate planes, or plotted points
+✓ Physics diagrams (forces, circuits, motion)
+✓ Any spatial or visual relationship
+
+FORMAT: [DIAGRAM NEEDED: detailed description with ALL dimensions, labels, and spatial relationships]
+
+EXAMPLE FOR GEOMETRY PROBLEM:
+Problem: "Rectangle PQRS with triangle OPQ where PQ = 6 units"
+Step 1 Content MUST include:
+"[DIAGRAM NEEDED: Rectangle PQRS with horizontal base PQ = 6 units at bottom, vertical height PS on left side. Isosceles triangle OPQ with base PQ (6 units) on bottom edge of rectangle, vertex O above PQ, equal sides OP and OQ forming triangle inside rectangle. Label all corners P, Q, R, S clockwise, and point O at triangle apex.]
+
+We are given that PQRS is a rectangle..."
+
+NO EXCEPTIONS. If geometry/visual problem → Step 1 MUST have [DIAGRAM NEEDED: ...]
+
 CRITICAL MATHEMATICAL FORMATTING RULES:
 
 **FRACTIONS - ABSOLUTELY MANDATORY VERTICAL FORMAT:**
@@ -226,21 +245,6 @@ d = {{-14 ± √400}/{6}} = {{-14 ± 20}/{6}}
 Two solutions:
 d = {{-14 + 20}/{6}} = {6/6} = [red:1]
 d = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]"
-
-**MANDATORY VISUAL DIAGRAMS:**
-For the following problem types, you MUST add [DIAGRAM NEEDED: detailed description] in the FIRST step where the diagram would help:
-
-**REQUIRED for:**
-- Geometry: rectangles, triangles, circles, polygons → [DIAGRAM NEEDED: Rectangle ABCD with length 8 units (AB) and width 5 units (BC), all corners labeled]
-- Coordinate planes/graphs → [DIAGRAM NEEDED: Coordinate plane showing line y=2x+3 with y-intercept at (0,3) and point (2,7) labeled]
-- Physics diagrams: forces, motion, circuits → [DIAGRAM NEEDED: Free body diagram showing box on inclined plane at 30°, with force vectors for weight (mg), normal force (N), and friction (f)]
-- Charts/visual comparisons → [DIAGRAM NEEDED: Bar chart comparing heights of three buildings]
-
-**Examples of [DIAGRAM NEEDED: ...]:**
-- [DIAGRAM NEEDED: Isosceles triangle OPQ with base PQ=6 units labeled at bottom, equal sides OP and OQ both 5 units, altitude of 4 units from O perpendicular to PQ at midpoint]
-- [DIAGRAM NEEDED: Rectangle PQRS with width PS=4 units on left side and length PQ=6 units on top, all corners labeled clockwise starting from P]
-
-The description must be detailed enough to draw the exact diagram with all dimensions, labels, and angles.
 
 **CHEMISTRY/PHYSICS:**
 - Subscripts: H_2_O, v_0_, x_n_
@@ -360,6 +364,25 @@ RESPONSE FORMAT (JSON):
   "finalAnswer": "Plain text final answer"
 }
 
+🚨 STEP 1 REQUIREMENT - DIAGRAMS ARE MANDATORY FOR VISUAL PROBLEMS 🚨
+
+If the problem involves ANY of the following, you MUST include [DIAGRAM NEEDED: ...] in Step 1:
+✓ Rectangles, triangles, circles, or ANY geometric shapes
+✓ Graphs, coordinate planes, or plotted points
+✓ Physics diagrams (forces, circuits, motion)
+✓ Any spatial or visual relationship
+
+FORMAT: [DIAGRAM NEEDED: detailed description with ALL dimensions, labels, and spatial relationships]
+
+EXAMPLE FOR THIS EXACT TYPE OF PROBLEM:
+Problem: "Rectangle PQRS with triangle OPQ where PQ = 6 units"
+Step 1 Content MUST include:
+"[DIAGRAM NEEDED: Rectangle PQRS with horizontal base PQ = 6 units at bottom, vertical height PS on left side. Isosceles triangle OPQ with base PQ (6 units) on bottom edge of rectangle, vertex O above PQ, equal sides OP and OQ forming triangle inside rectangle. Label all corners P, Q, R, S clockwise, and point O at triangle apex.]
+
+We are given that PQRS is a rectangle..."
+
+NO EXCEPTIONS. If geometry/visual problem → Step 1 MUST have [DIAGRAM NEEDED: ...]
+
 CRITICAL MATHEMATICAL FORMATTING RULES:
 
 **FRACTIONS - ABSOLUTELY MANDATORY VERTICAL FORMAT:**
@@ -437,21 +460,6 @@ d = {{-14 ± √400}/{6}} = {{-14 ± 20}/{6}}
 Two solutions:
 d = {{-14 + 20}/{6}} = {6/6} = [red:1]
 d = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]"
-
-**MANDATORY VISUAL DIAGRAMS:**
-For the following problem types, you MUST add [DIAGRAM NEEDED: detailed description] in the FIRST step where the diagram would help:
-
-**REQUIRED for:**
-- Geometry: rectangles, triangles, circles, polygons → [DIAGRAM NEEDED: Rectangle ABCD with length 8 units (AB) and width 5 units (BC), all corners labeled]
-- Coordinate planes/graphs → [DIAGRAM NEEDED: Coordinate plane showing line y=2x+3 with y-intercept at (0,3) and point (2,7) labeled]
-- Physics diagrams: forces, motion, circuits → [DIAGRAM NEEDED: Free body diagram showing box on inclined plane at 30°, with force vectors for weight (mg), normal force (N), and friction (f)]
-- Charts/visual comparisons → [DIAGRAM NEEDED: Bar chart comparing heights of three buildings]
-
-**Examples of [DIAGRAM NEEDED: ...]:**
-- [DIAGRAM NEEDED: Isosceles triangle OPQ with base PQ=6 units labeled at bottom, equal sides OP and OQ both 5 units, altitude of 4 units from O perpendicular to PQ at midpoint]
-- [DIAGRAM NEEDED: Rectangle PQRS with width PS=4 units on left side and length PQ=6 units on top, all corners labeled clockwise starting from P]
-
-The description must be detailed enough to draw the exact diagram with all dimensions, labels, and angles.
 
 **CHEMISTRY/PHYSICS:**
 - Subscripts: H_2_O, v_0_, x_n_
