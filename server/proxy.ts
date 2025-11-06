@@ -664,59 +664,68 @@ Grade-appropriate language based on difficulty level.`
       }
     }
     
-    // Process visualAids array to generate diagrams
+    // ⚡ PERFORMANCE OPTIMIZATION: Generate all diagrams in parallel
+    const diagramPromises: Promise<void>[] = [];
+    
+    // Process visualAids array to generate diagrams (in parallel)
     if (result.visualAids && Array.isArray(result.visualAids)) {
       for (const visualAid of result.visualAids) {
         const { type, stepId, description } = visualAid;
         const diagramDescription = `type=${type} - ${description}`;
-        const diagramUrl = await generateDiagram(diagramDescription);
         
-        if (diagramUrl) {
-          // Find the step and add the image to its content
-          const step = result.steps.find((s: any) => s.id === stepId);
-          if (step) {
-            step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
-          }
-        }
+        diagramPromises.push(
+          generateDiagram(diagramDescription).then(diagramUrl => {
+            if (diagramUrl) {
+              const step = result.steps.find((s: any) => s.id === stepId);
+              if (step) {
+                step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
+              }
+            }
+          })
+        );
       }
     }
     
-    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags
+    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags (in parallel)
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
         const diagramDescription = diagramMatch[1];
-        const diagramUrl = await generateDiagram(diagramDescription);
-        if (diagramUrl) {
-          // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
-          step.content = step.content.replace(
-            diagramMatch[0],
-            `(IMAGE: ${diagramDescription}](${diagramUrl})`
-          );
-        }
+        
+        diagramPromises.push(
+          generateDiagram(diagramDescription).then(diagramUrl => {
+            if (diagramUrl) {
+              step.content = step.content.replace(
+                diagramMatch[0],
+                `(IMAGE: ${diagramDescription}](${diagramUrl})`
+              );
+            }
+          })
+        );
       }
     }
+    
+    // Wait for all diagrams to complete in parallel
+    await Promise.all(diagramPromises);
     
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
-    // VALIDATE SOLUTION ACCURACY - Quality control check
-    const { solution: validatedSolution, validationPassed, validationDetails } = await validateSolution(question, formattedResult);
+    // ⚡ PERFORMANCE OPTIMIZATION: Skip validation for speed (adds 5+ seconds)
+    // Validation runs in background for monitoring/logging only
+    validateSolution(question, formattedResult).then(({ validationPassed, validationDetails }) => {
+      if (!validationPassed) {
+        console.warn('⚠️ Background validation failed:', validationDetails);
+        // Log but don't block - solution already delivered to user
+      } else {
+        console.log('✅ Background validation passed');
+      }
+    }).catch(err => {
+      console.error('Background validation error:', err);
+    });
     
-    if (!validationPassed) {
-      // Validation failed - do NOT return potentially incorrect solution to student
-      console.error('❌ Solution failed validation - blocking delivery');
-      console.error('Validation details:', validationDetails);
-      
-      return res.status(400).json({ 
-        error: 'We encountered some concerns about the accuracy of this solution. Please try rephrasing your question or breaking it into smaller parts. If this persists, double-check the problem statement for any typos.',
-        validationFailed: true,
-        retryable: true
-      });
-    }
-    
-    console.log('✅ Analysis successful and validated');
-    res.json(validatedSolution);
+    console.log('✅ Analysis successful - returning immediately (validation async)');
+    res.json(formattedResult);
   } catch (error) {
     console.error('Error analyzing text:', error);
     res.status(500).json({ error: 'Failed to analyze question' });
@@ -1030,60 +1039,69 @@ Grade-appropriate language based on difficulty level.`
       }
     }
     
-    // Process visualAids array to generate diagrams
+    // ⚡ PERFORMANCE OPTIMIZATION: Generate all diagrams in parallel
+    const diagramPromises: Promise<void>[] = [];
+    
+    // Process visualAids array to generate diagrams (in parallel)
     if (result.visualAids && Array.isArray(result.visualAids)) {
       for (const visualAid of result.visualAids) {
         const { type, stepId, description } = visualAid;
         const diagramDescription = `type=${type} - ${description}`;
-        const diagramUrl = await generateDiagram(diagramDescription);
         
-        if (diagramUrl) {
-          // Find the step and add the image to its content
-          const step = result.steps.find((s: any) => s.id === stepId);
-          if (step) {
-            step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
-            console.log('✓ Diagram embedded:', diagramUrl);
-          }
-        }
+        diagramPromises.push(
+          generateDiagram(diagramDescription).then(diagramUrl => {
+            if (diagramUrl) {
+              const step = result.steps.find((s: any) => s.id === stepId);
+              if (step) {
+                step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
+                console.log('✓ Diagram embedded:', diagramUrl);
+              }
+            }
+          })
+        );
       }
     }
     
-    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags
+    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags (in parallel)
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
         const diagramDescription = diagramMatch[1];
-        const diagramUrl = await generateDiagram(diagramDescription);
-        if (diagramUrl) {
-          // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
-          const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
-          step.content = step.content.replace(diagramMatch[0], imageTag);
-          console.log('✓ Diagram embedded:', diagramUrl);
-        }
+        
+        diagramPromises.push(
+          generateDiagram(diagramDescription).then(diagramUrl => {
+            if (diagramUrl) {
+              const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
+              step.content = step.content.replace(diagramMatch[0], imageTag);
+              console.log('✓ Diagram embedded:', diagramUrl);
+            }
+          })
+        );
       }
     }
+    
+    // Wait for all diagrams to complete in parallel
+    await Promise.all(diagramPromises);
     
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
-    // VALIDATE SOLUTION ACCURACY - Quality control check
+    // ⚡ PERFORMANCE OPTIMIZATION: Skip validation for speed (adds 5+ seconds)
+    // Validation runs in background for monitoring/logging only
     const problemText = `${formattedResult.problem}${problemNumber ? ` (Problem #${problemNumber})` : ''}`;
-    const { solution: validatedSolution, validationPassed, validationDetails } = await validateSolution(problemText, formattedResult);
+    validateSolution(problemText, formattedResult).then(({ validationPassed, validationDetails }) => {
+      if (!validationPassed) {
+        console.warn('⚠️ Background validation failed:', validationDetails);
+        // Log but don't block - solution already delivered to user
+      } else {
+        console.log('✅ Background validation passed');
+      }
+    }).catch(err => {
+      console.error('Background validation error:', err);
+    });
     
-    if (!validationPassed) {
-      // Validation failed - do NOT return potentially incorrect solution to student
-      console.error('❌ Solution failed validation - blocking delivery');
-      console.error('Validation details:', validationDetails);
-      
-      return res.status(400).json({ 
-        error: 'We encountered some concerns about the accuracy of this solution. Please try retaking the photo with better lighting, or type the question manually for better results.',
-        validationFailed: true,
-        retryable: true
-      });
-    }
-    
-    console.log('✅ Image analysis successful and validated');
-    res.json(validatedSolution);
+    console.log('✅ Image analysis successful - returning immediately (validation async)');
+    res.json(formattedResult);
   } catch (error) {
     console.error('Error analyzing image:', error);
     res.status(500).json({ error: 'Failed to analyze image' });
