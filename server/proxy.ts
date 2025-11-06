@@ -1,10 +1,11 @@
 import express from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import cors from 'cors';
 import OpenAI from 'openai';
 import pRetry, { AbortError } from 'p-retry';
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = 5000;
 
 app.use(cors({
   origin: '*',
@@ -12,6 +13,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json({ limit: '50mb' }));
 
 const openai = new OpenAI({
@@ -32,6 +34,7 @@ function isRateLimitError(error: any): boolean {
 app.post('/api/analyze-text', async (req, res) => {
   try {
     const { question } = req.body;
+    console.log('Analyzing text question:', question);
     
     const result = await pRetry(
       async () => {
@@ -77,6 +80,7 @@ FORMATTING RULES:
           const content = response.choices[0]?.message?.content || "{}";
           return JSON.parse(content);
         } catch (error: any) {
+          console.error('OpenAI API error:', error);
           if (isRateLimitError(error)) {
             throw error;
           }
@@ -91,6 +95,7 @@ FORMATTING RULES:
       }
     );
     
+    console.log('Analysis successful');
     res.json(result);
   } catch (error) {
     console.error('Error analyzing text:', error);
@@ -101,6 +106,7 @@ FORMATTING RULES:
 app.post('/api/analyze-image', async (req, res) => {
   try {
     const { imageUri, problemNumber } = req.body;
+    console.log('Analyzing image, problem number:', problemNumber);
     
     const result = await pRetry(
       async () => {
@@ -154,6 +160,7 @@ FORMATTING RULES:
           const content = response.choices[0]?.message?.content || "{}";
           return JSON.parse(content);
         } catch (error: any) {
+          console.error('OpenAI API error:', error);
           if (isRateLimitError(error)) {
             throw error;
           }
@@ -168,6 +175,7 @@ FORMATTING RULES:
       }
     );
     
+    console.log('Image analysis successful');
     res.json(result);
   } catch (error) {
     console.error('Error analyzing image:', error);
@@ -178,6 +186,7 @@ FORMATTING RULES:
 app.post('/api/ask-question', async (req, res) => {
   try {
     const { question, context } = req.body;
+    console.log('Answering follow-up question');
     
     const result = await pRetry(
       async () => {
@@ -203,6 +212,7 @@ Solution: ${context.solution}`
           
           return response.choices[0]?.message?.content || "I'm sorry, I couldn't answer that question.";
         } catch (error: any) {
+          console.error('OpenAI API error:', error);
           if (isRateLimitError(error)) {
             throw error;
           }
@@ -217,6 +227,7 @@ Solution: ${context.solution}`
       }
     );
     
+    console.log('Follow-up question answered');
     res.json({ answer: result });
   } catch (error) {
     console.error('Error answering question:', error);
@@ -224,10 +235,25 @@ Solution: ${context.solution}`
   }
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'API server is running' });
 });
 
+app.use('/', createProxyMiddleware({
+  target: 'http://localhost:8081',
+  changeOrigin: false,
+  ws: true,
+  on: {
+    proxyReq: (proxyReq: any, req: any) => {
+      if (req.headers.origin) {
+        proxyReq.setHeader('origin', req.headers.origin);
+      }
+    }
+  }
+}));
+
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Backend API server running on port ${PORT}`);
+  console.log(`🚀 Proxy server with API running on port ${PORT}`);
+  console.log(`   API endpoints available at /api/*`);
+  console.log(`   Frontend proxied from port 8081`);
 });

@@ -1,20 +1,8 @@
-const getApiUrl = () => {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    
-    if (hostname.includes('replit.dev')) {
-      const apiHost = hostname.replace('-00-', '-08-');
-      return `${protocol}//${apiHost}/api`;
-    }
-  }
-  return 'http://localhost:8080/api';
-};
-
-const API_URL = getApiUrl();
+const API_URL = '/api';
 
 export async function analyzeTextQuestion(question: string): Promise<any> {
   try {
+    console.log('Calling API:', `${API_URL}/analyze-text`);
     const response = await fetch(`${API_URL}/analyze-text`, {
       method: 'POST',
       headers: {
@@ -25,11 +13,13 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('API Error Response:', errorData);
+      console.error('API Error Response:', response.status, errorData);
       throw new Error(errorData.error || 'Failed to analyze question');
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log('API Response received successfully');
+    return result;
   } catch (error) {
     console.error('Error analyzing text question:', error);
     throw error;
@@ -38,6 +28,7 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
 
 export async function analyzeImageQuestion(imageUri: string, problemNumber?: string): Promise<any> {
   try {
+    console.log('Calling API:', `${API_URL}/analyze-image`);
     const response = await fetch(`${API_URL}/analyze-image`, {
       method: 'POST',
       headers: {
@@ -48,11 +39,13 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('API Error Response:', errorData);
+      console.error('API Error Response:', response.status, errorData);
       throw new Error(errorData.error || 'Failed to analyze image');
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log('API Response received successfully');
+    return result;
   } catch (error) {
     console.error('Error analyzing image question:', error);
     throw error;
@@ -64,6 +57,7 @@ export async function askFollowUpQuestion(
   context: { problem: string; solution: string }
 ): Promise<string> {
   try {
+    console.log('Calling API:', `${API_URL}/ask-question`);
     const response = await fetch(`${API_URL}/ask-question`, {
       method: 'POST',
       headers: {
@@ -74,11 +68,12 @@ export async function askFollowUpQuestion(
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('API Error Response:', errorData);
+      console.error('API Error Response:', response.status, errorData);
       throw new Error(errorData.error || 'Failed to ask question');
     }
     
     const data = await response.json();
+    console.log('API Response received successfully');
     return data.answer;
   } catch (error) {
     console.error('Error asking follow-up question:', error);

@@ -136,13 +136,24 @@ Automatically configured by Replit AI Integrations:
 ## Development
 
 ### Running the App
-The app runs on port 5000 for web preview:
-```bash
-PORT=5000 npx expo start --web --port 5000
-```
+The app uses a proxy server architecture to handle both frontend and API:
+- **Expo Dev Server**: Runs on port 8081 (internal)
+- **Proxy Server**: Runs on port 5000 (exposed to browser)
+  - Serves API endpoints at `/api/*`
+  - Proxies frontend requests to Expo dev server on 8081
 
 ### Workflow
-A workflow named `expo-dev-server` is configured to automatically start the development server.
+A workflow named `expo-dev-server` automatically starts both servers:
+```bash
+PORT=8081 npx expo start --web --port 8081 & sleep 3 && npx tsx server/proxy.ts
+```
+
+### Architecture
+The proxy server (`server/proxy.ts`) provides:
+- OpenAI API integration endpoints
+- CORS handling
+- Request proxying to Expo dev server
+- All on port 5000 (the only port exposed in Replit webview)
 
 ### Key Dependencies
 - `expo` ~54.0.22
