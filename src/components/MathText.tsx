@@ -245,7 +245,9 @@ const styles = StyleSheet.create({
   },
   fractionContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
     marginHorizontal: 2,
+    alignSelf: 'center',
   },
   fractionText: {
     textAlign: 'center',
