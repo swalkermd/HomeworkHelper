@@ -180,7 +180,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
               {simplifiedMode && simplified && (
                 <View style={styles.simplifiedBox}>
                   <View style={styles.simplifiedHeader}>
-                    <Ionicons name="bulb" size={20} color="#f59e0b" />
+                    <Ionicons name="bulb" size={20} color="#92400e" />
                     <Text style={styles.simplifiedLabel}>Simpler Explanation</Text>
                   </View>
                   <MathText 
@@ -499,9 +499,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   simplifiedBox: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: '#fde68a',
     borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
+    borderLeftColor: '#fbbf24',
     borderRadius: 8,
     padding: spacing.md,
     marginTop: spacing.md,
@@ -516,6 +516,6 @@ const styles = StyleSheet.create({
     fontSize: typography.bodyLarge.fontSize,
     lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
-    color: '#f59e0b',
+    color: '#92400e',
   },
 });

@@ -18,6 +18,7 @@ The application features a responsive design with distinct typography for portra
 - **Row 2 - "Ready for More?"**: Full-width gradient button
   - "New Problem" button (green gradient #10b981→#059669, matches Final Answer card)
 - Clean visual hierarchy with gradient and outlined button styles, icons, and consistent spacing for a polished, modern appearance.
+- **Visual Continuity:** Simplified explanation dialogue boxes use matching yellow color scheme (#fde68a background with #fbbf24 border) to maintain visual connection with the Simplify button.
 
 ### Technical Implementations
 - **Framework & Language:** React Native 0.81.5 with Expo SDK 54, TypeScript.
