@@ -5,6 +5,7 @@ import { useHomeworkStore } from '../store/homeworkStore';
 import { analyzeImageQuestion } from '../services/openai';
 import { RootStackParamList } from '../navigation/types';
 import { colors, typography, spacing } from '../constants/theme';
+import { convertImageToBase64 } from '../utils/imageConverter';
 
 type ProblemSelectionScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ProblemSelection'>;
@@ -21,7 +22,10 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
 
     setIsLoading(true);
     try {
-      const solution = await analyzeImageQuestion(currentImage.uri, problemNumber);
+      console.log('Converting image to base64...');
+      const base64Image = await convertImageToBase64(currentImage.uri);
+      console.log('Image converted, analyzing...');
+      const solution = await analyzeImageQuestion(base64Image, problemNumber);
       setCurrentSolution(solution);
       navigation.navigate('Solution');
     } catch (error) {
