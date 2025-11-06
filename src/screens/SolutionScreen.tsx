@@ -259,7 +259,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
         
         <TouchableOpacity onPress={() => navigation.navigate('Home')} style={{ marginTop: spacing.sm }}>
           <View style={styles.newProblemOutlineButton}>
-            <Ionicons name="add-circle" size={22} color="#10b981" />
+            <Ionicons name="add-circle" size={22} color="#991b1b" />
             <Text style={styles.newProblemOutlineButtonText}>New Problem</Text>
           </View>
         </TouchableOpacity>
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   newProblemOutlineButton: {
     backgroundColor: '#ffffff',
     borderWidth: 3,
-    borderColor: '#10b981',
+    borderColor: '#991b1b',
     paddingVertical: spacing.md,
     borderRadius: 12,
     flexDirection: 'row',
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
     fontSize: typography.bodyLarge.fontSize,
     lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
-    color: '#10b981',
+    color: '#991b1b',
   },
   diagramContainer: {
     marginTop: spacing.md,

@@ -15,8 +15,8 @@ The application features a responsive design with distinct typography for portra
 - **Row 1 - "Need More Help?"**: Two equal-width buttons side-by-side
   - "Simplify" button (yellow gradient #fbbf24→#f59e0b, turns green when active)
   - "Ask Question" button (blue gradient #3b82f6→#2563eb with white text/icon)
-- **Row 2 - "Ready for More?"**: Full-width button
-  - "New Problem" button (white background with thick green border #10b981)
+- **Row 2**: Full-width button (reduced spacing for cleaner layout)
+  - "New Problem" button (white background with thick maroon border #991b1b)
 - Clean visual hierarchy with gradient and outlined button styles, icons, and consistent spacing for a polished, modern appearance.
 - **Visual Continuity:** Simplified explanation dialogue boxes use matching yellow color scheme (#fde68a background with #fbbf24 border) to maintain visual connection with the Simplify button.
 
