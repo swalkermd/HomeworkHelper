@@ -23,7 +23,7 @@ const openai = new OpenAI({
 
 async function generateDiagram(description: string): Promise<string> {
   try {
-    console.log('Generating diagram:', description);
+    console.log('Generating diagram for:', description.substring(0, 100) + '...');
     const response = await openai.images.generate({
       model: "gpt-image-1",
       prompt: `Create a clear, educational diagram for a student: ${description}. Style: Clean whiteboard drawing with black lines on white background, clearly labeled, simple and easy to understand, no text explanations - just the visual diagram with labels and measurements.`,
@@ -31,18 +31,16 @@ async function generateDiagram(description: string): Promise<string> {
       n: 1,
     });
     
-    console.log('Image generation response:', JSON.stringify(response.data, null, 2));
-    
     // Replit AI Integrations returns base64 data by default
     const b64Data = response.data?.[0]?.b64_json;
     if (b64Data) {
       // Convert base64 to data URL for embedding
       const dataUrl = `data:image/png;base64,${b64Data}`;
-      console.log('Diagram generated successfully (base64 data URL created)');
+      console.log('✓ Diagram generated successfully');
       return dataUrl;
     }
     
-    console.log('No b64_json data found in response');
+    console.log('✗ No image data returned');
     return '';
   } catch (error) {
     console.error('Error generating diagram:', error);
@@ -536,10 +534,9 @@ Grade-appropriate language based on difficulty level.`
         const diagramUrl = await generateDiagram(diagramDescription);
         if (diagramUrl) {
           // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
-          step.content = step.content.replace(
-            diagramMatch[0],
-            `(IMAGE: ${diagramDescription}](${diagramUrl})`
-          );
+          const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
+          step.content = step.content.replace(diagramMatch[0], imageTag);
+          console.log('✓ Diagram embedded, URL starts with:', diagramUrl.substring(0, 30));
         }
       }
     }

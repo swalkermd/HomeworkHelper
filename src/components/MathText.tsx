@@ -210,12 +210,15 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     
     case 'image':
       if (part.url) {
+        console.log('MathText rendering image, URL starts with:', part.url.substring(0, 50));
         return (
           <View key={index} style={styles.imageContainer}>
             <Image
               source={{ uri: part.url }}
               style={styles.image}
               resizeMode="contain"
+              onError={(e) => console.log('Image failed to load:', e.nativeEvent.error)}
+              onLoad={() => console.log('Image loaded successfully!')}
             />
             <Text style={[styles.imageCaption, { fontSize: baseFontSize * 0.8 }]}>
               {part.content}
