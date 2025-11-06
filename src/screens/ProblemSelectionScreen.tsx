@@ -132,6 +132,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxHeight: 400,
     borderRadius: 12,
+    borderWidth: 3,
+    borderColor: colors.secondary,
     backgroundColor: colors.surfaceAlt,
     marginBottom: spacing.xl,
   },
