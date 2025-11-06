@@ -223,19 +223,19 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
             style={styles.helpButton}
           >
             <LinearGradient
-              colors={simplifiedMode ? ['#10b981', '#059669'] : ['#a78bfa', '#8b5cf6']}
+              colors={simplifiedMode ? ['#10b981', '#059669'] : ['#fbbf24', '#f59e0b']}
               style={styles.gradientButton}
             >
               {loadingSimplified ? (
-                <ActivityIndicator color="#ffffff" />
+                <ActivityIndicator color={simplifiedMode ? "#ffffff" : "#1f2937"} />
               ) : (
                 <>
                   <Ionicons 
                     name={simplifiedMode ? "checkmark-circle" : "bulb"} 
                     size={20} 
-                    color="#ffffff" 
+                    color={simplifiedMode ? "#ffffff" : "#1f2937"} 
                   />
-                  <Text style={styles.helpButtonText}>
+                  <Text style={[styles.helpButtonText, !simplifiedMode && { color: '#1f2937' }]}>
                     {simplifiedMode ? "Hide" : "Simplify"}
                   </Text>
                 </>
@@ -247,13 +247,10 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
             style={styles.helpButton}
             onPress={() => navigation.navigate('Question')}
           >
-            <LinearGradient
-              colors={['#60a5fa', '#3b82f6']}
-              style={styles.gradientButton}
-            >
-              <Ionicons name="chatbubble-ellipses" size={20} color="#ffffff" />
-              <Text style={styles.helpButtonText}>Ask Question</Text>
-            </LinearGradient>
+            <View style={styles.outlinedButton}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="#8b5cf6" />
+              <Text style={styles.outlinedButtonText}>Ask Question</Text>
+            </View>
           </TouchableOpacity>
         </View>
         
@@ -444,6 +441,24 @@ const styles = StyleSheet.create({
     lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  outlinedButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 3,
+    borderColor: '#8b5cf6',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  outlinedButtonText: {
+    fontSize: typography.bodyLarge.fontSize,
+    lineHeight: typography.bodyLarge.lineHeight,
+    fontWeight: '600',
+    color: '#8b5cf6',
   },
   newProblemButton: {
     paddingVertical: spacing.md,

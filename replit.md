@@ -12,12 +12,12 @@ None documented yet.
 The application features a responsive design with distinct typography for portrait and landscape modes. Gradient buttons are used for key actions (Type Question: Indigo-Purple; Take Photo: Pink-Orange; Choose from Gallery: Green-Cyan). Color schemes prioritize readability and user engagement, utilizing primary indigo, secondary emerald green, and a range of grays for text and backgrounds. Animations with React Native Reanimated provide a smooth and interactive user experience, including progressive step reveals and haptic feedback.
 
 **Solution Screen Action Bar (Nov 2025):** Redesigned two-row card layout with grouped actions:
-- **Row 1 - "Need More Help?"**: Two equal-width gradient buttons side-by-side
-  - "Simplify" button (purple gradient #a78bfa→#8b5cf6, turns green when active)
-  - "Ask Question" button (blue gradient #60a5fa→#3b82f6)
+- **Row 1 - "Need More Help?"**: Two equal-width buttons side-by-side
+  - "Simplify" button (yellow gradient #fbbf24→#f59e0b, turns green when active)
+  - "Ask Question" button (white background with thick purple border #8b5cf6)
 - **Row 2 - "Ready for More?"**: Full-width gradient button
   - "New Problem" button (green gradient #10b981→#059669, matches Final Answer card)
-- All buttons feature gradient backgrounds, icons, and consistent spacing for a polished, modern appearance.
+- Clean visual hierarchy with gradient and outlined button styles, icons, and consistent spacing for a polished, modern appearance.
 
 ### Technical Implementations
 - **Framework & Language:** React Native 0.81.5 with Expo SDK 54, TypeScript.
