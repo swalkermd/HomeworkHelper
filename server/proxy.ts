@@ -181,6 +181,183 @@ function enforceResponseFormatting(response: any): any {
   return formatted;
 }
 
+// ============================================================================
+// QUALITY CONTROL & VALIDATION SYSTEM
+// ============================================================================
+
+interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  confidence: number;
+}
+
+// Structural validation - check required fields and format
+function validateStructure(solution: any): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  // Check required fields
+  if (!solution.problem || typeof solution.problem !== 'string') {
+    errors.push('Missing or invalid problem statement');
+  }
+  
+  if (!solution.subject || typeof solution.subject !== 'string') {
+    errors.push('Missing or invalid subject');
+  }
+  
+  if (!solution.difficulty || typeof solution.difficulty !== 'string') {
+    errors.push('Missing or invalid difficulty level');
+  }
+  
+  if (!Array.isArray(solution.steps) || solution.steps.length === 0) {
+    errors.push('Missing or empty steps array');
+  } else {
+    solution.steps.forEach((step: any, index: number) => {
+      if (!step.id || !step.title || !step.content) {
+        errors.push(`Step ${index + 1} missing required fields (id, title, or content)`);
+      }
+    });
+  }
+  
+  if (!solution.finalAnswer) {
+    errors.push('Missing final answer');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+// Cross-model verification - use a second AI to verify the solution
+async function crossModelVerification(
+  originalQuestion: string, 
+  proposedSolution: any
+): Promise<ValidationResult> {
+  try {
+    console.log('🔍 Running cross-model verification...');
+    
+    // Extract key information from the solution
+    const stepsText = proposedSolution.steps
+      .map((s: any) => `${s.title}: ${s.content}`)
+      .join('\n');
+    
+    const verificationPrompt = `You are a quality control expert verifying educational content for accuracy.
+
+ORIGINAL PROBLEM:
+${originalQuestion}
+
+PROPOSED SOLUTION:
+Subject: ${proposedSolution.subject}
+Grade Level: ${proposedSolution.difficulty}
+
+Steps:
+${stepsText}
+
+Final Answer: ${proposedSolution.finalAnswer}
+
+YOUR TASK:
+1. Verify the mathematical/scientific accuracy of this solution
+2. Check that calculations are correct at each step
+3. Verify the final answer is accurate
+4. Identify any errors in logic, arithmetic, or problem-solving approach
+5. Confirm the solution actually addresses the question asked
+
+Respond in JSON format:
+{
+  "isCorrect": true/false,
+  "confidence": 0-100 (how confident you are in this assessment),
+  "errors": ["list of specific errors found, if any"],
+  "warnings": ["list of minor issues or improvements, if any"],
+  "reasoning": "brief explanation of your assessment"
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert quality control validator for educational content. Your job is to verify accuracy and identify errors."
+        },
+        {
+          role: "user",
+          content: verificationPrompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 2048,
+      temperature: 0.3, // Lower temperature for more consistent verification
+    });
+    
+    const verification = JSON.parse(response.choices[0]?.message?.content || "{}");
+    
+    console.log(`✓ Verification complete - Correct: ${verification.isCorrect}, Confidence: ${verification.confidence}%`);
+    if (verification.errors && verification.errors.length > 0) {
+      console.log(`⚠️  Errors found:`, verification.errors);
+    }
+    if (verification.warnings && verification.warnings.length > 0) {
+      console.log(`⚠️  Warnings:`, verification.warnings);
+    }
+    
+    return {
+      isValid: verification.isCorrect === true,
+      errors: verification.errors || [],
+      warnings: verification.warnings || [],
+      confidence: verification.confidence || 0
+    };
+    
+  } catch (error) {
+    console.error('❌ Verification error:', error);
+    // If verification fails, we'll log it but not block the solution
+    return {
+      isValid: true, // Assume valid if verification system fails
+      errors: [],
+      warnings: ['Verification system encountered an error'],
+      confidence: 50
+    };
+  }
+}
+
+// Main validation orchestrator
+async function validateSolution(
+  originalQuestion: string,
+  solution: any,
+  maxRetries: number = 1
+): Promise<{ solution: any; validationPassed: boolean }> {
+  console.log('🎯 Starting solution validation...');
+  
+  // Step 1: Structural validation
+  const structureCheck = validateStructure(solution);
+  if (!structureCheck.isValid) {
+    console.error('❌ Structure validation failed:', structureCheck.errors);
+    throw new Error(`Invalid solution structure: ${structureCheck.errors.join(', ')}`);
+  }
+  console.log('✓ Structure validation passed');
+  
+  // Step 2: Cross-model verification
+  const verification = await crossModelVerification(originalQuestion, solution);
+  
+  // Step 3: Determine if solution passes quality control
+  const passesQC = verification.isValid && verification.confidence >= 70;
+  
+  if (passesQC) {
+    console.log('✅ Solution passed all validation checks');
+    return { solution, validationPassed: true };
+  } else {
+    console.log(`⚠️  Solution validation concerns (confidence: ${verification.confidence}%)`);
+    if (verification.errors.length > 0) {
+      console.log('Errors detected:', verification.errors);
+    }
+    
+    // For now, we log the concerns but still return the solution
+    // In future, could implement retry logic here
+    return { 
+      solution, 
+      validationPassed: false
+    };
+  }
+}
+
 app.post('/api/analyze-text', async (req, res) => {
   try {
     const { question } = req.body;
@@ -396,8 +573,15 @@ Grade-appropriate language based on difficulty level.`
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
+    // VALIDATE SOLUTION ACCURACY - Quality control check
+    const { solution: validatedSolution, validationPassed } = await validateSolution(question, formattedResult);
+    
+    if (!validationPassed) {
+      console.log('⚠️  Validation concerns logged, but returning solution to user');
+    }
+    
     console.log('Analysis successful');
-    res.json(formattedResult);
+    res.json(validatedSolution);
   } catch (error) {
     console.error('Error analyzing text:', error);
     res.status(500).json({ error: 'Failed to analyze question' });
@@ -669,8 +853,16 @@ Grade-appropriate language based on difficulty level.`
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
+    // VALIDATE SOLUTION ACCURACY - Quality control check
+    const problemText = `${formattedResult.problem}${problemNumber ? ` (Problem #${problemNumber})` : ''}`;
+    const { solution: validatedSolution, validationPassed } = await validateSolution(problemText, formattedResult);
+    
+    if (!validationPassed) {
+      console.log('⚠️  Validation concerns logged, but returning solution to user');
+    }
+    
     console.log('Image analysis successful');
-    res.json(formattedResult);
+    res.json(validatedSolution);
   } catch (error) {
     console.error('Error analyzing image:', error);
     res.status(500).json({ error: 'Failed to analyze image' });
