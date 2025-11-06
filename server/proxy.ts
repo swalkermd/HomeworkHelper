@@ -466,8 +466,10 @@ RESPONSE FORMAT (JSON):
 
 **DATA VISUALIZATION - NEARLY MANDATORY:**
 ✓ **SURVEYS & PERCENTAGES** - Any problem asking about percentages, surveys, or preferences
-   → Show pie chart or bar chart comparing categories
+   → **MUST CREATE** a pie chart or bar chart comparing categories
+   → Examples triggering this: "survey of students", "percentage of...", "what fraction preferred", "poll results"
    → Tag: [DIAGRAM NEEDED: type=chart - Pie chart showing [category names] with percentages: [list each category with its percentage]. Use distinct colors for each segment and label with both category name and percentage.]
+   → EXAMPLE: For "survey of 200 students: Math 60, Science 50, English 40, History 30, Art 20" → ADD: [DIAGRAM NEEDED: type=chart - Pie chart showing subject preferences: Math 30%, Science 25%, English 20%, History 15%, Art 10%. Use distinct colors for each segment with labels.]
 
 ✓ **COMPARING QUANTITIES** - Problems comparing multiple values, populations, or measurements
    → Show bar chart or comparison chart
@@ -757,8 +759,10 @@ RESPONSE FORMAT (JSON):
 
 **DATA VISUALIZATION - NEARLY MANDATORY:**
 ✓ **SURVEYS & PERCENTAGES** - Any problem asking about percentages, surveys, or preferences
-   → Show pie chart or bar chart comparing categories
+   → **MUST CREATE** a pie chart or bar chart comparing categories
+   → Examples triggering this: "survey of students", "percentage of...", "what fraction preferred", "poll results"
    → Tag: [DIAGRAM NEEDED: type=chart - Pie chart showing [category names] with percentages: [list each category with its percentage]. Use distinct colors for each segment and label with both category name and percentage.]
+   → EXAMPLE: For "survey of 200 students: Math 60, Science 50, English 40, History 30, Art 20" → ADD: [DIAGRAM NEEDED: type=chart - Pie chart showing subject preferences: Math 30%, Science 25%, English 20%, History 15%, Art 10%. Use distinct colors for each segment with labels.]
 
 ✓ **COMPARING QUANTITIES** - Problems comparing multiple values, populations, or measurements
    → Show bar chart or comparison chart
