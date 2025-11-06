@@ -1,0 +1,519 @@
+Build an Al-powered homework assistant mobile app that helps students understand concepts across all subjects (Math, Chemistry, Physics, Bible
+Studies, Language Arts, Geography). The app provides step-by-step visual solutions with world-class teaching principles, beautiful formatting, and
+‘grade-appropriate explanations.
+Core Features
+1. Multiple input Methods
+- Type/Paste Question: Text input screen for direct question entry
+Take Photo: Native camera integration to capture homework pages
+- Gallery Upload: Select existing photos from device gallery
+- Permission Handling: Graceful camera and photo library permission requests
+2. Problem Analysis
+~ Al Vision Processing: GPT-4o analyzes images to extract problems.
+- Problem Selection: Optional problem number specification when multiple problems exist
+Automatic Subject Detection: Analyzes content to identify Math, Chemistry, Physics, Bible, Language Arts, Geography, or General
+Automatic Difficulty Detection: Determines grade level (K-5, 6-8, 9-12, College+) based on problem complexity
+3. Step-by-Step Solutions
+= Progressive Reveal: Steps animate in sequentially with haptic feedback (800ms intervals)
+- Color-Coded Learning: Strategic highlighting to identity lke terms, operations, and key concepts
+= Mathematical Notation:
+= Vertical graphical fractions with horizontal divider
+= Subscripts (H.0, vo, vs)
+= Superscripts (x", Ca™, m/s")
+= Italic variables in explanatory text (x, ve)
+[fe eer ee
+
+---
+
+- Visual Diagrams: Automatic generation for geometry, 3D shapes, graphs, physics scenarios
+
+- Grade-Appropriate Language: Vocabulary and complenity adapted to detected student level
+
+- Answer Verification: Al verifies every answer before presenting (substitutes back, cross-references)
+
+4. Interactive Features
+
+- Ask Follow-Up Questions: Modal Q&A chat interface with context from solution
+
+"I Stil Don't Get It": Regenerates solution with slower steps, plain language explanations, and yellow "Why this step?" boxes
+New Problem: Return to home to start fresh
+
+Technical Architecture
+
+Tech Stack Requirements
+
+- Framework: React Native 0.76.7+ with Expo SDK 53+
+
+~ Language: TypeScrint with strict type safety
+
+- Navigation: React Navigation v7+ (Native Stack for screens, Modal presentation for Q&A)
+
+= State Management: Zustand (non-persisted for privacy)
+
+= Styling: NativeWind va+ (TailwindCSS for React Native)
+
+~ Animations: React Native Reanimated v3
+
+= Gestures: React Native Gesture Handler
+
+~ Al Integration: OpenAl GPT-4o API for vision and text
+
+= Image Handling: Expo Image, Expo Camera, Expo Image Picker
+
+Navigation Structure
+
+RootNavigator (Native Stack) [— Hone (landing, 3 input options) | TextInput (type/paste question) |— Camera
+(full-screen capture) |— Problenselection (image preview, problem # input) | Solution (step-by-step display)
+question (modal, aga chat)
+
+ape ey
+
+---
+
+typescript { currentImage: HomeworkImage | null, selectedProblem: SelectedProblem | null,  currentSolution:
+HomeworkSolution | null, isAnalyzing: boolean }
+‘Type Definitions
+typescript HomeworkInage: { uri, width, height } SelectedProblem: { imageUri, problemArea? } SolutionStep: { id,
+title, content, explanation? } HomeworkSolution: { problem, steps(J, finalAnswer }
+‘Screen Specifications
+Home Screen
+~ Layout: Centered gradient hero with app icon, 3 action buttons, footer text
+= Buttons:
+= Type Question (Indigo-Purple gradient)
+= Take Photo (Pink-Orange gradient)
+= Choose from Gallery (Green-Cyan gradient)
+- Design: Circular gradient icon containers, bold typography, elevated shadows.
+- Behavior: Reset state on mount
+‘Text input Screen
+- Layout: Title "Type or Paste Your Question, multiline input, submit button
+- Input: Keyboard-dismissable, scrollable content
+- Submit: Calls Al text analysis, navigates to Solution
+‘Camera Screen
+~ Layout: Full-screen CameraView with absolute-positioned overlay Ul
+~ Controls: Flash toggle, camera flip, close button, capture button (bottom center)
+= Camera: Expo Camera (CameraView, NOT deprecated Camera component)
+~ Styling: Direct style prop (NOT className - breaks camera view)
+
+---
+
+~ Behavior: Haptic feedback on capture, navigate to ProblemSelection
+Problem Selection Sereen
+Layout: Scrollview content + fixed bottom buttons (NOT shifted by keyboard)
+~ Image: Large preview with proper aspect ratio
+~ Input: Optional problem number field
+Buttons: "Analyze This Problem” (indigo), "Retake Photo" (gray outline)
+- Behavior: KeyboardAvoidingView with smooth scrolling
+Solution Screen (MOST COMPLEX)
+Header
+- Fixed white bar with back button, "Solution" ttle, spacer
+Content (Scrollview)
+1. Problem Card: White card, indigo icon, highlighted problem statement box
+2, Step Cards:
+= Sequential reveal (opacity 0.3 > 1.0)
+= Numbered badge (green when revealed, gray when pending)
++ Step title (gray text)
+= Content box (light gray bg, border, uses MathText component)
++ Optional yellow explanation box ("Why this step?")
+3. inal Answer Card:
+~ Green gradient background, glowing shadow
+= Checkmark icon, "Final Answer" heading
+Semi-transparent white box with answer
+= Renders only after all steps revealed
+Bottom Action Bar (Fixed, white bg, shadow)
+= Row 1: "Ask Question" (indigo) | "New Problem" (white outline)
+
+---
+
+= Row 2: “I Still Don’t Get It* (amber, full width)
+‘Question Sereen (Modal)
+~ Layout: Chat Ul with user messages (right, indigo) and Al messages (left, white)
+- Input: Fixed bottom text input with send button
+= Messages:
+= User: Right-aligned, indigo background
+Al: Left-aligned, white background, uses MathText for formatting
+~ Al Behavior: Concise 2-4 sentence responses, plain language, preserves math notation
+MathText Component (Critical)
+Purpose
+Custom text renderer that parses and displays mathematical notation, subscripts, superscripts, color highlights, and inline images.
+‘Supported Syntax.
+{nun/den} > Vertical graphical fraction x12" > Superscript (x2) 4.2.0 >
+Subscript (H20) +v+_0_ > Italic variable with subscript (ve) (red: tern) > Red highlighted
+text [blue:term] + Blue highlighted text > or -> ‘Prominent arrow (1.5x size, bold, green)
+(IMAGE: desc](url) > Inline image display
+Rendering Rules
+= Fractions: 70% of base font size, horizontal divider, proper spacing
+- Subscripts: 70% font size, Unicode conversion (ou-)
+~ Superscripts: 70% font size, Unicode conversion (°™")
+- Arrows: 150% font size, bold weight 900, green (#105981) or white (on green ba)
+= Colors: 9 supported (red, blue, green, purple, orange, pink, yellow, tal, indigo)
+= Grouping: Prevents line breaks between fractions and adjacent variables ((3/4)y stays together)
+
+---
+
+~ For multiple choice: Double-check reasoning
+
+- For concepts: Cross-reference knowledge base
+
+~ Only provide solution after confirmation.
+
+ISON Response Format
+
+json { "problem": "Restate the problen", "steps": [ "title": "Clear action heading",
+"content": "Math with proper formatting", “explanation”: "Optional for simplified mode" > 1,
+“finalanswer": "Plain text answer (NO color coding)" }
+
+Design System
+
+Colors.
+
+javascript primary: "#6366f1" (Indigo) secondary: "#1eb981" (Emerald Green) textPrimary: "#111827" (Gray-900)
+textSecondary: "#6b7280" (Gray-500) background: "#f9fatb" (Gray-50) surfaceAlt: *#f3f4f6" (Gray-100) border:
+“weSe7eb" (Gray-200)
+
+‘Typography (Responsive - Portrait vs Landscape)
+
+Portrait Mode (smaller for compactness):
+
+= displayLarge: 20pt /28pt line height
+
++ displayMedium: 1Spt / 22pt
+
+= titleLarge: 14pt / 20pt
+
+= bodyLarge: 13pt / 20pt,
+
+~mathLarge: 14pt / 2ipt
+
+~ mathMedium: 13pt /20pt,
+
+Landscape Mode (original generous sizing)
+
+= displayLarge: 32pt / 40pt
+
+---
+
+- displayMedium: 24pt / 32pt
+
+= titleLarge: 18pt /24pt
+
+~bodyLarge: 16pt /24pt
+
+= mathLarge: 20pt / 30pt
+
+- mathMedium: 17pt |26pt
+
+‘Spacing (Responsive)
+
+= xs: 2px (portrait) / px (landscape)
+
+= sm: 4px / 8px
+
+= md: 6px / 129%.
+
+Ig: 8px /16px
+
++ xl: 10px / 20px
+
+xxl: 12x /24p%.
+
+‘Animations
+
+~ Step Reveal: FadelnDown with staggered delay (200ms * index), duration 600ms
+- Problem Card: FadelnUp duration 500ms
+
+- Final Answer: FadelnUp duration 600ms
+
+~ Haptics: Light impact on step reveal, Medium on button press
+Content Formatting Post-Processor
+
+Purpose
+
+Programmatic fixes to ensure Al output displays correctly regardless of prompt compliance,
+‘Transformations
+
+1. Fraction Normalization: Convert ¥s, %, 3/4 > (3/4)
+
+2. Protect Units: Don't convert m/s, km/h
+
+---
+
+3. Line Break Removal: Fix breaks around colons, punctuation, action words
+‘4, Word Spacing: Fix "backinto" ~> "back into”
+
+5. Newline Cleanup: Remove \n around arrows (->)
+
+‘Application
+
+~ Applied to ALL Al-generated solutions before rendering
+
+~ Catches content from both text and image analysis
+
+Ensures deterministic correct output
+
+Image Generation System
+
+Triggers
+
+~Alincludes [IMAGE NEEDED: description] markers
+
+= Automatic for geometry, 3D shapes, physics diagrams, geography maps
+Process
+
+1. Scan solution steps for [IMAGE NEEDED: .. .] markers
+
+2. Generate detailed educational prompt with validation rules
+
+3. Call gpt-image-1 API (1024x1024, high quality, PNG)
+
+4, Replace marker with (IMAGE: description] (url)
+
+5. MathText renders inline with 300px height, rounded corners, caption
+Quality Control (Built into prompt)
+
+Rectangles: Opposite sides equal
+
+~ Cubes: All edges same length
+
+= Triangles: Angles sum to 180°
+
+~ Auto-correct conflicting dimensions
+
+---
+
+Implementation Details.
+
+~ Parse text character-by-character
+
+~ Build parts array (tex, fraction, highlighted, arrow, italic, image)
+
+~ Group fractions with following variables (flexShrink: 0)
+
+Render with flexWrap, proper spacing, color inheritance
+
+Al Integration
+
+Models Used
+
+= Vision Analysis: GPT-4o (multimodal) analyzes images and text questions
+= Q&A Chat: GPT-4o (text) - conversational follow-up questions
+
+- Image Generation: gpt-image-1 (OpenAl DALL-£) - educational diagrams
+Prompt Engineering (CRITICAL)
+
+Subject-Specitic Formatting Rules
+
+Math:
+
+Show intermediate steps with arrows
+
+- Highlight ONLY operation terms in RED (left of arrow)
+
+Result after arrow in PLAIN BLACK
+
+- Always show mixed numbers for improper fractions (e.g, {-4/3} or -1(1/3))
+chemistry:
+
+= Subscripts for formulas (H_2_0, CO_2_)
+
+~ Superscripts for charges (Ca*2+*, SO_4_*2-")
+
+= Continuous line formatting (no mid-equation breaks)
+
+---
+
+Physics:
+= Mandatory units with all values (16 mis, 9.8 m/s*2*)
+= Italic variables with subscripts (v0, Fnet)
+= Clear progression: formula > identify > substitute > calculate
+= MUST include motion diagrams for kinematics problems
+‘Geography/Bible/Language Arts:
+= MINIMIZE color highlighting (very sparingly)
+- Prioritize CLARITY and DIRECTNESS
+= Simple questions = simple, concise answers,
+= Avoid unnecessary verbosity
+Visual Diagram Requirements
+= MANDATORY for: Geometry, 3D shapes, graphs, physics scenarios
+= Syntax: [IMAGE NEEDED: clear description) in first step
+~ Examples:
+= CIMAGE NEEDED: 30 cube with side 9om labeled)
+- LIMAGE NEEDED: rectangle with dimensions 8 x 6]
+- LIMAGE NEEDED: motion diagram showing car with ve=, a=3.20 a/s?, t=32.8s]
+Grade-Appropriate Language
+Elementary (K-5): Very simple words, short sentences, everyday examples (toys, playground)
+Middle School (6-8): Clear language, defined technical terms, moderate detail
+High Schoo! (9-12): Formal academic language, detailed logical explanations.
+College/Advanced: Sophisticated vocabulary, rigorous theoretical foundations
+‘Answer Verification
+= For math: Substitute answer beck OR solve akemative method
+
+---
+
+‘Subject Detection System
+
+Method
+
+Keyword matching + pattern detection on problem text
+
+Subjects
+
+= Math: solve, equation, calculate, simplify, variable
+
+= Chemistry: molecule, atom, compound, reaction, balance, H_X_O patterns
+= Physics: velocity, force, acceleration, distance, energy, motion
+
+= Bible: verse, scripture, testament, gospel, chapter:verse patterns
+Language Arts: metaphor, theme, character, analyze, essay, author
+= Geography: country, capital, continent, border, ocean, river
+Formatting Rules Per Subject
+
+Returns subject-specific instructions for:
+
+= Color usage (heavy for mathjchem/physics, minimal for geography /bibleflanguage)
+- Notation requirements (subscripts, superscripts, units)
+
+= Visual diagram needs
+
+= Response style (detailed steps vs concise factual)
+
+Difficulty Detection System
+
+Method
+
+‘Analyze complexity indicators in problem text
+
+Grade Levels
+
+Elementary (K-5): Single-digit math, simple fractions, basic concepts
+Middle School (6-8): Variables, simple equations, percentages
+
+High School (9-12): Quadratics, trig, advanced notation
+
+---
+
+College (Advanced): Calculus, theoretical, Greek letters
+Vocabulary Guidance
+
+Returns instructions for:
+
+= Word choice (simple vs sophisticated)
+
+~ Sentence complexity (short vs multi-clause)
+
+- Explanation depth (basic vs rigorous)
+
+- Examples (playground toys vs theoretical applications)
+Simplified Explanation Feature
+
+Trigger
+
+User presses "I till Don't Get it" button
+
+Behavior
+
+1. Shows loading state on button
+
+2. Sends original problem + request for simpler explanation to GPT-40
+3. Alreturns steps with BOTH content and explanation fields
+44, Renders yellow "Why this step?" boxes under each step
+
+5. Resets revealed steps counter and animates in sequentially
+Explanation Content
+
+~ Background education (definitions, concepts)
+
+= Plain language reasoning ("To keep equation balanced like a seesaw...")
+= Why we perform each operation
+
+Real-world analogies
+
+---
+
+‘Safe Area Handling
+
+Rules
+
+- Use SafeAreaView from react-native-safe-area-context (NOT react-native)
+~ Only use when native headers are hidden
+
+React Navigation headersjtabs auto-handle insets
+
+Bottom tab navigators handle bottom insets automatically
+
+= Custom headers need top: true edge specification
+
+Implementation
+
+typescript <SafeareaView edges={{ "top", "botton"]}> // Content </SafeAreaView
+Platform-Specitic Notes
+
+10S Optimizations
+
+= Native stack animations (slide_from_right,slide_from_bottom)
+
+Haptic feedback (Expo Haptics)
+
+- SF Pro font (system default)
+
+- Modal presentation with native feel
+
+‘Camera implementation
+
+CRITICAL: Use NEW Expo Camera API
+
+typescript import { CameraView, useCameraPermissions } from ‘expo-camera'; // NOT: import { Camera } from ‘expo
+camera’; (DEPRECATED)
+
+‘Styling Constraints
+
+= Use className for View, Text (NativeWind)
+
+- Use style prop for Camera, LinearGradient inline styles only)
+
+- Fractions need direct style prop for sizing calculations.
+
+---
+
+Performance Considerations
+
++ Zustand Selectors: Use primitives only useStore(s => s.foo) not whole store
+- Image Optimization: Expo Image with contentFit="contain”
+
+~ Animation Thread: Reanimated runs on Ul thread
+
+- Debounced Inputs: Prevent excessive API calls
+
+~ Lazy Loading: Components render as needed
+
+Environment Variables Required
+
+OPENAT_API_KEY=sk-...
+
+User Flow Examples
+
+Photo Input Flow
+
+1. Home > Tap "Take Photo"
+
+2. Camera > Capture homework page
+
+3. ProblemSelection ~ Preview image, optionally enter problem #
+4. (Loading) > "Analyzing your homework..."
+
+5. Solution > Steps reveal sequentially with animations,
+
+6. Optional: "Ask Question" or"! Still Don't Get It"
+
+Text input Flow
+
+1. Home > Tap "Type Question”
+
+2. Textinput > Enter "Solve: 3x 17 = 45"
+
+---
+
+8:24PM Wed Nov, = 100%
+a v Clearhistory @
+3. (Loading) > Al processes
+
+4, Solution > 2 steps with red highlighting, mixed number final answer
+
+5. Optional: Ask fllow-up via chat modal
