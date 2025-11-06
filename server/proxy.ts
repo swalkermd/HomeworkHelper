@@ -141,16 +141,18 @@ function enforceProperFormatting(text: string | null | undefined): string {
   // 0. Normalize whitespace: replace single newlines with spaces, preserve double newlines (paragraph breaks)
   // First, normalize all line endings to \n
   formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // Remove zero-width characters and other invisible Unicode whitespace that AI might generate
+  formatted = formatted.replace(/[\u200B-\u200D\uFEFF]/g, '');
   // Protect intentional paragraph breaks (double newlines) by converting to placeholder
   formatted = formatted.replace(/\n\n+/g, '___PARAGRAPH_BREAK___');
   // Now replace ALL remaining single newlines with spaces (these are awkward mid-sentence breaks)
   formatted = formatted.replace(/\n/g, ' ');
-  // Clean up multiple spaces
-  formatted = formatted.replace(/ +/g, ' ');
+  // Clean up multiple spaces (including NBSP)
+  formatted = formatted.replace(/[\s\u00A0\u202F]+/g, ' ');
   // Restore paragraph breaks as single newlines (MathText will handle rendering)
   formatted = formatted.replace(/___PARAGRAPH_BREAK___/g, '\n');
-  // CRITICAL: Remove spaces before punctuation (caused by newline-to-space conversion)
-  formatted = formatted.replace(/\s+([.,!?;:])/g, '$1');
+  // CRITICAL: Remove ALL whitespace (including Unicode) before punctuation
+  formatted = formatted.replace(/[\s\u00A0\u202F]+([.,!?;:])/g, '$1');
   // Trim leading/trailing whitespace
   formatted = formatted.trim();
   
