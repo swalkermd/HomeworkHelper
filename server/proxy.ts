@@ -576,12 +576,64 @@ async function validateSolution(
   }
 }
 
+// Ensure biology/chemistry topics have visual aids based on keyword detection
+function ensureBiologyVisualAids(question: string, result: any): any {
+  // Biology/Chemistry keywords that should trigger visual aids
+  const biologyKeywords = {
+    'krebs cycle': 'Krebs (citric acid) cycle showing circular pathway starting with Acetyl-CoA + Oxaloacetate forming Citrate, then proceeding through Isocitrate, α-Ketoglutarate, Succinyl-CoA, Succinate, Fumarate, Malate, and back to Oxaloacetate. Mark inputs (Acetyl-CoA), outputs (2 CO₂), and energy molecules produced (3 NADH, 1 FADH₂, 1 ATP/GTP) at appropriate steps. Use arrows to show cycle direction.',
+    'citric acid cycle': 'Citric acid cycle (Krebs cycle) showing circular pathway with all intermediate compounds (Citrate, Isocitrate, α-Ketoglutarate, Succinyl-CoA, Succinate, Fumarate, Malate, Oxaloacetate), inputs (Acetyl-CoA), outputs (CO₂), and energy molecules (NADH, FADH₂, ATP/GTP) labeled at each step. Use arrows to show direction of cycle.',
+    'electron transport chain': 'Electron transport chain showing the sequential transfer of electrons through protein complexes (Complex I, II, III, IV) in the inner mitochondrial membrane. Mark electron flow with arrows, H⁺ pumping across membrane, and ATP synthase generating ATP. Label inputs (NADH, FADH₂, O₂) and outputs (NAD⁺, FAD, H₂O, ATP).',
+    'calvin cycle': 'Calvin cycle showing the three phases: Carbon Fixation (CO₂ + RuBP → 3-PGA), Reduction (3-PGA → G3P using ATP and NADPH), and Regeneration (G3P → RuBP). Mark inputs (CO₂, ATP, NADPH), outputs (glucose/G3P), and the role of RuBisCO enzyme. Use arrows to show cycle direction.',
+    'photosynthesis': 'Photosynthesis process showing two main stages: Light-dependent reactions in thylakoid membranes (light energy → ATP + NADPH + O₂) and Light-independent reactions/Calvin cycle in stroma (CO₂ + ATP + NADPH → glucose). Label chloroplast structures, inputs (light, H₂O, CO₂), and outputs (O₂, glucose).',
+    'cellular respiration': 'Cellular respiration showing all stages: Glycolysis (glucose → pyruvate in cytoplasm), Krebs cycle (in mitochondrial matrix), and Electron Transport Chain (in inner mitochondrial membrane). Mark inputs (glucose, O₂), outputs (CO₂, H₂O, ATP), and energy yield at each stage.',
+    'protein synthesis': 'Protein synthesis showing two stages: Transcription (DNA → mRNA in nucleus) and Translation (mRNA → protein at ribosome in cytoplasm). Label DNA, mRNA, tRNA, amino acids, and ribosome. Show direction of synthesis with arrows.',
+    'dna replication': 'DNA replication showing the double helix unwinding, leading strand synthesis (continuous), and lagging strand synthesis (Okazaki fragments). Label DNA polymerase, helicase, primase, template strands, and direction of synthesis (5\' to 3\'). Mark leading and lagging strands clearly.',
+    'glycolysis': 'Glycolysis pathway showing 10-step conversion of glucose to 2 pyruvate molecules. Mark energy investment phase (steps 1-5 using 2 ATP) and energy payoff phase (steps 6-10 producing 4 ATP and 2 NADH). Label key intermediates and net ATP yield (+2 ATP).',
+    'cell cycle': 'Cell cycle diagram showing Interphase (G₁, S, G₂ phases) and M phase (Mitosis + Cytokinesis). Mark key events in each phase, checkpoints (G₁, G₂, M), and relative time spent in each phase. Use circular diagram with labeled sections.'
+  };
+  
+  const questionLower = question.toLowerCase();
+  let matchedKeyword: string | null = null;
+  let description: string | null = null;
+  
+  // Check if question contains any biology keywords
+  for (const [keyword, defaultDescription] of Object.entries(biologyKeywords)) {
+    if (questionLower.includes(keyword)) {
+      matchedKeyword = keyword;
+      description = defaultDescription;
+      break;
+    }
+  }
+  
+  // If keyword matched and no visual aids exist, add one
+  if (matchedKeyword && description) {
+    if (!result.visualAids || result.visualAids.length === 0) {
+      console.log(`🧬 Biology keyword detected: "${matchedKeyword}" - Adding required visual aid`);
+      
+      // Add visual aid to first step (or create one if none exist)
+      const stepId = result.steps && result.steps.length > 0 ? result.steps[0].id : "1";
+      
+      result.visualAids = [{
+        type: "illustration",
+        stepId: stepId,
+        description: description
+      }];
+      
+      console.log(`✅ Auto-added biology visual aid for "${matchedKeyword}"`);
+    } else {
+      console.log(`ℹ️  Biology keyword "${matchedKeyword}" detected, but visual aid already exists`);
+    }
+  }
+  
+  return result;
+}
+
 app.post('/api/analyze-text', async (req, res) => {
   try {
     const { question } = req.body;
     console.log('Analyzing text question:', question);
     
-    const result = await pRetry(
+    let result = await pRetry(
       async () => {
         try {
           const response = await openai.chat.completions.create({
@@ -652,6 +704,7 @@ RESPONSE FORMAT (JSON):
 - Physics: projectile motion, force diagrams, circuits, kinematics
 - Geometry: shapes, angles, spatial relationships
 - Data: surveys, percentages, comparing quantities, proportions
+- Biology/Chemistry: metabolic cycles (Krebs, Calvin, electron transport), cellular processes, multi-step reactions
 - Leave empty [] ONLY if truly no visual would help
 
 📊 INTELLIGENT VISUAL AIDS - WHEN AND WHAT TYPE TO CREATE 📊
@@ -694,6 +747,20 @@ RESPONSE FORMAT (JSON):
 ✓ **PROPORTIONS & RATIOS** - Problems involving parts of a whole
    → Show pie chart or stacked bar chart
    → Tag: [DIAGRAM NEEDED: type=chart - Visual representation showing proportions of [total] divided into [parts with values/percentages].]
+
+**BIOLOGY & CHEMISTRY - NEARLY MANDATORY:**
+✓ **METABOLIC CYCLES & PATHWAYS** - The Krebs cycle, citric acid cycle, Calvin cycle, electron transport chain
+   → **MUST CREATE** a process illustration showing the cycle with inputs, outputs, and intermediate steps
+   → Tag: [DIAGRAM NEEDED: type=illustration - [Cycle name] showing circular pathway with all intermediate compounds, enzymes (if mentioned), inputs (substrates entering), outputs (products leaving), and energy molecules (ATP, NADH, FADH₂, etc.). Label each step in sequence with arrows showing direction of flow.]
+   → EXAMPLE: "Krebs cycle" → ADD: [DIAGRAM NEEDED: type=illustration - Krebs (citric acid) cycle showing circular pathway starting with Acetyl-CoA + Oxaloacetate forming Citrate, then proceeding through Isocitrate, α-Ketoglutarate, Succinyl-CoA, Succinate, Fumarate, Malate, and back to Oxaloacetate. Mark inputs (Acetyl-CoA), outputs (2 CO₂), and energy molecules produced (3 NADH, 1 FADH₂, 1 ATP/GTP) at appropriate steps. Use arrows to show cycle direction.]
+
+✓ **CELLULAR PROCESSES** - Photosynthesis, cellular respiration, protein synthesis, DNA replication
+   → Show multi-stage process with labeled inputs, outputs, and intermediate steps
+   → Tag: [DIAGRAM NEEDED: type=illustration - [Process name] showing all stages, key molecules/structures involved, inputs, outputs, and energy flow. Label each major step.]
+
+✓ **CHEMICAL REACTIONS & MECHANISMS** - Multi-step organic reactions, redox reactions, equilibrium systems
+   → Show reaction pathway with structures, electron flow, intermediates
+   → Tag: [DIAGRAM NEEDED: type=illustration - Reaction mechanism showing reactants, intermediates, and products with electron flow arrows and key conditions.]
 
 **SCREENING CRITERIA - For other cases, create visuals when they SIGNIFICANTLY enhance understanding:**
 
@@ -852,6 +919,9 @@ Grade-appropriate language based on difficulty level.`
       }
     );
     
+    // 🧬 BIOLOGY/CHEMISTRY KEYWORD DETECTION: Ensure visual aids for metabolic cycles
+    result = ensureBiologyVisualAids(question, result);
+    
     // ⚡ ASYNC DIAGRAM GENERATION: Generate unique solution ID
     const solutionId = crypto.randomBytes(16).toString('hex');
     const diagrams: DiagramStatus[] = [];
@@ -958,7 +1028,7 @@ app.post('/api/analyze-image', async (req, res) => {
     const { imageUri, problemNumber } = req.body;
     console.log('Analyzing image, problem number:', problemNumber);
     
-    const result = await pRetry(
+    let result = await pRetry(
       async () => {
         try {
           const response = await openai.chat.completions.create({
@@ -1073,6 +1143,7 @@ RESPONSE FORMAT (JSON):
 - Physics: projectile motion, force diagrams, circuits, kinematics
 - Geometry: shapes, angles, spatial relationships
 - Data: surveys, percentages, comparing quantities, proportions
+- Biology/Chemistry: metabolic cycles (Krebs, Calvin, electron transport), cellular processes, multi-step reactions
 - Leave empty [] ONLY if truly no visual would help
 
 📊 INTELLIGENT VISUAL AIDS - WHEN AND WHAT TYPE TO CREATE 📊
@@ -1115,6 +1186,20 @@ RESPONSE FORMAT (JSON):
 ✓ **PROPORTIONS & RATIOS** - Problems involving parts of a whole
    → Show pie chart or stacked bar chart
    → Tag: [DIAGRAM NEEDED: type=chart - Visual representation showing proportions of [total] divided into [parts with values/percentages].]
+
+**BIOLOGY & CHEMISTRY - NEARLY MANDATORY:**
+✓ **METABOLIC CYCLES & PATHWAYS** - The Krebs cycle, citric acid cycle, Calvin cycle, electron transport chain
+   → **MUST CREATE** a process illustration showing the cycle with inputs, outputs, and intermediate steps
+   → Tag: [DIAGRAM NEEDED: type=illustration - [Cycle name] showing circular pathway with all intermediate compounds, enzymes (if mentioned), inputs (substrates entering), outputs (products leaving), and energy molecules (ATP, NADH, FADH₂, etc.). Label each step in sequence with arrows showing direction of flow.]
+   → EXAMPLE: "Krebs cycle" → ADD: [DIAGRAM NEEDED: type=illustration - Krebs (citric acid) cycle showing circular pathway starting with Acetyl-CoA + Oxaloacetate forming Citrate, then proceeding through Isocitrate, α-Ketoglutarate, Succinyl-CoA, Succinate, Fumarate, Malate, and back to Oxaloacetate. Mark inputs (Acetyl-CoA), outputs (2 CO₂), and energy molecules produced (3 NADH, 1 FADH₂, 1 ATP/GTP) at appropriate steps. Use arrows to show cycle direction.]
+
+✓ **CELLULAR PROCESSES** - Photosynthesis, cellular respiration, protein synthesis, DNA replication
+   → Show multi-stage process with labeled inputs, outputs, and intermediate steps
+   → Tag: [DIAGRAM NEEDED: type=illustration - [Process name] showing all stages, key molecules/structures involved, inputs, outputs, and energy flow. Label each major step.]
+
+✓ **CHEMICAL REACTIONS & MECHANISMS** - Multi-step organic reactions, redox reactions, equilibrium systems
+   → Show reaction pathway with structures, electron flow, intermediates
+   → Tag: [DIAGRAM NEEDED: type=illustration - Reaction mechanism showing reactants, intermediates, and products with electron flow arrows and key conditions.]
 
 **SCREENING CRITERIA - For other cases, create visuals when they SIGNIFICANTLY enhance understanding:**
 
@@ -1295,6 +1380,9 @@ Grade-appropriate language based on difficulty level.`
       });
     }
     console.log('========================\n');
+    
+    // 🧬 BIOLOGY/CHEMISTRY KEYWORD DETECTION: Ensure visual aids for metabolic cycles
+    result = ensureBiologyVisualAids(result.problem || '', result);
     
     // ⚡ ASYNC DIAGRAM GENERATION: Generate unique solution ID
     const solutionId = crypto.randomBytes(16).toString('hex');
