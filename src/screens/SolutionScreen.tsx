@@ -247,22 +247,22 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
             style={styles.helpButton}
             onPress={() => navigation.navigate('Question')}
           >
-            <View style={styles.outlinedButton}>
-              <Ionicons name="chatbubble-ellipses" size={20} color="#8b5cf6" />
-              <Text style={styles.outlinedButtonText}>Ask Question</Text>
-            </View>
+            <LinearGradient
+              colors={['#3b82f6', '#2563eb']}
+              style={styles.gradientButton}
+            >
+              <Ionicons name="chatbubble-ellipses" size={20} color="#ffffff" />
+              <Text style={styles.helpButtonText}>Ask Question</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
         
         <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>Ready for More?</Text>
         <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <LinearGradient
-            colors={['#10b981', '#059669']}
-            style={styles.newProblemButton}
-          >
-            <Ionicons name="add-circle" size={22} color="#ffffff" />
-            <Text style={styles.newProblemButtonText}>New Problem</Text>
-          </LinearGradient>
+          <View style={styles.newProblemOutlineButton}>
+            <Ionicons name="add-circle" size={22} color="#10b981" />
+            <Text style={styles.newProblemOutlineButtonText}>New Problem</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -442,25 +442,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-  outlinedButton: {
+  newProblemOutlineButton: {
     backgroundColor: '#ffffff',
     borderWidth: 3,
-    borderColor: '#8b5cf6',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  outlinedButtonText: {
-    fontSize: typography.bodyLarge.fontSize,
-    lineHeight: typography.bodyLarge.lineHeight,
-    fontWeight: '600',
-    color: '#8b5cf6',
-  },
-  newProblemButton: {
+    borderColor: '#10b981',
     paddingVertical: spacing.md,
     borderRadius: 12,
     flexDirection: 'row',
@@ -468,11 +453,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
   },
-  newProblemButtonText: {
+  newProblemOutlineButtonText: {
     fontSize: typography.bodyLarge.fontSize,
     lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#10b981',
   },
   diagramContainer: {
     marginTop: spacing.md,

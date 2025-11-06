@@ -14,9 +14,9 @@ The application features a responsive design with distinct typography for portra
 **Solution Screen Action Bar (Nov 2025):** Redesigned two-row card layout with grouped actions:
 - **Row 1 - "Need More Help?"**: Two equal-width buttons side-by-side
   - "Simplify" button (yellow gradient #fbbf24→#f59e0b, turns green when active)
-  - "Ask Question" button (white background with thick purple border #8b5cf6)
-- **Row 2 - "Ready for More?"**: Full-width gradient button
-  - "New Problem" button (green gradient #10b981→#059669, matches Final Answer card)
+  - "Ask Question" button (blue gradient #3b82f6→#2563eb with white text/icon)
+- **Row 2 - "Ready for More?"**: Full-width button
+  - "New Problem" button (white background with thick green border #10b981)
 - Clean visual hierarchy with gradient and outlined button styles, icons, and consistent spacing for a polished, modern appearance.
 - **Visual Continuity:** Simplified explanation dialogue boxes use matching yellow color scheme (#fde68a background with #fbbf24 border) to maintain visual connection with the Simplify button.
 
