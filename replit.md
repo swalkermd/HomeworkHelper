@@ -27,18 +27,21 @@ The application features a responsive design with distinct typography for portra
 - **Step-by-Step Solutions:** Features progressive reveal animations, haptic feedback, custom math notation rendering, and grade-appropriate language adaptation. Final answers are highlighted.
 - **Interactive Features:** Includes a follow-up Q&A chat modal with context preservation and navigation for asking new questions or returning home.
 - **OCR Accuracy Improvements:** Specific instructions and examples for AI to improve transcription of mathematical expressions, fractions, and coefficients from images.
-- **Server-Side Formatting Enforcement:** A post-processing layer on the server ensures consistent mathematical formatting, converting all fractions to vertical {num/den} format and handling decimal-to-fraction conversions. **Whitespace normalization (Nov 2025):** Comprehensive cleanup of all newline characters (\n, \r, \u2028, \u2029), zero-width characters, and non-breaking spaces applied after all transformations (including image placeholder restoration) to ensure continuous text flow without mid-sentence breaks.
+- **Number Format Matching (Nov 2025):** AI prompts explicitly instruct the model to MATCH the input format. If the problem uses decimals (0.5, 2.75), the solution uses decimals. If the problem uses fractions (1/2, 3/4), the solution uses vertical fractions {num/den} including mixed numbers when appropriate (e.g., {1{1/2}} for 1½). This ensures the solution format aligns with the student's learning context and problem presentation.
+- **Server-Side Formatting Enforcement:** A post-processing layer on the server ensures consistent mathematical formatting, converting OCR-detected fractions (like "1/8") to vertical {num/den} format while preserving the number format from the input. **Whitespace normalization (Nov 2025):** Comprehensive cleanup of all newline characters (\n, \r, \u2028, \u2029), zero-width characters, and non-breaking spaces applied after all transformations (including image placeholder restoration) to ensure continuous text flow without mid-sentence breaks.
 - **Quality Control & Validation System:** Multi-stage validation pipeline that ensures solution accuracy:
   - **Structural Validation**: Verifies JSON schema compliance, required fields, and proper formatting
   - **Cross-Model Verification**: Independent AI verification call reviews solution accuracy, calculations, and final answers
   - **Confidence Scoring**: Solutions must pass 70% confidence threshold
   - **Comprehensive Logging**: Timestamps, validation metrics, errors, and warnings logged for quality monitoring
   - **Async Background Execution**: Validation runs in background after delivering solution to user (non-blocking for speed)
-- **Performance Optimizations (Nov 2025):** Target processing time <15 seconds for complex problems:
+- **Performance Optimizations (Nov 2025):** Target processing time <15 seconds for complex problems (achieved: 3-7s avg):
   - **Parallel Diagram Generation**: All visual aids generate concurrently using Promise.all instead of sequentially
   - **Async Validation**: Quality control runs in background (non-blocking) for logging/monitoring only
+  - **Simplified Prompts**: Reduced diagram prompts from 150 words to 20 words for faster generation
   - **Robust Error Handling**: Diagram generation failures gracefully degrade without breaking UX
   - **Timeout Configuration**: Server timeout 300s, client fetch timeout 120s (intentional mismatch provides safety margin)
+  - **Image Size**: Diagrams generated at 1024x1024 for optimal quality and compatibility
 
 ### System Design Choices
 The application uses a proxy server architecture (running on port 5000) that handles API endpoints and proxies frontend requests to the Expo dev server (port 8081). This setup centralizes OpenAI API integration, CORS handling, and ensures all interactions occur through a single exposed port in the Replit environment.

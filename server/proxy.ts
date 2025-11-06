@@ -66,19 +66,9 @@ async function generateDiagram(description: string): Promise<string> {
     
     const response = await openai.images.generate({
       model: "gpt-image-1",
-      prompt: `Create a clear, educational ${visualType} for a student: ${cleanDescription}. 
-
-Style requirements: ${styleGuide}
-
-Key principles:
-- White background, black/dark lines for maximum clarity
-- All components clearly labeled with text
-- Include all measurements, dimensions, and values mentioned
-- Simple, uncluttered design focused on understanding
-- No decorative elements - purely educational
-- Large enough text to be readable`,
+      prompt: `Educational ${visualType}: ${cleanDescription}. ${styleGuide} White background, black lines, labeled clearly.`,
       size: "1024x1024",
-      n: 1,
+      n: 1
     });
     
     // Replit AI Integrations returns base64 data by default
@@ -124,6 +114,29 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
+// Convert decimal to fraction with simplification
+// Helper function: Convert decimal to fraction using continued fractions algorithm
+// Currently unused - format matching respects input (decimals stay decimals, fractions stay fractions)
+// Preserved for potential future features
+function decimalToFraction(decimal: number): { numerator: number; denominator: number } {
+  const tolerance = 1.0E-6;
+  let h1 = 1, h2 = 0, k1 = 0, k2 = 1;
+  let b = decimal;
+  
+  do {
+    const a = Math.floor(b);
+    let aux = h1;
+    h1 = a * h1 + h2;
+    h2 = aux;
+    aux = k1;
+    k1 = a * k1 + k2;
+    k2 = aux;
+    b = 1 / (b - a);
+  } while (Math.abs(decimal - h1 / k1) > decimal * tolerance);
+  
+  return { numerator: h1, denominator: k1 };
+}
+
 // Enforce proper math formatting - convert ALL fractions to {num/den} format
 function enforceProperFormatting(text: string | null | undefined, debugLabel: string = ''): string {
   // Return empty string if text is null or undefined
@@ -163,33 +176,8 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
     console.log(`  AFTER:  ${JSON.stringify(formattedSample)}`);
   }
   
-  // 1. Convert common decimals to fractions (only standalone decimals, not part of larger numbers)
-  const decimalToFraction: { [key: string]: string } = {
-    '0.125': '{1/8}',
-    '0.25': '{1/4}',
-    '0.375': '{3/8}',
-    '0.5': '{1/2}',
-    '0.625': '{5/8}',
-    '0.75': '{3/4}',
-    '0.875': '{7/8}',
-    '0.333': '{1/3}',
-    '0.667': '{2/3}',
-    '0.2': '{1/5}',
-    '0.4': '{2/5}',
-    '0.6': '{3/5}',
-    '0.8': '{4/5}',
-    '0.166': '{1/6}',
-    '0.833': '{5/6}',
-  };
-  
-  // Replace standalone decimals with fractions
-  for (const [decimal, fraction] of Object.entries(decimalToFraction)) {
-    const escapedDecimal = decimal.replace('.', '\\.');
-    const regex = new RegExp(`(?<!\\d)${escapedDecimal}(?!\\d)`, 'g');
-    formatted = formatted.replace(regex, fraction);
-  }
-  
-  // 2. Convert standalone fractions like "1/8" to "{1/8}"
+  // 1. Convert standalone fractions like "1/8" to "{1/8}" (for OCR-detected fractions)
+  // NOTE: We no longer force decimal→fraction conversion. Format should match input.
   formatted = formatted.replace(/(?<![{/])(\d+)\/(\d+)(?![}/])/g, '{$1/$2}');
   
   // Restore IMAGE tags
@@ -484,6 +472,12 @@ app.post('/api/analyze-text', async (req, res) => {
               {
                 role: "system",
                 content: `You are an expert educational AI tutor. Analyze the homework question and provide a step-by-step solution with proper formatting.
+
+🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
+- If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
+- If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
+- For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
+- CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
@@ -885,6 +879,12 @@ app.post('/api/analyze-image', async (req, res) => {
 ⚠️ CRITICAL: You MUST respond with valid JSON only.
 
 ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multiple problems exist, solve the most prominent one.'}
+
+🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
+- If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
+- If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
+- For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
+- CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
