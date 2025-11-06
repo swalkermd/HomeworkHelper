@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, View, Image, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { typography, colors } from '../constants/theme';
 
 interface MathTextProps {
