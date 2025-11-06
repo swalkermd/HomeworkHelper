@@ -464,6 +464,19 @@ RESPONSE FORMAT (JSON):
 ✓ Spatial relationships between multiple geometric objects
 ✓ 3D geometry or perspective views
 
+**DATA VISUALIZATION - NEARLY MANDATORY:**
+✓ **SURVEYS & PERCENTAGES** - Any problem asking about percentages, surveys, or preferences
+   → Show pie chart or bar chart comparing categories
+   → Tag: [DIAGRAM NEEDED: type=chart - Pie chart showing [category names] with percentages: [list each category with its percentage]. Use distinct colors for each segment and label with both category name and percentage.]
+
+✓ **COMPARING QUANTITIES** - Problems comparing multiple values, populations, or measurements
+   → Show bar chart or comparison chart
+   → Tag: [DIAGRAM NEEDED: type=chart - Bar chart comparing [categories] with values: [list values]. Include labeled axes and value labels on each bar.]
+
+✓ **PROPORTIONS & RATIOS** - Problems involving parts of a whole
+   → Show pie chart or stacked bar chart
+   → Tag: [DIAGRAM NEEDED: type=chart - Visual representation showing proportions of [total] divided into [parts with values/percentages].]
+
 **SCREENING CRITERIA - For other cases, create visuals when they SIGNIFICANTLY enhance understanding:**
 
 Consider creating a visual aid when:
@@ -741,6 +754,19 @@ RESPONSE FORMAT (JSON):
 ✓ Any problem with shapes, angles, areas, perimeters
 ✓ Spatial relationships between multiple geometric objects
 ✓ 3D geometry or perspective views
+
+**DATA VISUALIZATION - NEARLY MANDATORY:**
+✓ **SURVEYS & PERCENTAGES** - Any problem asking about percentages, surveys, or preferences
+   → Show pie chart or bar chart comparing categories
+   → Tag: [DIAGRAM NEEDED: type=chart - Pie chart showing [category names] with percentages: [list each category with its percentage]. Use distinct colors for each segment and label with both category name and percentage.]
+
+✓ **COMPARING QUANTITIES** - Problems comparing multiple values, populations, or measurements
+   → Show bar chart or comparison chart
+   → Tag: [DIAGRAM NEEDED: type=chart - Bar chart comparing [categories] with values: [list values]. Include labeled axes and value labels on each bar.]
+
+✓ **PROPORTIONS & RATIOS** - Problems involving parts of a whole
+   → Show pie chart or stacked bar chart
+   → Tag: [DIAGRAM NEEDED: type=chart - Visual representation showing proportions of [total] divided into [parts with values/percentages].]
 
 **SCREENING CRITERIA - For other cases, create visuals when they SIGNIFICANTLY enhance understanding:**
 
