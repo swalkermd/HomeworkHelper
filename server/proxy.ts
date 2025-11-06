@@ -204,12 +204,17 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   formatted = formatted.replace(/[\s\u00A0\u202F]+([.,!?;:])/g, '$1');  // Remove spaces before punctuation
   formatted = formatted.trim();
   
-  // Enhanced debug logging - show full string with newline detection
+  // Enhanced debug logging - show full text for blue highlighting issues
+  if (debugLabel && formatted.includes('[blue:')) {
+    console.log(`\n🔵 BLUE HIGHLIGHTING in [${debugLabel}]:`);
+    console.log(`   Full text: ${JSON.stringify(formatted)}`);
+  }
+  
+  // Check for newlines
   if (debugLabel) {
     const hasNewlines = /[\r\n\u2028\u2029]/.test(formatted);
-    const length = formatted.length;
     if (hasNewlines) {
-      console.log(`\n⚠️  NEWLINES DETECTED in [${debugLabel}] (length: ${length})`);
+      console.log(`\n⚠️  NEWLINES DETECTED in [${debugLabel}]:`);
       console.log(`   Full text: ${JSON.stringify(formatted)}`);
     }
   }
