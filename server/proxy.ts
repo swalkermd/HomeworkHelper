@@ -1685,18 +1685,36 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API server is running' });
 });
 
-app.use('/', createProxyMiddleware({
-  target: 'http://localhost:8081',
-  changeOrigin: false,
-  ws: true,
-  on: {
-    proxyReq: (proxyReq: any, req: any) => {
-      if (req.headers.origin) {
-        proxyReq.setHeader('origin', req.headers.origin);
+// Health check endpoint for deployment
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    message: 'Homework Helper API is running',
+    endpoints: {
+      analyzeText: '/api/analyze-text',
+      analyzeImage: '/api/analyze-image',
+      askQuestion: '/api/ask-question',
+      diagramStatus: '/api/diagram-status/:solutionId',
+      health: '/api/health'
+    }
+  });
+});
+
+// Only proxy to frontend in development (when Expo dev server is running)
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/', createProxyMiddleware({
+    target: 'http://localhost:8081',
+    changeOrigin: false,
+    ws: true,
+    on: {
+      proxyReq: (proxyReq: any, req: any) => {
+        if (req.headers.origin) {
+          proxyReq.setHeader('origin', req.headers.origin);
+        }
       }
     }
-  }
-}));
+  }));
+}
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Proxy server with API running on port ${PORT}`);
