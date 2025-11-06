@@ -578,6 +578,106 @@ Grade-appropriate language based on difficulty level.`
   }
 });
 
+app.post('/api/simplify-explanation', async (req, res) => {
+  try {
+    const { problem, subject, difficulty, steps } = req.body;
+    console.log('Generating simplified explanations for', steps.length, 'steps');
+    
+    const result = await pRetry(
+      async () => {
+        try {
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: `You are an exceptional teacher helping a struggling student understand a problem. The student has seen the solution steps but still doesn't get it. Your job is to provide a MUCH SIMPLER, more intuitive explanation for each step.
+
+Guidelines:
+- Use everyday language and analogies
+- Break down WHY we're doing each operation, not just WHAT we're doing
+- Use relatable examples when possible
+- Keep each explanation to 2-3 short sentences maximum
+- Preserve math formatting: {num/den} for fractions, _subscript_, ^superscript^, [color:text] for highlighting
+- Focus on the INTUITION and REASONING behind each step
+
+Problem: ${problem}
+Subject: ${subject}
+Difficulty Level: ${difficulty}
+
+For each step provided, return a simplified explanation that helps the student understand the underlying logic and reasoning.
+
+IMPORTANT: Return ONLY a valid JSON array with this exact structure:
+[
+  {
+    "stepNumber": 1,
+    "simplifiedExplanation": "Plain language explanation here"
+  },
+  {
+    "stepNumber": 2,
+    "simplifiedExplanation": "Plain language explanation here"
+  }
+]
+
+Do NOT include any text before or after the JSON array.`
+              },
+              {
+                role: "user",
+                content: `Here are the solution steps that need simplified explanations:
+
+${steps.map((step: any, index: number) => `Step ${index + 1}: ${step.title}
+${step.content}`).join('\n\n')}
+
+Please provide a simplified, intuitive explanation for each step.`
+              }
+            ],
+            max_tokens: 2000,
+          });
+          
+          const content = response.choices[0]?.message?.content || '[]';
+          
+          // Parse JSON response
+          try {
+            const jsonMatch = content.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) {
+              throw new Error('No JSON array found in response');
+            }
+            const parsed = JSON.parse(jsonMatch[0]);
+            return parsed;
+          } catch (parseError: any) {
+            console.error('Failed to parse simplified explanations:', content);
+            throw new AbortError(parseError);
+          }
+        } catch (error: any) {
+          console.error('OpenAI API error:', error);
+          if (isRateLimitError(error)) {
+            throw error;
+          }
+          throw new AbortError(error);
+        }
+      },
+      {
+        retries: 7,
+        minTimeout: 2000,
+        maxTimeout: 128000,
+        factor: 2,
+      }
+    );
+    
+    // ENFORCE PROPER FORMATTING on each explanation
+    const formattedExplanations = result.map((item: any) => ({
+      ...item,
+      simplifiedExplanation: enforceProperFormatting(item.simplifiedExplanation)
+    }));
+    
+    console.log('Simplified explanations generated');
+    res.json({ simplifiedExplanations: formattedExplanations });
+  } catch (error) {
+    console.error('Error generating simplified explanations:', error);
+    res.status(500).json({ error: 'Failed to generate simplified explanations' });
+  }
+});
+
 app.post('/api/ask-question', async (req, res) => {
   try {
     const { question, context } = req.body;
