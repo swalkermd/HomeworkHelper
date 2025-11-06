@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Alert, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import { View, Alert, StyleSheet, ActivityIndicator, Text, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHomeworkStore } from '../store/homeworkStore';
@@ -17,9 +17,57 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
   useEffect(() => {
     if (!hasPickedRef.current) {
       hasPickedRef.current = true;
-      pickImage();
+      
+      if (Platform.OS === 'web') {
+        pickImageWeb();
+      } else {
+        pickImage();
+      }
     }
   }, []);
+
+  const pickImageWeb = () => {
+    console.log('🖼️ Gallery: Using web file input...');
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) {
+        console.log('🖼️ Gallery: No file selected');
+        navigation.navigate('Home');
+        return;
+      }
+
+      console.log('🖼️ Gallery: File selected:', file.name);
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const uri = event.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          console.log('🖼️ Gallery: Image loaded, dimensions:', img.width, 'x', img.height);
+          setCurrentImage({
+            uri,
+            width: img.width,
+            height: img.height,
+          });
+          navigation.navigate('ProblemSelection');
+        };
+        img.src = uri;
+      };
+      reader.readAsDataURL(file);
+    };
+    
+    input.oncancel = () => {
+      console.log('🖼️ Gallery: File picker canceled');
+      navigation.navigate('Home');
+    };
+    
+    input.click();
+  };
 
   const pickImage = async () => {
     try {
@@ -33,7 +81,7 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
         Alert.alert(
           'Permission Required',
           'Please grant permission to access your photo library.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+          [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
         );
         return;
       }
@@ -58,27 +106,14 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
         navigation.navigate('ProblemSelection');
       } else {
         console.log('🖼️ Gallery: Selection canceled or no asset');
-        if (navigation.canGoBack()) {
-          navigation.goBack();
-        } else {
-          navigation.navigate('Home');
-        }
+        navigation.navigate('Home');
       }
     } catch (error) {
       console.error('🖼️ Gallery: Error picking image:', error);
       Alert.alert(
         'Error',
         'Failed to open photo library. Please try again.',
-        [{ 
-          text: 'OK', 
-          onPress: () => {
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            } else {
-              navigation.navigate('Home');
-            }
-          }
-        }]
+        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
       );
     }
   };
