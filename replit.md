@@ -207,6 +207,12 @@ The proxy server (`server/proxy.ts`) provides:
 - [ ] Offline mode with cached solutions
 
 ## Recent Changes
+- November 6, 2025: **OCR ACCURACY IMPROVEMENTS** - Enhanced image analysis:
+  - Added critical OCR accuracy instructions to carefully transcribe mathematical notation
+  - Double-check requirements for fractions, coefficients, variables, parentheses, signs
+  - Explicit guidance to use simplest appropriate method (avoid overcomplicating)
+  - Common OCR error prevention (fraction misreads, coefficient confusion, missing parentheses)
+  - Exact problem transcription required in response for verification
 - November 6, 2025: **MAJOR UPDATE** - Comprehensive math formatting improvements:
   - All fractions now display in proper vertical format {num/den} - never inline or decimal
   - Color highlighting added: blue for operations being performed, red for results
