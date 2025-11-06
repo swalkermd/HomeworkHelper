@@ -219,8 +219,10 @@ function validateStructure(solution: any): { isValid: boolean; errors: string[] 
     });
   }
   
-  if (!solution.finalAnswer) {
-    errors.push('Missing final answer');
+  // Final answer is optional for multi-part questions where answers are in steps
+  // Only flag as error if there are no steps either
+  if (!solution.finalAnswer && (!solution.steps || solution.steps.length === 0)) {
+    errors.push('Missing final answer and no solution steps provided');
   }
   
   return {
