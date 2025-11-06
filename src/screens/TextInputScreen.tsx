@@ -57,7 +57,7 @@ export default function TextInputScreen({ navigation }: TextInputScreenProps) {
           {isLoading ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.submitButtonText}>Get Solution</Text>
+            <Text style={styles.submitButtonText}>Solve!</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

@@ -78,7 +78,7 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
           {isLoading ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.analyzeButtonText}>Analyze This Problem</Text>
+            <Text style={styles.analyzeButtonText}>Solve!</Text>
           )}
         </TouchableOpacity>
 
