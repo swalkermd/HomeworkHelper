@@ -34,6 +34,15 @@ A comprehensive AI-powered homework assistant mobile app built with React Native
      - Inline images (IMAGE: desc](url)
    - Grade-appropriate language adaptation
    - Final answer card with green gradient
+   - **Automatic Diagram Generation** using DALL-E 3:
+     - AI intelligently detects when visual diagrams would help
+     - Automatically generates diagrams for:
+       - Geometry problems (rectangles, triangles, circles with labeled dimensions)
+       - Graphs and coordinate planes
+       - Physics diagrams (force diagrams, motion diagrams)
+       - Charts and visual representations
+     - Clean whiteboard-style diagrams with labels and measurements
+     - Embedded directly in solution steps for better understanding
 
 4. ✅ **Interactive Features**
    - Follow-up Q&A chat modal with context preservation
@@ -195,10 +204,10 @@ The proxy server (`server/proxy.ts`) provides:
 - [ ] Solution history to save and review past problems
 - [ ] Answer verification system
 - [ ] Subject-specific formatting post-processor
-- [ ] Automatic diagram generation for geometry/physics
 - [ ] Offline mode with cached solutions
 
 ## Recent Changes
+- November 6, 2025: Added automatic diagram generation with DALL-E 3 for visual problems (geometry, graphs, physics diagrams, charts)
 - November 6, 2025: Initial MVP implementation complete
   - All core screens and navigation
   - AI integration with GPT-4o

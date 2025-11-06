@@ -21,6 +21,26 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
 });
 
+async function generateDiagram(description: string): Promise<string> {
+  try {
+    console.log('Generating diagram:', description);
+    const response = await openai.images.generate({
+      model: "dall-e-3",
+      prompt: `Create a clear, educational diagram for a student: ${description}. Style: Clean whiteboard drawing with black lines on white background, clearly labeled, simple and easy to understand, no text explanations - just the visual diagram with labels and measurements.`,
+      size: "1024x1024",
+      quality: "standard",
+      n: 1,
+    });
+    
+    const imageUrl = response.data[0]?.url || '';
+    console.log('Diagram generated successfully');
+    return imageUrl;
+  } catch (error) {
+    console.error('Error generating diagram:', error);
+    return '';
+  }
+}
+
 function isRateLimitError(error: any): boolean {
   const errorMsg = error?.message || String(error);
   return (
@@ -65,7 +85,7 @@ FORMATTING RULES:
 - Math: Use {num/den} for fractions, highlight operations in [red:term], show steps with ->
 - Chemistry: Use _subscript_ (H_2_O), ^superscript^ (Ca^2+^)
 - Physics: Include units, use +italic+_subscript_ for variables (v_0_)
-- For geometry/physics: Add [IMAGE NEEDED: description] in first step
+- VISUAL DIAGRAMS: For problems involving geometry, graphs, coordinate planes, shapes, physics diagrams, or any visual representation, add [DIAGRAM NEEDED: detailed description] in the FIRST step where it would be helpful. Be specific about what to show (e.g., "Rectangle with length 8 units and width 5 units, labeled dimensions", "Coordinate plane showing line y=2x+3 from x=-5 to x=5", "Right triangle with sides 3, 4, 5 labeled")
 - Grade-appropriate language based on difficulty level`
               },
               {
@@ -94,6 +114,22 @@ FORMATTING RULES:
         factor: 2,
       }
     );
+    
+    // Check if any step needs a diagram and generate it
+    for (const step of result.steps) {
+      const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
+      if (diagramMatch) {
+        const diagramDescription = diagramMatch[1];
+        const diagramUrl = await generateDiagram(diagramDescription);
+        if (diagramUrl) {
+          // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
+          step.content = step.content.replace(
+            diagramMatch[0],
+            `(IMAGE: ${diagramDescription}](${diagramUrl})`
+          );
+        }
+      }
+    }
     
     console.log('Analysis successful');
     res.json(result);
@@ -139,7 +175,8 @@ FORMATTING RULES:
 - Math: Use {num/den} for fractions, [red:term] for highlighting, -> for arrows
 - Chemistry: _subscript_ (H_2_O), ^superscript^ (Ca^2+^)
 - Physics: Include units, +italic+_subscript_ (v_0_)
-- Add [IMAGE NEEDED: description] for diagrams needed`
+- VISUAL DIAGRAMS: For problems involving geometry, graphs, coordinate planes, shapes, physics diagrams, or any visual representation, add [DIAGRAM NEEDED: detailed description] in the FIRST step where it would be helpful. Be specific about what to show (e.g., "Rectangle with length 8 units and width 5 units, labeled dimensions", "Coordinate plane showing line y=2x+3 from x=-5 to x=5", "Right triangle with sides 3, 4, 5 labeled")
+- For rectangle area problems, ALWAYS include a diagram showing the rectangle with labeled dimensions`
               },
               {
                 role: "user",
@@ -174,6 +211,22 @@ FORMATTING RULES:
         factor: 2,
       }
     );
+    
+    // Check if any step needs a diagram and generate it
+    for (const step of result.steps) {
+      const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
+      if (diagramMatch) {
+        const diagramDescription = diagramMatch[1];
+        const diagramUrl = await generateDiagram(diagramDescription);
+        if (diagramUrl) {
+          // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
+          step.content = step.content.replace(
+            diagramMatch[0],
+            `(IMAGE: ${diagramDescription}](${diagramUrl})`
+          );
+        }
+      }
+    }
     
     console.log('Image analysis successful');
     res.json(result);
