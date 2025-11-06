@@ -110,7 +110,12 @@ function isRateLimitError(error: any): boolean {
 }
 
 // Enforce proper math formatting - convert ALL fractions to {num/den} format
-function enforceProperFormatting(text: string): string {
+function enforceProperFormatting(text: string | null | undefined): string {
+  // Return empty string if text is null or undefined
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+  
   // Extract and preserve IMAGE tags to avoid processing their data URLs
   const imageTags: string[] = [];
   let formatted = text.replace(/\(IMAGE:[^\)]+\]\([^\)]+\)/g, (match) => {
