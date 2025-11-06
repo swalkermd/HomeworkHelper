@@ -488,7 +488,10 @@ app.post('/api/analyze-text', async (req, res) => {
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
 - Use [red:result] for the outcome (e.g., "= [red:24]")
-- Example: "Multiply both sides by [blue:8]: [blue:8] × {1/8}(3d - 2) = [blue:8] × {1/4}(d + 5) simplifies to (3d - 2) = [red:2(d + 5)]"
+- **CRITICAL:** Include operators WITH the number when showing multiplication/division operations
+  - CORRECT: "[blue:8 ×] {1/8}(3d - 2) = [blue:8 ×] {1/4}(d + 5)"
+  - WRONG: "[blue:8] × {1/8}" (operator outside the tag causes line breaks)
+- Example: "Multiply both sides by [blue:8 ×] to eliminate fractions: [blue:8 ×] {1/8}(3d - 2) = [blue:8 ×] {1/4}(d + 5) simplifies to [red:(3d - 2) = 2(d + 5)]"
 - NEVER skip color highlighting - it's essential for student understanding!
 - **CRITICAL:** Keep all text (including punctuation) on the SAME LINE as color tags. NEVER write: "[red:phototropism]\n." Instead write: "[red:phototropism]."
 
@@ -881,8 +884,12 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
 - Use [red:result] for the outcome (e.g., "= [red:24]")
-- Example: "Multiply both sides by [blue:8]: [blue:8] × {1/8}(3d - 2) = [blue:8] × {1/4}(d + 5) simplifies to (3d - 2) = [red:2(d + 5)]"
+- **CRITICAL:** Include operators WITH the number when showing multiplication/division operations
+  - CORRECT: "[blue:8 ×] {1/8}(3d - 2) = [blue:8 ×] {1/4}(d + 5)"
+  - WRONG: "[blue:8] × {1/8}" (operator outside the tag causes line breaks)
+- Example: "Multiply both sides by [blue:8 ×] to eliminate fractions: [blue:8 ×] {1/8}(3d - 2) = [blue:8 ×] {1/4}(d + 5) simplifies to [red:(3d - 2) = 2(d + 5)]"
 - NEVER skip color highlighting - it's essential for student understanding!
+- **CRITICAL:** Keep all text (including punctuation) on the SAME LINE as color tags. NEVER write: "[red:phototropism]\n." Instead write: "[red:phototropism]."
 
 **CRITICAL OCR ACCURACY INSTRUCTIONS - READ CAREFULLY:**
 
