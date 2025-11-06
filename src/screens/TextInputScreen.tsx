@@ -20,11 +20,14 @@ export default function TextInputScreen({ navigation }: TextInputScreenProps) {
 
     setIsLoading(true);
     try {
+      console.log('📤 Submitting question...');
       const solution = await analyzeTextQuestion(question);
+      console.log('📥 Solution received, setting in store...');
       setCurrentSolution(solution);
+      console.log('✅ Solution set in store, navigating to Solution screen...');
       navigation.navigate('Solution');
     } catch (error) {
-      console.error('Error analyzing question:', error);
+      console.error('❌ Error analyzing question:', error);
       alert('Failed to analyze question. Please try again.');
     } finally {
       setIsLoading(false);

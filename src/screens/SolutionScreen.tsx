@@ -25,7 +25,16 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const [loadingSimplified, setLoadingSimplified] = useState(false);
 
   useEffect(() => {
+    console.log('🔍 SolutionScreen mounted. Has solution:', !!currentSolution);
+    console.log('Solution details:', currentSolution ? {
+      hasSteps: !!currentSolution.steps,
+      stepsCount: currentSolution.steps?.length,
+      subject: currentSolution.subject,
+      difficulty: currentSolution.difficulty
+    } : 'No solution');
+    
     if (!currentSolution) {
+      console.log('⚠️ No solution found, navigating back to Home');
       navigation.navigate('Home');
       return;
     }

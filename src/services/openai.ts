@@ -20,10 +20,16 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
     }
     
     const result = await response.json();
-    console.log('API Response received successfully');
+    console.log('✓ Text API Response:', {
+      hasSteps: !!result?.steps,
+      stepsCount: result?.steps?.length,
+      subject: result?.subject,
+      difficulty: result?.difficulty,
+      hasProblem: !!result?.problem
+    });
     return result;
   } catch (error) {
-    console.error('Error analyzing text question:', error);
+    console.error('❌ Error analyzing text question:', error);
     throw error;
   }
 }
@@ -46,10 +52,16 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     }
     
     const result = await response.json();
-    console.log('API Response received successfully');
+    console.log('✓ Image API Response:', {
+      hasSteps: !!result?.steps,
+      stepsCount: result?.steps?.length,
+      subject: result?.subject,
+      difficulty: result?.difficulty,
+      hasProblem: !!result?.problem
+    });
     return result;
   } catch (error) {
-    console.error('Error analyzing image question:', error);
+    console.error('❌ Error analyzing image question:', error);
     throw error;
   }
 }
