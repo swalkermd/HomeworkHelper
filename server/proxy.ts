@@ -1681,6 +1681,11 @@ Solution: ${context.solution}`
   }
 });
 
+// Health check endpoints (must be before static file serving for fast response)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API server is running' });
 });
@@ -1689,12 +1694,33 @@ app.get('/api/health', (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   // In production, serve the built Expo web app
   const distPath = path.join(process.cwd(), 'dist');
-  app.use(express.static(distPath));
   
-  // Serve index.html for all non-API routes (SPA routing)
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
+  // Check if dist directory exists
+  if (fs.existsSync(distPath)) {
+    console.log(`📦 Serving static files from ${distPath}`);
+    app.use(express.static(distPath));
+    
+    // Serve index.html for all non-API routes (SPA routing)
+    app.get('*', (req, res) => {
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(500).json({ 
+          error: 'Frontend build not found',
+          message: 'Please run: npx expo export --platform web' 
+        });
+      }
+    });
+  } else {
+    console.error(`❌ dist/ directory not found at ${distPath}`);
+    app.get('*', (req, res) => {
+      res.status(500).json({ 
+        error: 'Frontend build not found',
+        message: 'The dist/ directory is missing. Build step may have failed.' 
+      });
+    });
+  }
 } else {
   // In development, proxy to Expo dev server
   app.use('/', createProxyMiddleware({
