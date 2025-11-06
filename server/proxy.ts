@@ -125,11 +125,13 @@ function isRateLimitError(error: any): boolean {
 }
 
 // Enforce proper math formatting - convert ALL fractions to {num/den} format
-function enforceProperFormatting(text: string | null | undefined): string {
+function enforceProperFormatting(text: string | null | undefined, debugLabel: string = ''): string {
   // Return empty string if text is null or undefined
   if (!text || typeof text !== 'string') {
     return '';
   }
+  
+  const originalText = text;
   
   // Extract and preserve IMAGE tags to avoid processing their data URLs
   const imageTags: string[] = [];
@@ -155,6 +157,15 @@ function enforceProperFormatting(text: string | null | undefined): string {
   formatted = formatted.replace(/[\s\u00A0\u202F]+([.,!?;:])/g, '$1');
   // Trim leading/trailing whitespace
   formatted = formatted.trim();
+  
+  // Debug logging - show sample before/after for content with punctuation issues
+  if (debugLabel && originalText.includes(',')) {
+    const sample = originalText.substring(0, 100);
+    const formattedSample = formatted.substring(0, 100);
+    console.log(`\n🔍 DEBUG [${debugLabel}]:`);
+    console.log(`  BEFORE: ${JSON.stringify(sample)}`);
+    console.log(`  AFTER:  ${JSON.stringify(formattedSample)}`);
+  }
   
   // 1. Convert common decimals to fractions (only standalone decimals, not part of larger numbers)
   const decimalToFraction: { [key: string]: string } = {
@@ -199,21 +210,21 @@ function enforceResponseFormatting(response: any): any {
   
   // Fix problem field
   if (formatted.problem) {
-    formatted.problem = enforceProperFormatting(formatted.problem);
+    formatted.problem = enforceProperFormatting(formatted.problem, 'problem');
   }
   
   // Fix all step content and titles
   if (formatted.steps && Array.isArray(formatted.steps)) {
-    formatted.steps = formatted.steps.map((step: any) => ({
+    formatted.steps = formatted.steps.map((step: any, index: number) => ({
       ...step,
-      title: step.title ? enforceProperFormatting(step.title) : step.title,
-      content: step.content ? enforceProperFormatting(step.content) : step.content
+      title: step.title ? enforceProperFormatting(step.title, `step${index+1}-title`) : step.title,
+      content: step.content ? enforceProperFormatting(step.content, `step${index+1}-content`) : step.content
     }));
   }
   
   // Fix final answer if present
   if (formatted.finalAnswer) {
-    formatted.finalAnswer = enforceProperFormatting(formatted.finalAnswer);
+    formatted.finalAnswer = enforceProperFormatting(formatted.finalAnswer, 'finalAnswer');
   }
   
   return formatted;
