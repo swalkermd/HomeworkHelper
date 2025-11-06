@@ -530,18 +530,13 @@ Grade-appropriate language based on difficulty level.`
     }
     console.log('========================\n');
     
-    // Check if any step needs a diagram and generate it
+    // TEMPORARILY DISABLED: Check if any step needs a diagram and generate it
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
-        const diagramDescription = diagramMatch[1];
-        const diagramUrl = await generateDiagram(diagramDescription);
-        if (diagramUrl) {
-          // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
-          const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
-          step.content = step.content.replace(diagramMatch[0], imageTag);
-          console.log('✓ Diagram embedded, URL starts with:', diagramUrl.substring(0, 30));
-        }
+        // Remove the diagram marker for now to prevent crashes
+        step.content = step.content.replace(diagramMatch[0], '');
+        console.log('ℹ Diagram generation temporarily disabled');
       }
     }
     
