@@ -29,12 +29,20 @@ async function generateDiagram(description: string): Promise<string> {
       prompt: `Create a clear, educational diagram for a student: ${description}. Style: Clean whiteboard drawing with black lines on white background, clearly labeled, simple and easy to understand, no text explanations - just the visual diagram with labels and measurements.`,
       size: "1024x1024",
       n: 1,
+      response_format: "b64_json",
     });
     
-    console.log('Full response from image generation:', JSON.stringify(response, null, 2));
-    const imageUrl = response.data?.[0]?.url || '';
-    console.log('Extracted imageUrl:', imageUrl);
-    return imageUrl;
+    // Replit AI Integrations returns base64 data, not URLs
+    const b64Data = response.data?.[0]?.b64_json;
+    if (b64Data) {
+      // Convert base64 to data URL for embedding
+      const dataUrl = `data:image/png;base64,${b64Data}`;
+      console.log('Diagram generated successfully (base64 data URL)');
+      return dataUrl;
+    }
+    
+    console.log('No image data returned');
+    return '';
   } catch (error) {
     console.error('Error generating diagram:', error);
     return '';
