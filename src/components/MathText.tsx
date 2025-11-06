@@ -35,7 +35,20 @@ export default function MathText({ content, fontSize = 14, color = colors.textPr
   // Parse the content directly without splitting on newlines
   // All newlines are already removed server-side
   const parsedContent = parseContent(content);
-
+  
+  // Check if content has fractions or images (which require View components)
+  const hasComplexElements = parsedContent.some(part => part.type === 'fraction' || part.type === 'image');
+  
+  // If no fractions/images, use nested Text for proper inline flow (prevents unwanted line breaks)
+  if (!hasComplexElements) {
+    return (
+      <Text style={{ fontSize, color }}>
+        {parsedContent.map((part, index) => renderTextPart(part, index, fontSize, color, isOnGreenBackground))}
+      </Text>
+    );
+  }
+  
+  // Otherwise use View with flex layout (for fractions/images)
   return (
     <View style={styles.lineContainer}>
       {parsedContent.map((part, index) => (
@@ -162,6 +175,54 @@ function parseContent(content: string): ParsedPart[] {
   return parts;
 }
 
+// Render text-only parts as nested Text (for inline flow without breaks)
+function renderTextPart(part: ParsedPart, index: number, baseFontSize: number, baseColor: string, isOnGreenBg: boolean): React.ReactNode {
+  switch (part.type) {
+    case 'highlighted':
+      const highlightColor = getHighlightColor(part.color || '');
+      return (
+        <Text key={index} style={{ color: highlightColor, fontWeight: '600' }}>
+          {part.content}
+        </Text>
+      );
+    
+    case 'arrow':
+      const arrowColor = isOnGreenBg ? '#ffffff' : colors.secondary;
+      return (
+        <Text key={index} style={{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor }}>
+          {' → '}
+        </Text>
+      );
+    
+    case 'italic':
+      return (
+        <Text key={index} style={{ fontStyle: 'italic' }}>
+          {part.content}
+        </Text>
+      );
+    
+    case 'subscript':
+      const subscriptText = part.content.split('').map(char => SUBSCRIPT_MAP[char] || char).join('');
+      return (
+        <Text key={index} style={{ fontSize: baseFontSize * 0.7 }}>
+          {subscriptText}
+        </Text>
+      );
+    
+    case 'superscript':
+      const superscriptText = part.content.split('').map(char => SUPERSCRIPT_MAP[char] || char).join('');
+      return (
+        <Text key={index} style={{ fontSize: baseFontSize * 0.7 }}>
+          {superscriptText}
+        </Text>
+      );
+    
+    default: // 'text'
+      return part.content;
+  }
+}
+
+// Render all parts (including fractions/images) as View children
 function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseColor: string, isOnGreenBg: boolean): React.ReactNode {
   switch (part.type) {
     case 'fraction':
