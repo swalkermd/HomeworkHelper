@@ -25,6 +25,11 @@ import crypto from 'crypto';
 const app = express();
 const PORT = 5000;
 
+// CRITICAL: Health check endpoint FIRST - must respond immediately for deployment health checks
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.use(cors({
   origin: '*',
   credentials: true,
@@ -1681,48 +1686,38 @@ Solution: ${context.solution}`
   }
 });
 
-// Health check endpoints (must be before static file serving for fast response)
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
-
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API server is running' });
 });
 
-// Serve static files in production, proxy in development
-if (process.env.NODE_ENV === 'production') {
-  // In production, serve the built Expo web app
-  const distPath = path.join(process.cwd(), 'dist');
+// Smart environment detection: serve static files if dist/ exists, otherwise proxy to dev server
+const distPath = path.join(process.cwd(), 'dist');
+const hasDistBuild = fs.existsSync(distPath) && fs.existsSync(path.join(distPath, 'index.html'));
+const isProduction = process.env.NODE_ENV === 'production' || hasDistBuild;
+
+if (isProduction && hasDistBuild) {
+  // Serve the built Expo web app from dist/
+  console.log(`📦 Production mode: Serving static files from ${distPath}`);
+  app.use(express.static(distPath));
   
-  // Check if dist directory exists
-  if (fs.existsSync(distPath)) {
-    console.log(`📦 Serving static files from ${distPath}`);
-    app.use(express.static(distPath));
-    
-    // Serve index.html for all non-API routes (SPA routing)
-    app.get('*', (req, res) => {
-      const indexPath = path.join(distPath, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(500).json({ 
-          error: 'Frontend build not found',
-          message: 'Please run: npx expo export --platform web' 
-        });
-      }
+  // Serve index.html for all non-API, non-static routes (SPA routing)
+  app.use((req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else if (isProduction && !hasDistBuild) {
+  // Production mode but no build files - return helpful error
+  console.error(`❌ Production mode but dist/ directory not found at ${distPath}`);
+  app.use((req, res) => {
+    res.status(500).json({ 
+      error: 'Frontend build not found',
+      message: 'The dist/ directory is missing. Run: npx expo export --platform web',
+      mode: 'production',
+      NODE_ENV: process.env.NODE_ENV
     });
-  } else {
-    console.error(`❌ dist/ directory not found at ${distPath}`);
-    app.get('*', (req, res) => {
-      res.status(500).json({ 
-        error: 'Frontend build not found',
-        message: 'The dist/ directory is missing. Build step may have failed.' 
-      });
-    });
-  }
+  });
 } else {
-  // In development, proxy to Expo dev server
+  // Development mode: proxy to Expo dev server
+  console.log(`🔧 Development mode: Proxying to Expo dev server on port 8081`);
   app.use('/', createProxyMiddleware({
     target: 'http://localhost:8081',
     changeOrigin: false,
