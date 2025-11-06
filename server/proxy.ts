@@ -410,8 +410,11 @@ Grade-appropriate language based on difficulty level.`
     console.log('Steps count:', result.steps?.length);
     if (result.steps && result.steps.length > 0) {
       result.steps.forEach((step: any, i: number) => {
-        console.log(`\nStep ${i + 1} - ${step.title}`);
-        console.log(`Content preview: ${step.content.substring(0, 200)}`);
+        console.log(`\n========== STEP ${i + 1} ==========`);
+        console.log(`Title: ${step.title}`);
+        console.log(`Full Content:`);
+        console.log(step.content);
+        console.log(`==================================`);
       });
     }
     console.log('========================\n');
