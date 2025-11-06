@@ -238,22 +238,30 @@ app.post('/api/analyze-image', async (req, res) => {
 
 ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multiple problems exist, solve the most prominent one.'}
 
-**CRITICAL OCR ACCURACY INSTRUCTIONS:**
-1. CAREFULLY transcribe the EXACT problem from the image - pay close attention to:
-   - Fraction coefficients (1/8, 1/4, 2/5, etc.)
-   - Variables and their positions
-   - Parentheses placement
-   - Signs (+ vs -)
-2. DOUBLE-CHECK your transcription before solving
-3. Common OCR errors to AVOID:
-   - Misreading fractions (1/8 vs 1/3, 1/4 vs 1/9)
-   - Confusing coefficients with denominators
-   - Missing parentheses
-4. Use the SIMPLEST appropriate method:
-   - Linear equations → basic algebra (multiply, distribute, solve)
-   - Quadratic equations → only if ax² + bx + c = 0 form exists
-   - Don't use quadratic formula for linear equations!
-5. In "problem" field: Write the EXACT transcribed equation as it appears in the image
+**CRITICAL OCR ACCURACY INSTRUCTIONS - READ CAREFULLY:**
+
+1. **TRANSCRIBE EXACTLY character-by-character** from the image:
+   - Look for fraction coefficients BEFORE parentheses: "1/8(3d - 2)" means multiply (3d-2) by the fraction 1/8
+   - "1/4(d + 5)" means multiply (d+5) by the fraction 1/4
+   - These are LINEAR equations, NOT fractions equal to expressions
+   
+2. **Common patterns you might see:**
+   - "1/8(3d - 2) = 1/4(d + 5)" → This is LINEAR (no d² term), solve with basic algebra
+   - "2/5h - 7 = 12/5h - 2h + 3" → This is LINEAR, collect like terms
+   - "2(4r + 6) = 2/3(12r + 18)" → This is LINEAR, distribute and solve
+   
+3. **OCR DOUBLE-CHECK - Before solving, verify:**
+   ✓ Did you read fraction coefficients correctly? (1/8, 1/4, 2/5, etc.)
+   ✓ Are parentheses in the right place?
+   ✓ Did you capture all variables and signs correctly?
+   ✓ Is there a d² or x² term? (NO = linear equation, use basic algebra)
+   
+4. **SOLUTION METHOD SELECTION:**
+   - If NO squared terms (d², x², etc.) → LINEAR equation → Use: multiply, distribute, collect terms, divide
+   - If you see ax² + bx + c = 0 → QUADRATIC equation → Use: quadratic formula
+   - NEVER use quadratic formula for linear equations!
+   
+5. **Write the EXACT transcription in "problem" field** for verification
 
 RESPONSE FORMAT (JSON):
 {
