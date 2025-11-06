@@ -662,11 +662,15 @@ app.post('/api/analyze-text', async (req, res) => {
 📝 **ESSAY QUESTIONS - SPECIAL FORMAT:**
 **If the question requires an essay/written response** (common in Language Arts, Bible Studies, History, or opinion questions):
 - Use ONLY ONE step with id "1" titled "Key Concepts for Your Essay"
-- In this single step, explain the main themes, arguments, or concepts the student should address
-- Put the COMPLETE ESSAY in the finalAnswer field
+- In this single step, provide GUIDANCE and RECOMMENDATIONS for the student on what themes to address and how to structure their essay
+- Put the COMPLETE, POLISHED, FINAL ESSAY in the finalAnswer field - NOT advice or recommendations
+- **CRITICAL:** The finalAnswer must be the ACTUAL ESSAY ITSELF written as a finished piece, not instructions on how to write it
 - The essay should be well-structured with introduction, body paragraphs, and conclusion
 - Highlight key concepts and vocabulary with [red:term] throughout the essay
-- Example step 1 content: "Your essay should address [blue:three main themes]: the protagonist's journey, the [red:symbolism] of the setting, and the [red:moral lesson]. Begin with an engaging introduction that states your thesis. Each body paragraph should focus on one theme with [blue:specific examples] from the text. Conclude by summarizing how these elements work together."
+- **Example:**
+  - Step 1 content (GUIDANCE): "Your essay should address [blue:three main themes]: the protagonist's journey, the [red:symbolism] of the setting, and the [red:moral lesson]. Begin with an engaging introduction that states your thesis. Each body paragraph should focus on one theme with [blue:specific examples] from the text. Conclude by summarizing how these elements work together."
+  - finalAnswer (ACTUAL ESSAY): "In Harper Lee's novel To Kill a Mockingbird, the protagonist Scout Finch embarks on a transformative journey from innocence to moral awareness. The story explores how childhood experiences shape our understanding of justice and [red:prejudice] in society. Throughout the narrative, Scout's father Atticus serves as a moral compass, teaching her that true courage means standing up for what is right even when facing overwhelming opposition. The [red:symbolism] of the mockingbird represents innocence and the harm caused by destroying it without reason..."
+  - WRONG finalAnswer: "To write this essay, you should discuss the protagonist's journey. Include examples from the text. Make sure to address symbolism..." (This is advice, not an essay!)
 
 RESPONSE FORMAT (JSON):
 {
@@ -1065,11 +1069,15 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
 📝 **ESSAY QUESTIONS - SPECIAL FORMAT:**
 **If the question requires an essay/written response** (common in Language Arts, Bible Studies, History, or opinion questions):
 - Use ONLY ONE step with id "1" titled "Key Concepts for Your Essay"
-- In this single step, explain the main themes, arguments, or concepts the student should address
-- Put the COMPLETE ESSAY in the finalAnswer field
+- In this single step, provide GUIDANCE and RECOMMENDATIONS for the student on what themes to address and how to structure their essay
+- Put the COMPLETE, POLISHED, FINAL ESSAY in the finalAnswer field - NOT advice or recommendations
+- **CRITICAL:** The finalAnswer must be the ACTUAL ESSAY ITSELF written as a finished piece, not instructions on how to write it
 - The essay should be well-structured with introduction, body paragraphs, and conclusion
 - Highlight key concepts and vocabulary with [red:term] throughout the essay
-- Example step 1 content: "Your essay should address [blue:three main themes]: the protagonist's journey, the [red:symbolism] of the setting, and the [red:moral lesson]. Begin with an engaging introduction that states your thesis. Each body paragraph should focus on one theme with [blue:specific examples] from the text. Conclude by summarizing how these elements work together."
+- **Example:**
+  - Step 1 content (GUIDANCE): "Your essay should address [blue:three main themes]: the protagonist's journey, the [red:symbolism] of the setting, and the [red:moral lesson]. Begin with an engaging introduction that states your thesis. Each body paragraph should focus on one theme with [blue:specific examples] from the text. Conclude by summarizing how these elements work together."
+  - finalAnswer (ACTUAL ESSAY): "In Harper Lee's novel To Kill a Mockingbird, the protagonist Scout Finch embarks on a transformative journey from innocence to moral awareness. The story explores how childhood experiences shape our understanding of justice and [red:prejudice] in society. Throughout the narrative, Scout's father Atticus serves as a moral compass, teaching her that true courage means standing up for what is right even when facing overwhelming opposition. The [red:symbolism] of the mockingbird represents innocence and the harm caused by destroying it without reason..."
+  - WRONG finalAnswer: "To write this essay, you should discuss the protagonist's journey. Include examples from the text. Make sure to address symbolism..." (This is advice, not an essay!)
 
 **CRITICAL OCR ACCURACY INSTRUCTIONS - READ CAREFULLY:**
 
