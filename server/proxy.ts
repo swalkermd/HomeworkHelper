@@ -402,6 +402,20 @@ Grade-appropriate language based on difficulty level.`
       }
     );
     
+    // Log AI response for debugging
+    console.log('=== AI RESPONSE DEBUG ===');
+    console.log('Problem:', result.problem);
+    console.log('Subject:', result.subject);
+    console.log('Difficulty:', result.difficulty);
+    console.log('Steps count:', result.steps?.length);
+    if (result.steps && result.steps.length > 0) {
+      result.steps.forEach((step: any, i: number) => {
+        console.log(`\nStep ${i + 1} - ${step.title}`);
+        console.log(`Content preview: ${step.content.substring(0, 200)}`);
+      });
+    }
+    console.log('========================\n');
+    
     // Check if any step needs a diagram and generate it
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
