@@ -332,7 +332,21 @@ async function validateSolution(
   const structureCheck = validateStructure(solution);
   if (!structureCheck.isValid) {
     console.error('❌ Structure validation failed:', structureCheck.errors);
-    throw new Error(`Invalid solution structure: ${structureCheck.errors.join(', ')}`);
+    // Return a failed validation rather than throwing (more graceful)
+    return {
+      solution,
+      validationPassed: false,
+      validationDetails: {
+        timestamp,
+        attempt: attemptNumber,
+        passed: false,
+        confidence: 0,
+        errors: ['Solution format is invalid: ' + structureCheck.errors.join(', ')],
+        warnings: [],
+        subject: solution.subject || 'Unknown',
+        difficulty: solution.difficulty || 'Unknown'
+      }
+    };
   }
   console.log('✓ Structure validation passed');
   
@@ -603,13 +617,21 @@ Grade-appropriate language based on difficulty level.`
     const formattedResult = enforceResponseFormatting(result);
     
     // VALIDATE SOLUTION ACCURACY - Quality control check
-    const { solution: validatedSolution, validationPassed } = await validateSolution(question, formattedResult);
+    const { solution: validatedSolution, validationPassed, validationDetails } = await validateSolution(question, formattedResult);
     
     if (!validationPassed) {
-      console.log('⚠️  Validation concerns logged, but returning solution to user');
+      // Validation failed - do NOT return potentially incorrect solution to student
+      console.error('❌ Solution failed validation - blocking delivery');
+      console.error('Validation details:', validationDetails);
+      
+      return res.status(400).json({ 
+        error: 'We encountered some concerns about the accuracy of this solution. Please try rephrasing your question or breaking it into smaller parts. If this persists, double-check the problem statement for any typos.',
+        validationFailed: true,
+        retryable: true
+      });
     }
     
-    console.log('Analysis successful');
+    console.log('✅ Analysis successful and validated');
     res.json(validatedSolution);
   } catch (error) {
     console.error('Error analyzing text:', error);
@@ -884,13 +906,21 @@ Grade-appropriate language based on difficulty level.`
     
     // VALIDATE SOLUTION ACCURACY - Quality control check
     const problemText = `${formattedResult.problem}${problemNumber ? ` (Problem #${problemNumber})` : ''}`;
-    const { solution: validatedSolution, validationPassed } = await validateSolution(problemText, formattedResult);
+    const { solution: validatedSolution, validationPassed, validationDetails } = await validateSolution(problemText, formattedResult);
     
     if (!validationPassed) {
-      console.log('⚠️  Validation concerns logged, but returning solution to user');
+      // Validation failed - do NOT return potentially incorrect solution to student
+      console.error('❌ Solution failed validation - blocking delivery');
+      console.error('Validation details:', validationDetails);
+      
+      return res.status(400).json({ 
+        error: 'We encountered some concerns about the accuracy of this solution. Please try retaking the photo with better lighting, or type the question manually for better results.',
+        validationFailed: true,
+        retryable: true
+      });
     }
     
-    console.log('Image analysis successful');
+    console.log('✅ Image analysis successful and validated');
     res.json(validatedSolution);
   } catch (error) {
     console.error('Error analyzing image:', error);
