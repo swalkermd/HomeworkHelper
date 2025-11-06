@@ -55,7 +55,13 @@ The application features a responsive design with distinct typography for portra
   - **Timeout Configuration**: Server timeout 300s, client fetch timeout 30s for initial response
 
 ### System Design Choices
-The application uses a proxy server architecture (running on port 5000) that handles API endpoints and proxies frontend requests to the Expo dev server (port 8081). This setup centralizes OpenAI API integration, CORS handling, and ensures all interactions occur through a single exposed port in the Replit environment.
+The application uses a proxy server architecture (running on port 5000) that handles API endpoints and, in development, proxies frontend requests to the Expo dev server (port 8081). This setup centralizes OpenAI API integration, CORS handling, and ensures all interactions occur through a single exposed port in the Replit environment.
+
+**Deployment Configuration (Nov 2025):** The server is configured for Autoscale deployment with environment-aware behavior:
+- **Development**: Proxies root (/) requests to Expo dev server on port 8081 for live frontend development
+- **Production**: Root (/) endpoint returns HTTP 200 health check with API endpoint documentation, satisfying deployment health checks
+- **Conditional Proxying**: Frontend proxy only runs when `NODE_ENV !== 'production'`, preventing failed connections to non-existent Expo dev server in production
+- **Health Checks**: GET / responds with status, message, and available API endpoints for monitoring
 
 ## External Dependencies
 - **AI Integration:** OpenAI GPT-4o via Replit AI Integrations for vision analysis, text analysis, Q&A chat, and image generation (gpt-image-1). No external API key is required, and charges are billed to Replit credits.
