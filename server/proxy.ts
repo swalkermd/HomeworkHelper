@@ -60,7 +60,12 @@ function isRateLimitError(error: any): boolean {
 
 // Enforce proper math formatting - convert ALL fractions to {num/den} format
 function enforceProperFormatting(text: string): string {
-  let formatted = text;
+  // Extract and preserve IMAGE tags to avoid processing their data URLs
+  const imageTags: string[] = [];
+  let formatted = text.replace(/\(IMAGE:[^\)]+\]\([^\)]+\)/g, (match) => {
+    imageTags.push(match);
+    return `__IMAGE_PLACEHOLDER_${imageTags.length - 1}__`;
+  });
   
   // 1. Convert common decimals to fractions (only standalone decimals, not part of larger numbers)
   const decimalToFraction: { [key: string]: string } = {
@@ -82,20 +87,19 @@ function enforceProperFormatting(text: string): string {
   };
   
   // Replace standalone decimals with fractions
-  // Use word boundaries to avoid matching decimals that are part of larger numbers
-  // (?<!\d) = not preceded by a digit (so 10.25 won't match)
-  // (?!\d) = not followed by a digit (so 0.254 won't match)
   for (const [decimal, fraction] of Object.entries(decimalToFraction)) {
     const escapedDecimal = decimal.replace('.', '\\.');
     const regex = new RegExp(`(?<!\\d)${escapedDecimal}(?!\\d)`, 'g');
     formatted = formatted.replace(regex, fraction);
   }
   
-  // 2. Convert standalone fractions like "1/8" to "{1/8}" (but NOT if already in braces or part of a URL)
-  // Match digit(s)/digit(s) that are NOT already inside {}, NOT in URLs, and NOT in special contexts
-  // Negative lookbehind: not preceded by { or /
-  // Negative lookahead: not followed by } or another /
+  // 2. Convert standalone fractions like "1/8" to "{1/8}"
   formatted = formatted.replace(/(?<![{/])(\d+)\/(\d+)(?![}/])/g, '{$1/$2}');
+  
+  // Restore IMAGE tags
+  formatted = formatted.replace(/__IMAGE_PLACEHOLDER_(\d+)__/g, (match, index) => {
+    return imageTags[parseInt(index)];
+  });
   
   return formatted;
 }
