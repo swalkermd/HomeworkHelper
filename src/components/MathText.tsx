@@ -120,7 +120,7 @@ function parseContent(content: string): ParsedPart[] {
             content: desc,
             url: url,
           });
-          i = closingParenIndex;
+          i = closingParenIndex + 1;  // Skip past the closing )
         } else {
           // Malformed tag, treat as text
           currentText += content[i];
