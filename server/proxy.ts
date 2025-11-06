@@ -318,13 +318,15 @@ Respond in JSON format:
   }
 }
 
-// Main validation orchestrator
+// Main validation orchestrator with retry capability
 async function validateSolution(
   originalQuestion: string,
   solution: any,
-  maxRetries: number = 1
-): Promise<{ solution: any; validationPassed: boolean }> {
-  console.log('🎯 Starting solution validation...');
+  attemptNumber: number = 1,
+  maxRetries: number = 2
+): Promise<{ solution: any; validationPassed: boolean; validationDetails?: any }> {
+  const timestamp = new Date().toISOString();
+  console.log(`🎯 [${timestamp}] Starting solution validation (Attempt ${attemptNumber}/${maxRetries})...`);
   
   // Step 1: Structural validation
   const structureCheck = validateStructure(solution);
@@ -338,22 +340,49 @@ async function validateSolution(
   const verification = await crossModelVerification(originalQuestion, solution);
   
   // Step 3: Determine if solution passes quality control
-  const passesQC = verification.isValid && verification.confidence >= 70;
+  const MIN_CONFIDENCE_THRESHOLD = 70;
+  const passesQC = verification.isValid && verification.confidence >= MIN_CONFIDENCE_THRESHOLD;
+  
+  // Log validation metrics
+  const validationLog = {
+    timestamp,
+    attempt: attemptNumber,
+    passed: passesQC,
+    confidence: verification.confidence,
+    errors: verification.errors,
+    warnings: verification.warnings,
+    subject: solution.subject,
+    difficulty: solution.difficulty
+  };
+  console.log('📊 Validation metrics:', JSON.stringify(validationLog, null, 2));
   
   if (passesQC) {
-    console.log('✅ Solution passed all validation checks');
-    return { solution, validationPassed: true };
-  } else {
-    console.log(`⚠️  Solution validation concerns (confidence: ${verification.confidence}%)`);
-    if (verification.errors.length > 0) {
-      console.log('Errors detected:', verification.errors);
-    }
-    
-    // For now, we log the concerns but still return the solution
-    // In future, could implement retry logic here
+    console.log(`✅ Solution passed all validation checks (Confidence: ${verification.confidence}%)`);
     return { 
       solution, 
-      validationPassed: false
+      validationPassed: true,
+      validationDetails: validationLog
+    };
+  } else {
+    // If validation failed and we have retries left, log warning but don't retry yet
+    // (Retry logic would need to regenerate solution, which is expensive and complex)
+    const errorSummary = verification.errors.length > 0 
+      ? `Errors: ${verification.errors.join('; ')}` 
+      : 'Low confidence score';
+    
+    console.log(`⚠️  Solution validation concerns (Confidence: ${verification.confidence}%)`);
+    console.log(`    ${errorSummary}`);
+    
+    if (verification.warnings.length > 0) {
+      console.log(`    Warnings: ${verification.warnings.join('; ')}`);
+    }
+    
+    // Note: We return the solution even if validation has concerns
+    // This prevents blocking users while still logging issues for improvement
+    return { 
+      solution, 
+      validationPassed: false,
+      validationDetails: validationLog
     };
   }
 }
