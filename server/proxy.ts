@@ -700,6 +700,10 @@ RESPONSE FORMAT (JSON):
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
+- **MULTIPLE CHOICE QUESTIONS:** If the question provides answer choices (A, B, C, D), ALWAYS include the correct letter in the final answer:
+  - CORRECT: "[red:C) Mitochondrion]" or "[red:C)] [red:Mitochondrion]"
+  - WRONG: "[red:Mitochondrion]" (missing the letter C)
+  - The letter must be clearly visible so students know which option is correct
 - **MULTI-PART ANSWERS:** If the question has multiple parts OR your answer has multiple numbered/lettered items, put each part on its own line:
   - CORRECT (letters): "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
   - CORRECT (numbers): "1. [blue:Patient Preparation]: ... \n 2. [blue:Ultrasound Guidance]: ... \n 3. [blue:Sterile Field]: ..."
@@ -1145,6 +1149,10 @@ RESPONSE FORMAT (JSON):
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
+- **MULTIPLE CHOICE QUESTIONS:** If the question provides answer choices (A, B, C, D), ALWAYS include the correct letter in the final answer:
+  - CORRECT: "[red:C) Mitochondrion]" or "[red:C)] [red:Mitochondrion]"
+  - WRONG: "[red:Mitochondrion]" (missing the letter C)
+  - The letter must be clearly visible so students know which option is correct
 - **MULTI-PART ANSWERS:** If the question has multiple parts OR your answer has multiple numbered/lettered items, put each part on its own line:
   - CORRECT (letters): "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
   - CORRECT (numbers): "1. [blue:Patient Preparation]: ... \n 2. [blue:Ultrasound Guidance]: ... \n 3. [blue:Sterile Field]: ..."
