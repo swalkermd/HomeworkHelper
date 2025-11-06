@@ -138,6 +138,16 @@ function enforceProperFormatting(text: string | null | undefined): string {
     return `__IMAGE_PLACEHOLDER_${imageTags.length - 1}__`;
   });
   
+  // 0. Normalize whitespace: replace single newlines with spaces, preserve double newlines (paragraph breaks)
+  // First, normalize all line endings to \n
+  formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // Replace single newlines (not followed by another newline) with a space
+  formatted = formatted.replace(/\n(?!\n)/g, ' ');
+  // Clean up multiple spaces
+  formatted = formatted.replace(/ +/g, ' ');
+  // Preserve double newlines as paragraph breaks
+  formatted = formatted.replace(/\n\n+/g, '\n\n');
+  
   // 1. Convert common decimals to fractions (only standalone decimals, not part of larger numbers)
   const decimalToFraction: { [key: string]: string } = {
     '0.125': '{1/8}',
