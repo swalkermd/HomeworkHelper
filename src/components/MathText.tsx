@@ -67,12 +67,16 @@ function parseContent(content: string): ParsedPart[] {
       const fractionContent = content.substring(i + 1, endIndex);
       const [num, den] = fractionContent.split('/');
       if (num && den) {
+        // This is a fraction like {1/8}
         parts.push({
           type: 'fraction',
           content: fractionContent,
           numerator: num.trim(),
           denominator: den.trim(),
         });
+      } else {
+        // This is just text in braces like {8}, treat as normal text
+        parts.push({ type: 'text', content: `{${fractionContent}}` });
       }
       i = endIndex + 1;
     } else if (content[i] === '[' && content.indexOf(':', i) > i && content.indexOf(']', i) > i) {
