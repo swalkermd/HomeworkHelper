@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.primary,
     paddingVertical: spacing.md,
     borderRadius: 12,
     alignItems: 'center',
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   simplifyButton: {
-    backgroundColor: '#f97316',
+    backgroundColor: '#fbbf24',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: 12,
