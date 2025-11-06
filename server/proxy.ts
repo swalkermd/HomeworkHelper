@@ -586,6 +586,15 @@ app.post('/api/analyze-text', async (req, res) => {
 - NEVER skip color highlighting - it's essential for student understanding!
 - **CRITICAL:** Keep all text (including punctuation) on the SAME LINE as color tags. NEVER write: "[red:phototropism]\n." Instead write: "[red:phototropism]."
 
+📝 **ESSAY QUESTIONS - SPECIAL FORMAT:**
+**If the question requires an essay/written response** (common in Language Arts, Bible Studies, History, or opinion questions):
+- Use ONLY ONE step with id "1" titled "Key Concepts for Your Essay"
+- In this single step, explain the main themes, arguments, or concepts the student should address
+- Put the COMPLETE ESSAY in the finalAnswer field
+- The essay should be well-structured with introduction, body paragraphs, and conclusion
+- Highlight key concepts and vocabulary with [red:term] throughout the essay
+- Example step 1 content: "Your essay should address [blue:three main themes]: the protagonist's journey, the [red:symbolism] of the setting, and the [red:moral lesson]. Begin with an engaging introduction that states your thesis. Each body paragraph should focus on one theme with [blue:specific examples] from the text. Conclude by summarizing how these elements work together."
+
 RESPONSE FORMAT (JSON):
 {
   "problem": "Restate the problem clearly",
@@ -956,6 +965,15 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
 - Example: "Multiply both sides by [blue:8 ×] to eliminate fractions: [blue:8 ×] {1/8}(3d - 2) = [blue:8 ×] {1/4}(d + 5) simplifies to [red:(3d - 2) = 2(d + 5)]"
 - NEVER skip color highlighting - it's essential for student understanding!
 - **CRITICAL:** Keep all text (including punctuation) on the SAME LINE as color tags. NEVER write: "[red:phototropism]\n." Instead write: "[red:phototropism]."
+
+📝 **ESSAY QUESTIONS - SPECIAL FORMAT:**
+**If the question requires an essay/written response** (common in Language Arts, Bible Studies, History, or opinion questions):
+- Use ONLY ONE step with id "1" titled "Key Concepts for Your Essay"
+- In this single step, explain the main themes, arguments, or concepts the student should address
+- Put the COMPLETE ESSAY in the finalAnswer field
+- The essay should be well-structured with introduction, body paragraphs, and conclusion
+- Highlight key concepts and vocabulary with [red:term] throughout the essay
+- Example step 1 content: "Your essay should address [blue:three main themes]: the protagonist's journey, the [red:symbolism] of the setting, and the [red:moral lesson]. Begin with an engaging introduction that states your thesis. Each body paragraph should focus on one theme with [blue:specific examples] from the text. Conclude by summarizing how these elements work together."
 
 **CRITICAL OCR ACCURACY INSTRUCTIONS - READ CAREFULLY:**
 
