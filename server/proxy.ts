@@ -256,7 +256,13 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   
   // 1. Convert standalone fractions like "1/8" to "{1/8}" (for OCR-detected fractions)
   // NOTE: We no longer force decimal→fraction conversion. Format should match input.
+  const beforeFractionConversion = formatted;
   formatted = formatted.replace(/(?<![{/])(\d+)\/(\d+)(?![}/])/g, '{$1/$2}');
+  if (debugLabel === 'problem' && beforeFractionConversion !== formatted) {
+    console.log(`🔢 FRACTION CONVERSION in [${debugLabel}]:`);
+    console.log(`   BEFORE: ${JSON.stringify(beforeFractionConversion)}`);
+    console.log(`   AFTER:  ${JSON.stringify(formatted)}`);
+  }
   
   // Restore IMAGE tags
   formatted = formatted.replace(/__IMAGE_PLACEHOLDER_(\d+)__/g, (match, index) => {
@@ -294,7 +300,9 @@ function enforceResponseFormatting(response: any): any {
   
   // Fix problem field
   if (formatted.problem) {
+    console.log(`📝 BEFORE formatting problem: "${formatted.problem}"`);
     formatted.problem = enforceProperFormatting(formatted.problem, 'problem');
+    console.log(`✅ AFTER formatting problem: "${formatted.problem}"`);
   }
   
   // Fix all step content and titles

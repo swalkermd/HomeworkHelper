@@ -257,8 +257,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
           </TouchableOpacity>
         </View>
         
-        <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>Ready for More?</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+        <TouchableOpacity onPress={() => navigation.navigate('Home')} style={{ marginTop: spacing.sm }}>
           <View style={styles.newProblemOutlineButton}>
             <Ionicons name="add-circle" size={22} color="#10b981" />
             <Text style={styles.newProblemOutlineButtonText}>New Problem</Text>
