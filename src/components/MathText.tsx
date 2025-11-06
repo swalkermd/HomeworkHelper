@@ -35,9 +35,7 @@ export default function MathText({ content, fontSize = 14, color = colors.textPr
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.text, { fontSize, color }]}>
-        {parsedContent.map((part, index) => renderPart(part, index, fontSize, color, isOnGreenBackground))}
-      </Text>
+      {parsedContent.map((part, index) => renderPart(part, index, fontSize, color, isOnGreenBackground))}
     </View>
   );
 }
@@ -158,7 +156,7 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     case 'highlighted':
       const highlightColor = getHighlightColor(part.color || '');
       return (
-        <Text key={index} style={{ color: highlightColor, fontWeight: '600' }}>
+        <Text key={index} style={{ fontSize: baseFontSize, color: highlightColor, fontWeight: '600' }}>
           {part.content}
         </Text>
       );
@@ -173,7 +171,7 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     
     case 'italic':
       return (
-        <Text key={index} style={{ fontStyle: 'italic' }}>
+        <Text key={index} style={{ fontSize: baseFontSize, color: baseColor, fontStyle: 'italic' }}>
           {part.content}
         </Text>
       );
@@ -181,7 +179,7 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     case 'subscript':
       const subscriptText = part.content.split('').map(char => SUBSCRIPT_MAP[char] || char).join('');
       return (
-        <Text key={index} style={{ fontSize: baseFontSize * 0.7 }}>
+        <Text key={index} style={{ fontSize: baseFontSize * 0.7, color: baseColor }}>
           {subscriptText}
         </Text>
       );
@@ -189,7 +187,7 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     case 'superscript':
       const superscriptText = part.content.split('').map(char => SUPERSCRIPT_MAP[char] || char).join('');
       return (
-        <Text key={index} style={{ fontSize: baseFontSize * 0.7 }}>
+        <Text key={index} style={{ fontSize: baseFontSize * 0.7, color: baseColor }}>
           {superscriptText}
         </Text>
       );
@@ -213,7 +211,11 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     
     case 'text':
     default:
-      return <Text key={index}>{part.content}</Text>;
+      return (
+        <Text key={index} style={{ fontSize: baseFontSize, color: baseColor }}>
+          {part.content}
+        </Text>
+      );
   }
 }
 
@@ -236,21 +238,17 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  text: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    alignItems: 'baseline',
   },
   fractionContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 2,
-    marginTop: -5,
+    transform: [{ translateY: -5 }],
   },
   fractionText: {
     textAlign: 'center',
+    lineHeight: 12,
   },
   fractionLine: {
     height: 1,
