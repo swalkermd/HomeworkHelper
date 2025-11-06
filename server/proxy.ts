@@ -743,6 +743,18 @@ Grade-appropriate language based on difficulty level.`
     // Wait for all diagrams to complete in parallel (errors already handled per-promise)
     await Promise.all(diagramPromises);
     
+    // CLEANUP: Remove any remaining [DIAGRAM NEEDED] tags (from failed generations or unprocessed tags)
+    // Using [\s\S]*? to match any content including nested brackets, newlines, etc.
+    for (const step of result.steps) {
+      if (step.content) {
+        const beforeCleanup = step.content;
+        step.content = step.content.replace(/\[DIAGRAM NEEDED:[\s\S]*?\]/g, '');
+        if (beforeCleanup !== step.content) {
+          console.log(`⚠️ Removed [DIAGRAM NEEDED] placeholder from step ${step.id} (diagram generation likely failed)`);
+        }
+      }
+    }
+    
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
@@ -1141,6 +1153,18 @@ Grade-appropriate language based on difficulty level.`
     
     // Wait for all diagrams to complete in parallel (errors already handled per-promise)
     await Promise.all(diagramPromises);
+    
+    // CLEANUP: Remove any remaining [DIAGRAM NEEDED] tags (from failed generations or unprocessed tags)
+    // Using [\s\S]*? to match any content including nested brackets, newlines, etc.
+    for (const step of result.steps) {
+      if (step.content) {
+        const beforeCleanup = step.content;
+        step.content = step.content.replace(/\[DIAGRAM NEEDED:[\s\S]*?\]/g, '');
+        if (beforeCleanup !== step.content) {
+          console.log(`⚠️ Removed [DIAGRAM NEEDED] placeholder from step ${step.id} (diagram generation likely failed)`);
+        }
+      }
+    }
     
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
