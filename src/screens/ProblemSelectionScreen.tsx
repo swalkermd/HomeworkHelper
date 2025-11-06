@@ -18,20 +18,40 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
   const setCurrentSolution = useHomeworkStore((state) => state.setCurrentSolution);
 
   const handleAnalyze = async () => {
-    if (!currentImage || isLoading) return;
+    console.log('🔘 handleAnalyze called, currentImage:', !!currentImage, 'isLoading:', isLoading);
+    
+    if (!currentImage) {
+      console.error('❌ No current image!');
+      alert('No image selected. Please try again.');
+      return;
+    }
+    
+    if (isLoading) {
+      console.log('⚠️ Already loading, ignoring click');
+      return;
+    }
 
+    console.log('✅ Starting analysis...');
     setIsLoading(true);
+    
     try {
       console.log('Converting image to base64...');
+      console.log('Image URI:', currentImage.uri.substring(0, 50) + '...');
+      
       const base64Image = await convertImageToBase64(currentImage.uri);
-      console.log('Image converted, analyzing...');
+      console.log('Image converted, size:', base64Image.length, 'chars');
+      console.log('Analyzing with problem number:', problemNumber || 'none');
+      
       const solution = await analyzeImageQuestion(base64Image, problemNumber);
+      console.log('✅ Solution received:', solution ? 'yes' : 'no');
+      
       setCurrentSolution(solution);
+      console.log('Navigating to Solution screen...');
       navigation.navigate('Solution');
     } catch (error) {
-      console.error('Error analyzing image:', error);
-      alert('Failed to analyze image. Please try again.');
-    } finally {
+      console.error('❌ Error analyzing image:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      alert(`Failed to analyze image: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsLoading(false);
     }
   };
