@@ -180,15 +180,16 @@ function parseContent(content: string): ParsedPart[] {
       const superscriptContent = content.substring(i + 1, endIndex);
       parts.push({ type: 'superscript', content: superscriptContent });
       i = endIndex + 1;
-    } else if (content[i] === '+' && content.indexOf('+', i + 1) > i) {
+    } else if (content[i] === '+' && content[i + 1] === '+' && content.indexOf('++', i + 2) > i) {
+      // Only treat ++ as italic markers (not single + which is math operator)
       if (currentText) {
         parts.push({ type: 'text', content: currentText });
         currentText = '';
       }
-      const endIndex = content.indexOf('+', i + 1);
-      const italicContent = content.substring(i + 1, endIndex);
+      const endIndex = content.indexOf('++', i + 2);
+      const italicContent = content.substring(i + 2, endIndex);
       parts.push({ type: 'italic', content: italicContent });
-      i = endIndex + 1;
+      i = endIndex + 2;
     } else {
       currentText += content[i];
       i++;

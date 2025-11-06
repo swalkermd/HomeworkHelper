@@ -898,15 +898,21 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
    - "1/4(d + 5)" means multiply (d+5) by the fraction 1/4
    - These are LINEAR equations, NOT fractions equal to expressions
    
-2. **Common patterns you might see:**
+2. **⚠️ COMMON OCR MISTAKES TO AVOID:**
+   - DO NOT misread "1/8" as "12/8" or "18" - check if it's a SINGLE digit numerator
+   - DO NOT misread "1/4" as "14" or "1/14" - look for the slash carefully
+   - DO NOT misread "+" as missing - "(d + 5)" must keep the plus sign
+   - Fractions like 1/8, 1/4, 1/2, 1/3 are VERY common in homework - don't overcomplicate them!
+   
+3. **Common patterns you might see:**
    - "1/8(3d - 2) = 1/4(d + 5)" → This is LINEAR (no d² term), solve with basic algebra
    - "2/5h - 7 = 12/5h - 2h + 3" → This is LINEAR, collect like terms
    - "2(4r + 6) = 2/3(12r + 18)" → This is LINEAR, distribute and solve
    
-3. **OCR DOUBLE-CHECK - Before solving, verify:**
-   ✓ Did you read fraction coefficients correctly? (1/8, 1/4, 2/5, etc.)
+4. **OCR DOUBLE-CHECK - Before solving, verify:**
+   ✓ Did you read fraction coefficients correctly? Is "1/8" actually 1/8 or did you misread as 12/8?
    ✓ Are parentheses in the right place?
-   ✓ Did you capture all variables and signs correctly?
+   ✓ Did you capture all variables and signs correctly? Check for +, -, ×, ÷
    ✓ Is there a d² or x² term? (NO = linear equation, use basic algebra)
    
 4. **SOLUTION METHOD SELECTION:**
