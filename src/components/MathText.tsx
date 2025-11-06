@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 2,
-    transform: [{ translateY: -3 }],
+    transform: [{ translateY: -6 }],
   },
   fractionText: {
     textAlign: 'center',
