@@ -423,6 +423,12 @@ app.post('/api/analyze-text', async (req, res) => {
                 role: "system",
                 content: `You are an expert educational AI tutor. Analyze the homework question and provide a step-by-step solution with proper formatting.
 
+🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
+- Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
+- Use [red:result] for the outcome (e.g., "= [red:24]")
+- Example: "Multiply both sides by [blue:8]: [blue:8] × {1/8}(3d - 2) = [blue:8] × {1/4}(d + 5) simplifies to (3d - 2) = [red:2(d + 5)]"
+- NEVER skip color highlighting - it's essential for student understanding!
+
 RESPONSE FORMAT (JSON):
 {
   "problem": "Restate the problem clearly",
@@ -748,6 +754,12 @@ app.post('/api/analyze-image', async (req, res) => {
                 content: `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
 
 ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multiple problems exist, solve the most prominent one.'}
+
+🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
+- Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
+- Use [red:result] for the outcome (e.g., "= [red:24]")
+- Example: "Multiply both sides by [blue:8]: [blue:8] × {1/8}(3d - 2) = [blue:8] × {1/4}(d + 5) simplifies to (3d - 2) = [red:2(d + 5)]"
+- NEVER skip color highlighting - it's essential for student understanding!
 
 **CRITICAL OCR ACCURACY INSTRUCTIONS - READ CAREFULLY:**
 
