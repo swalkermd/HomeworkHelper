@@ -239,8 +239,8 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   formatted = formatted.replace(/[\u200B-\u200D\uFEFF]/g, '');
   
   // Preserve newlines before multi-part answer markers by using a temporary placeholder
-  // Match patterns like "\n a)" or "\n b)" or "\n c)" etc.
-  formatted = formatted.replace(/\n\s*([a-z]\))/gi, '__LINEBREAK__$1');
+  // Match patterns like "\n a)" or "\n b)" or "\n c)" or "\n 1." or "\n 2." or "\n 1)" etc.
+  formatted = formatted.replace(/\n\s*([a-z]\)|\d+\.|\d+\))/gi, '__LINEBREAK__$1');
   
   // Convert ALL other newlines (single or multiple) to single space
   formatted = formatted.replace(/\n+/g, ' ');
@@ -292,10 +292,10 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   
   // CRITICAL: Final whitespace scrub AFTER all transformations (including image restoration)
   // This catches any newlines that may have been reintroduced by image tags or other operations
-  // BUT preserve multi-part answer line breaks (a), b), c))
+  // BUT preserve multi-part answer line breaks (a), b), c), 1., 2., 1), 2))
   
   // First, preserve multi-part answer line breaks again
-  formatted = formatted.replace(/\n\s*([a-z]\))/gi, '__LINEBREAK__$1');
+  formatted = formatted.replace(/\n\s*([a-z]\)|\d+\.|\d+\))/gi, '__LINEBREAK__$1');
   
   // Remove other line separator characters
   formatted = formatted.replace(/[\r\n\u2028\u2029]+/g, ' ');  // All line separator characters
@@ -696,9 +696,11 @@ RESPONSE FORMAT (JSON):
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
-- **MULTI-PART ANSWERS:** If the question has multiple parts (a, b, c), put each part on its own line:
-  - CORRECT: "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
+- **MULTI-PART ANSWERS:** If the question has multiple parts OR your answer has multiple numbered/lettered items, put each part on its own line:
+  - CORRECT (letters): "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
+  - CORRECT (numbers): "1. [blue:Patient Preparation]: ... \n 2. [blue:Ultrasound Guidance]: ... \n 3. [blue:Sterile Field]: ..."
   - WRONG: "a) v = 15 m/s, b) h = 11.5 m, c) t = 3.1 s" (all on one line)
+  - WRONG: "1. Step one 2. Step two 3. Step three" (all on one line)
 
 **CRITICAL: visualAids array is REQUIRED for:**
 - Physics: projectile motion, force diagrams, circuits, kinematics
@@ -1135,9 +1137,11 @@ RESPONSE FORMAT (JSON):
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
-- **MULTI-PART ANSWERS:** If the question has multiple parts (a, b, c), put each part on its own line:
-  - CORRECT: "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
+- **MULTI-PART ANSWERS:** If the question has multiple parts OR your answer has multiple numbered/lettered items, put each part on its own line:
+  - CORRECT (letters): "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
+  - CORRECT (numbers): "1. [blue:Patient Preparation]: ... \n 2. [blue:Ultrasound Guidance]: ... \n 3. [blue:Sterile Field]: ..."
   - WRONG: "a) v = 15 m/s, b) h = 11.5 m, c) t = 3.1 s" (all on one line)
+  - WRONG: "1. Step one 2. Step two 3. Step three" (all on one line)
 
 **CRITICAL: visualAids array is REQUIRED for:**
 - Physics: projectile motion, force diagrams, circuits, kinematics
