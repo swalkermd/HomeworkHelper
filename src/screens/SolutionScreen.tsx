@@ -402,8 +402,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   simplifiedLabel: {
-    fontSize: typography.bodyMedium.fontSize,
-    lineHeight: typography.bodyMedium.lineHeight,
+    fontSize: typography.bodyLarge.fontSize,
+    lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
     color: '#f59e0b',
   },
