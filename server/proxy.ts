@@ -257,8 +257,19 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   // 1. Convert standalone fractions like "1/8" to "{1/8}" (for OCR-detected fractions)
   // NOTE: We no longer force decimal→fraction conversion. Format should match input.
   const beforeFractionConversion = formatted;
+  
+  // First, convert ALL fractions INSIDE color tags: [blue:12/5h - 10/5h] -> [blue:{12/5}h - {10/5}h]
+  // This regex handles multiple fractions within a single color tag by processing each tag's content
+  formatted = formatted.replace(/\[(blue|red):([^\]]+)\]/g, (match, color, content) => {
+    // Convert all fractions inside this color tag's content
+    const convertedContent = content.replace(/(?<![{/])(\d+)\/(\d+)(?![}/])/g, '{$1/$2}');
+    return `[${color}:${convertedContent}]`;
+  });
+  
+  // Then, convert any remaining standalone fractions outside color tags
   formatted = formatted.replace(/(?<![{/])(\d+)\/(\d+)(?![}/])/g, '{$1/$2}');
-  if (debugLabel === 'problem' && beforeFractionConversion !== formatted) {
+  
+  if (debugLabel && beforeFractionConversion !== formatted) {
     console.log(`🔢 FRACTION CONVERSION in [${debugLabel}]:`);
     console.log(`   BEFORE: ${JSON.stringify(beforeFractionConversion)}`);
     console.log(`   AFTER:  ${JSON.stringify(formatted)}`);
