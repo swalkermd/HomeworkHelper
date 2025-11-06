@@ -118,8 +118,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   title: {
-    fontSize: 48,
-    lineHeight: 56,
+    fontSize: 36,
+    lineHeight: 44,
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.xl,
