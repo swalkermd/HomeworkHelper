@@ -551,18 +551,11 @@ Grade-appropriate language based on difficulty level.`
     }
     console.log('========================\n');
     
-    // Check if any step needs a diagram and generate it
+    // Remove diagram markers (feature disabled due to React Native Web rendering issues)
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
-        const diagramDescription = diagramMatch[1];
-        const diagramUrl = await generateDiagram(diagramDescription);
-        if (diagramUrl) {
-          // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
-          const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
-          step.content = step.content.replace(diagramMatch[0], imageTag);
-          console.log('✓ Diagram embedded:', diagramUrl);
-        }
+        step.content = step.content.replace(diagramMatch[0], '');
       }
     }
     
