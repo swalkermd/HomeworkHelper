@@ -1262,8 +1262,14 @@ app.use('/', createProxyMiddleware({
   }
 }));
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Proxy server with API running on port ${PORT}`);
   console.log(`   API endpoints available at /api/*`);
   console.log(`   Frontend proxied from port 8081`);
 });
+
+// Increase server timeout to 5 minutes for long-running AI requests (diagram generation, validation, etc.)
+server.timeout = 300000; // 5 minutes in milliseconds
+server.keepAliveTimeout = 310000; // Slightly higher than timeout
+server.headersTimeout = 320000; // Slightly higher than keepAliveTimeout
+console.log(`⏱️  Server timeout set to ${server.timeout/1000} seconds`);
