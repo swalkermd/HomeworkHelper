@@ -100,20 +100,33 @@ function parseContent(content: string): ParsedPart[] {
       }
       parts.push({ type: 'arrow', content: content.substring(i, i + 2) });
       i += 2;
-    } else if (content[i] === '(' && content.substring(i, i + 7) === '(IMAGE:' && content.indexOf(']', i) > i) {
-      if (currentText) {
-        parts.push({ type: 'text', content: currentText });
-        currentText = '';
+    } else if (content[i] === '(' && content.substring(i, i + 7) === '(IMAGE:') {
+      // Find the closing parenthesis to get the full image tag: (IMAGE: desc](url)
+      const closingParenIndex = content.indexOf(')', i + 7);
+      if (closingParenIndex > i) {
+        if (currentText) {
+          parts.push({ type: 'text', content: currentText });
+          currentText = '';
+        }
+        // Extract everything between (IMAGE: and )
+        const imageContent = content.substring(i + 7, closingParenIndex);
+        const separatorIndex = imageContent.indexOf('](');
+        if (separatorIndex > -1) {
+          const desc = imageContent.substring(0, separatorIndex).trim();
+          const url = imageContent.substring(separatorIndex + 2).trim();
+          parts.push({
+            type: 'image',
+            content: desc,
+            url: url,
+          });
+          i = closingParenIndex;
+        } else {
+          // Malformed tag, treat as text
+          currentText += content[i];
+        }
+      } else {
+        currentText += content[i];
       }
-      const endIndex = content.indexOf(']', i);
-      const imageContent = content.substring(i + 7, endIndex);
-      const [desc, url] = imageContent.split('](');
-      parts.push({
-        type: 'image',
-        content: desc.trim(),
-        url: url?.trim(),
-      });
-      i = endIndex + 1;
     } else if (content[i] === '_' && content.indexOf('_', i + 1) > i) {
       if (currentText) {
         parts.push({ type: 'text', content: currentText });
