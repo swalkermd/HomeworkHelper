@@ -1685,23 +1685,18 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API server is running' });
 });
 
-// Health check endpoint for deployment
-app.get('/', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
-    message: 'Homework Helper API is running',
-    endpoints: {
-      analyzeText: '/api/analyze-text',
-      analyzeImage: '/api/analyze-image',
-      askQuestion: '/api/ask-question',
-      diagramStatus: '/api/diagram-status/:solutionId',
-      health: '/api/health'
-    }
+// Serve static files in production, proxy in development
+if (process.env.NODE_ENV === 'production') {
+  // In production, serve the built Expo web app
+  const distPath = path.join(process.cwd(), 'dist');
+  app.use(express.static(distPath));
+  
+  // Serve index.html for all non-API routes (SPA routing)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
   });
-});
-
-// Only proxy to frontend in development (when Expo dev server is running)
-if (process.env.NODE_ENV !== 'production') {
+} else {
+  // In development, proxy to Expo dev server
   app.use('/', createProxyMiddleware({
     target: 'http://localhost:8081',
     changeOrigin: false,
