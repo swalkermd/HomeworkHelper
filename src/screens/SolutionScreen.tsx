@@ -215,41 +215,57 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
       </ScrollView>
 
       <View style={styles.actionBar}>
+        <Text style={styles.sectionLabel}>Need More Help?</Text>
         <View style={styles.actionRow}>
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('Question')}
+            onPress={handleSimplifyExplanation}
+            disabled={loadingSimplified}
+            style={styles.helpButton}
           >
-            <Text style={styles.actionButtonText}>Ask Question</Text>
+            <LinearGradient
+              colors={simplifiedMode ? ['#10b981', '#059669'] : ['#a78bfa', '#8b5cf6']}
+              style={styles.gradientButton}
+            >
+              {loadingSimplified ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <>
+                  <Ionicons 
+                    name={simplifiedMode ? "checkmark-circle" : "bulb"} 
+                    size={20} 
+                    color="#ffffff" 
+                  />
+                  <Text style={styles.helpButtonText}>
+                    {simplifiedMode ? "Hide" : "Simplify"}
+                  </Text>
+                </>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={styles.actionButtonOutline}
-            onPress={() => navigation.navigate('Home')}
+            style={styles.helpButton}
+            onPress={() => navigation.navigate('Question')}
           >
-            <Text style={styles.actionButtonOutlineText}>New Problem</Text>
+            <LinearGradient
+              colors={['#60a5fa', '#3b82f6']}
+              style={styles.gradientButton}
+            >
+              <Ionicons name="chatbubble-ellipses" size={20} color="#ffffff" />
+              <Text style={styles.helpButtonText}>Ask Question</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
         
-        <TouchableOpacity
-          style={[styles.simplifyButton, simplifiedMode && styles.simplifyButtonActive]}
-          onPress={handleSimplifyExplanation}
-          disabled={loadingSimplified}
-        >
-          {loadingSimplified ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <>
-              <Ionicons 
-                name={simplifiedMode ? "checkmark-circle" : "help-circle"} 
-                size={20} 
-                color="#ffffff" 
-              />
-              <Text style={styles.simplifyButtonText}>
-                {simplifiedMode ? "Hide Simpler Explanations" : "I Still Don't Get It"}
-              </Text>
-            </>
-          )}
+        <Text style={[styles.sectionLabel, { marginTop: spacing.lg }]}>Ready for More?</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+          <LinearGradient
+            colors={['#10b981', '#059669']}
+            style={styles.newProblemButton}
+          >
+            <Ionicons name="add-circle" size={22} color="#ffffff" />
+            <Text style={styles.newProblemButtonText}>New Problem</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </View>
@@ -392,57 +408,56 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     padding: spacing.lg,
+    paddingBottom: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
   },
+  sectionLabel: {
+    fontSize: typography.bodyLarge.fontSize,
+    lineHeight: typography.bodyLarge.lineHeight,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
   actionRow: {
     flexDirection: 'row',
     gap: spacing.md,
+    marginBottom: spacing.md,
   },
-  actionButton: {
+  helpButton: {
     flex: 1,
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    borderRadius: 12,
-    alignItems: 'center',
   },
-  actionButtonText: {
+  gradientButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  helpButtonText: {
     fontSize: typography.bodyLarge.fontSize,
     lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
     color: '#ffffff',
   },
-  actionButtonOutline: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: colors.secondary,
+  newProblemButton: {
     paddingVertical: spacing.md,
     borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
   },
-  actionButtonOutlineText: {
+  newProblemButtonText: {
     fontSize: typography.bodyLarge.fontSize,
     lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  simplifyButton: {
-    backgroundColor: '#fbbf24',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  simplifyButtonActive: {
-    backgroundColor: '#10b981',
+    color: '#ffffff',
   },
   diagramContainer: {
     marginTop: spacing.md,
@@ -467,12 +482,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginTop: spacing.sm,
-  },
-  simplifyButtonText: {
-    fontSize: typography.bodyLarge.fontSize,
-    lineHeight: typography.bodyLarge.lineHeight,
-    fontWeight: '600',
-    color: '#ffffff',
   },
   simplifiedBox: {
     backgroundColor: '#fef3c7',
