@@ -292,8 +292,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   image: {
-    width: 300,
-    height: 300,
+    width: '100%',
+    maxWidth: 400,
+    aspectRatio: 1,
     borderRadius: 8,
   },
   imageCaption: {
