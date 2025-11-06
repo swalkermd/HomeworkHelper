@@ -197,6 +197,23 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
     return imageTags[parseInt(index)];
   });
   
+  // CRITICAL: Final whitespace scrub AFTER all transformations (including image restoration)
+  // This catches any newlines that may have been reintroduced by image tags or other operations
+  formatted = formatted.replace(/[\r\n\u2028\u2029]+/g, ' ');  // All line separator characters
+  formatted = formatted.replace(/[\s\u00A0\u202F]+/g, ' ');     // Normalize all whitespace
+  formatted = formatted.replace(/[\s\u00A0\u202F]+([.,!?;:])/g, '$1');  // Remove spaces before punctuation
+  formatted = formatted.trim();
+  
+  // Enhanced debug logging - show full string with newline detection
+  if (debugLabel) {
+    const hasNewlines = /[\r\n\u2028\u2029]/.test(formatted);
+    const length = formatted.length;
+    if (hasNewlines) {
+      console.log(`\n⚠️  NEWLINES DETECTED in [${debugLabel}] (length: ${length})`);
+      console.log(`   Full text: ${JSON.stringify(formatted)}`);
+    }
+  }
+  
   return formatted;
 }
 
