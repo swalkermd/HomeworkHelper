@@ -1,4 +1,14 @@
-const API_URL = 'http://localhost:3000/api';
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname.includes('replit.dev')) {
+      return `https://${hostname.replace('-00-', '-03-')}`;
+    }
+  }
+  return 'http://localhost:3000';
+};
+
+const API_URL = `${getApiUrl()}/api`;
 
 export async function analyzeTextQuestion(question: string): Promise<any> {
   try {
