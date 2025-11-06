@@ -75,8 +75,8 @@ function parseContent(content: string): ParsedPart[] {
           denominator: den.trim(),
         });
       } else {
-        // This is just text in braces like {8}, treat as normal text
-        parts.push({ type: 'text', content: `{${fractionContent}}` });
+        // This is just text in braces like {8}, display without braces
+        parts.push({ type: 'text', content: fractionContent });
       }
       i = endIndex + 1;
     } else if (content[i] === '[' && content.indexOf(':', i) > i && content.indexOf(']', i) > i) {

@@ -213,6 +213,7 @@ The proxy server (`server/proxy.ts`) provides:
   - Prevents inappropriate mid-equation breaks while allowing natural wrapping within lines
   - Improved fraction baseline alignment using transform translateY
   - Changed from nested Views-in-Text to proper flex layout with sibling Text components
+  - Fixed parser to handle non-fraction braced content (e.g., {8} displays as "8", not blank)
 - November 6, 2025: **SERVER-SIDE FORMATTING ENFORCEMENT** - Critical fix for math formatting:
   - Added server-side post-processing layer that forcefully converts ALL fractions to {num/den} format
   - Automatic decimal-to-fraction conversion (0.125→{1/8}, 0.25→{1/4}, 0.5→{1/2}, etc.) with boundary checks to avoid corrupting larger numbers
