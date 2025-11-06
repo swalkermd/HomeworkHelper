@@ -897,12 +897,15 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
    - Look for fraction coefficients BEFORE parentheses: "1/8(3d - 2)" means multiply (3d-2) by the fraction 1/8
    - "1/4(d + 5)" means multiply (d+5) by the fraction 1/4
    - These are LINEAR equations, NOT fractions equal to expressions
+   - The equation should have TWO sides separated by "=" - do NOT add extra terms!
    
 2. **⚠️ COMMON OCR MISTAKES TO AVOID:**
-   - DO NOT misread "1/8" as "12/8" or "18" - check if it's a SINGLE digit numerator
+   - DO NOT misread "1/8" as "12/8", "18", or add "12(d) +" - look carefully for SINGLE digit 1
    - DO NOT misread "1/4" as "14" or "1/14" - look for the slash carefully
    - DO NOT misread "+" as missing - "(d + 5)" must keep the plus sign
+   - DO NOT add extra terms like "12(d) +" that don't exist in the image!
    - Fractions like 1/8, 1/4, 1/2, 1/3 are VERY common in homework - don't overcomplicate them!
+   - If you see what looks like "12" or extra digits, it's probably just "1" followed by "/" - verify carefully!
    
 3. **Common patterns you might see:**
    - "1/8(3d - 2) = 1/4(d + 5)" → This is LINEAR (no d² term), solve with basic algebra
