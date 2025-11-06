@@ -440,7 +440,31 @@ RESPONSE FORMAT (JSON):
 
 📊 INTELLIGENT VISUAL AIDS - WHEN AND WHAT TYPE TO CREATE 📊
 
-**SCREENING CRITERIA - Only create visuals when they SIGNIFICANTLY enhance understanding:**
+**🚨 ESSENTIAL VISUALS - ALWAYS CREATE for these classic scenarios:**
+
+**PHYSICS - NEARLY MANDATORY:**
+✓ **PROJECTILE MOTION** - Any problem with objects launched at angles (catapults, projectiles, balls thrown)
+   → Show parabolic trajectory, launch angle, velocity components, max height, range
+   → Tag: [DIAGRAM NEEDED: type=physics - Projectile motion showing parabolic arc from launch point at [angle]° with initial velocity [v₀], marking maximum height at apex, horizontal range, and ground level. Label velocity components, trajectory path, and key measurements.]
+
+✓ **FORCE DIAGRAMS** - Any problem analyzing forces on an object (friction, tension, normal force)
+   → Show object with all force vectors (magnitude + direction), coordinate system
+   → Tag: [DIAGRAM NEEDED: type=physics - Free body diagram of [object] with force vectors: [list all forces with magnitudes and directions]. Include coordinate axes.]
+
+✓ **KINEMATICS** - Motion problems with acceleration, velocity, position over time
+   → Show motion diagram with position/velocity/acceleration vectors at key moments
+   → Tag: [DIAGRAM NEEDED: type=physics - Motion diagram showing [object] at key time points with velocity and acceleration vectors. Mark initial and final positions.]
+
+✓ **CIRCUITS** - Any electrical circuit problem
+   → Show circuit schematic with components, current flow, voltage labels
+   → Tag: [DIAGRAM NEEDED: type=physics - Circuit diagram with [components] connected in [series/parallel], showing current direction and voltage labels.]
+
+**GEOMETRY - NEARLY MANDATORY:**
+✓ Any problem with shapes, angles, areas, perimeters
+✓ Spatial relationships between multiple geometric objects
+✓ 3D geometry or perspective views
+
+**SCREENING CRITERIA - For other cases, create visuals when they SIGNIFICANTLY enhance understanding:**
 
 Consider creating a visual aid when:
 ✓ The problem involves spatial relationships that are hard to describe in words alone
@@ -448,37 +472,26 @@ Consider creating a visual aid when:
 ✓ Complex multi-step processes benefit from a visual roadmap
 ✓ The visual would clarify confusion, not just repeat what words already convey
 
-**TYPES OF VISUALS TO CONSIDER:**
+**TYPES OF VISUALS:**
 
 1. **GEOMETRIC DIAGRAMS** - For shapes, angles, spatial relationships
-   - When: Geometry problems with rectangles, triangles, circles, polygons
-   - Example: Rectangle with inscribed triangle, overlapping shapes, angle measurements
    - Tag: [DIAGRAM NEEDED: type=geometry - detailed description with ALL dimensions, labels, spatial relationships]
 
 2. **GRAPHS & COORDINATE PLANES** - For plotting, functions, data visualization
-   - When: Graphing linear/quadratic equations, plotting points, showing intersections
-   - Example: Plot y = 2x + 3, show where lines intersect, coordinate grid
    - Tag: [DIAGRAM NEEDED: type=graph - equation/function with axes, labels, key points]
 
 3. **CHARTS & DATA VISUALIZATION** - For comparing quantities, showing proportions
-   - When: Percentage problems, comparing values, showing parts of a whole
-   - Example: Pie chart showing budget breakdown, bar chart comparing quantities
    - Tag: [DIAGRAM NEEDED: type=chart - data values, labels, chart type (bar/pie/line)]
 
 4. **PHYSICS DIAGRAMS** - For forces, motion, circuits, energy
-   - When: Force diagrams, velocity vectors, circuit schematics, projectile motion
-   - Example: Free body diagram with force arrows, circuit with resistors and battery
    - Tag: [DIAGRAM NEEDED: type=physics - physical setup, forces/components, labels]
 
 5. **PROCESS ILLUSTRATIONS** - For sequential steps or transformations
-   - When: Chemical reactions, life cycles, step-by-step transformations
-   - Example: Before/after states, reaction arrows, stage progressions
    - Tag: [DIAGRAM NEEDED: type=illustration - what's shown, key elements, relationships]
 
 **WHEN NOT TO CREATE VISUALS:**
 ✗ Pure algebraic manipulation where symbols are clear enough
-✗ Word problems that are straightforward without spatial elements
-✗ Upper-level abstract concepts where visualization doesn't add value
+✗ Simple word problems without spatial/physical elements
 ✗ When the description in words is already perfectly clear
 
 **PLACEMENT:** Visual aids can appear in ANY step where they'd be most helpful, not just Step 1. Place them where understanding would benefit most.
@@ -705,7 +718,31 @@ RESPONSE FORMAT (JSON):
 
 📊 INTELLIGENT VISUAL AIDS - WHEN AND WHAT TYPE TO CREATE 📊
 
-**SCREENING CRITERIA - Only create visuals when they SIGNIFICANTLY enhance understanding:**
+**🚨 ESSENTIAL VISUALS - ALWAYS CREATE for these classic scenarios:**
+
+**PHYSICS - NEARLY MANDATORY:**
+✓ **PROJECTILE MOTION** - Any problem with objects launched at angles (catapults, projectiles, balls thrown)
+   → Show parabolic trajectory, launch angle, velocity components, max height, range
+   → Tag: [DIAGRAM NEEDED: type=physics - Projectile motion showing parabolic arc from launch point at [angle]° with initial velocity [v₀], marking maximum height at apex, horizontal range, and ground level. Label velocity components, trajectory path, and key measurements.]
+
+✓ **FORCE DIAGRAMS** - Any problem analyzing forces on an object (friction, tension, normal force)
+   → Show object with all force vectors (magnitude + direction), coordinate system
+   → Tag: [DIAGRAM NEEDED: type=physics - Free body diagram of [object] with force vectors: [list all forces with magnitudes and directions]. Include coordinate axes.]
+
+✓ **KINEMATICS** - Motion problems with acceleration, velocity, position over time
+   → Show motion diagram with position/velocity/acceleration vectors at key moments
+   → Tag: [DIAGRAM NEEDED: type=physics - Motion diagram showing [object] at key time points with velocity and acceleration vectors. Mark initial and final positions.]
+
+✓ **CIRCUITS** - Any electrical circuit problem
+   → Show circuit schematic with components, current flow, voltage labels
+   → Tag: [DIAGRAM NEEDED: type=physics - Circuit diagram with [components] connected in [series/parallel], showing current direction and voltage labels.]
+
+**GEOMETRY - NEARLY MANDATORY:**
+✓ Any problem with shapes, angles, areas, perimeters
+✓ Spatial relationships between multiple geometric objects
+✓ 3D geometry or perspective views
+
+**SCREENING CRITERIA - For other cases, create visuals when they SIGNIFICANTLY enhance understanding:**
 
 Consider creating a visual aid when:
 ✓ The problem involves spatial relationships that are hard to describe in words alone
@@ -713,37 +750,26 @@ Consider creating a visual aid when:
 ✓ Complex multi-step processes benefit from a visual roadmap
 ✓ The visual would clarify confusion, not just repeat what words already convey
 
-**TYPES OF VISUALS TO CONSIDER:**
+**TYPES OF VISUALS:**
 
 1. **GEOMETRIC DIAGRAMS** - For shapes, angles, spatial relationships
-   - When: Geometry problems with rectangles, triangles, circles, polygons
-   - Example: Rectangle with inscribed triangle, overlapping shapes, angle measurements
    - Tag: [DIAGRAM NEEDED: type=geometry - detailed description with ALL dimensions, labels, spatial relationships]
 
 2. **GRAPHS & COORDINATE PLANES** - For plotting, functions, data visualization
-   - When: Graphing linear/quadratic equations, plotting points, showing intersections
-   - Example: Plot y = 2x + 3, show where lines intersect, coordinate grid
    - Tag: [DIAGRAM NEEDED: type=graph - equation/function with axes, labels, key points]
 
 3. **CHARTS & DATA VISUALIZATION** - For comparing quantities, showing proportions
-   - When: Percentage problems, comparing values, showing parts of a whole
-   - Example: Pie chart showing budget breakdown, bar chart comparing quantities
    - Tag: [DIAGRAM NEEDED: type=chart - data values, labels, chart type (bar/pie/line)]
 
 4. **PHYSICS DIAGRAMS** - For forces, motion, circuits, energy
-   - When: Force diagrams, velocity vectors, circuit schematics, projectile motion
-   - Example: Free body diagram with force arrows, circuit with resistors and battery
    - Tag: [DIAGRAM NEEDED: type=physics - physical setup, forces/components, labels]
 
 5. **PROCESS ILLUSTRATIONS** - For sequential steps or transformations
-   - When: Chemical reactions, life cycles, step-by-step transformations
-   - Example: Before/after states, reaction arrows, stage progressions
    - Tag: [DIAGRAM NEEDED: type=illustration - what's shown, key elements, relationships]
 
 **WHEN NOT TO CREATE VISUALS:**
 ✗ Pure algebraic manipulation where symbols are clear enough
-✗ Word problems that are straightforward without spatial elements
-✗ Upper-level abstract concepts where visualization doesn't add value
+✗ Simple word problems without spatial/physical elements
 ✗ When the description in words is already perfectly clear
 
 **PLACEMENT:** Visual aids can appear in ANY step where they'd be most helpful, not just Step 1. Place them where understanding would benefit most.
