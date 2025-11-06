@@ -51,6 +51,74 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
+// Enforce proper math formatting - convert ALL fractions to {num/den} format
+function enforceProperFormatting(text: string): string {
+  let formatted = text;
+  
+  // 1. Convert common decimals to fractions (only standalone decimals, not part of larger numbers)
+  const decimalToFraction: { [key: string]: string } = {
+    '0.125': '{1/8}',
+    '0.25': '{1/4}',
+    '0.375': '{3/8}',
+    '0.5': '{1/2}',
+    '0.625': '{5/8}',
+    '0.75': '{3/4}',
+    '0.875': '{7/8}',
+    '0.333': '{1/3}',
+    '0.667': '{2/3}',
+    '0.2': '{1/5}',
+    '0.4': '{2/5}',
+    '0.6': '{3/5}',
+    '0.8': '{4/5}',
+    '0.166': '{1/6}',
+    '0.833': '{5/6}',
+  };
+  
+  // Replace standalone decimals with fractions
+  // Use word boundaries to avoid matching decimals that are part of larger numbers
+  // (?<!\d) = not preceded by a digit (so 10.25 won't match)
+  // (?!\d) = not followed by a digit (so 0.254 won't match)
+  for (const [decimal, fraction] of Object.entries(decimalToFraction)) {
+    const escapedDecimal = decimal.replace('.', '\\.');
+    const regex = new RegExp(`(?<!\\d)${escapedDecimal}(?!\\d)`, 'g');
+    formatted = formatted.replace(regex, fraction);
+  }
+  
+  // 2. Convert standalone fractions like "1/8" to "{1/8}" (but NOT if already in braces or part of a URL)
+  // Match digit(s)/digit(s) that are NOT already inside {}, NOT in URLs, and NOT in special contexts
+  // Negative lookbehind: not preceded by { or /
+  // Negative lookahead: not followed by } or another /
+  formatted = formatted.replace(/(?<![{/])(\d+)\/(\d+)(?![}/])/g, '{$1/$2}');
+  
+  return formatted;
+}
+
+// Apply formatting enforcement to entire AI response
+function enforceResponseFormatting(response: any): any {
+  const formatted = { ...response };
+  
+  // Fix problem field
+  if (formatted.problem) {
+    formatted.problem = enforceProperFormatting(formatted.problem);
+  }
+  
+  // Fix all step content and titles
+  if (formatted.steps && Array.isArray(formatted.steps)) {
+    formatted.steps = formatted.steps.map((step: any) => ({
+      ...step,
+      title: step.title ? enforceProperFormatting(step.title) : step.title,
+      content: step.content ? enforceProperFormatting(step.content) : step.content
+    }));
+  }
+  
+  // Fix final answer if present
+  if (formatted.finalAnswer) {
+    formatted.finalAnswer = enforceProperFormatting(formatted.finalAnswer);
+  }
+  
+  return formatted;
+}
+
 app.post('/api/analyze-text', async (req, res) => {
   try {
     const { question } = req.body;
@@ -213,8 +281,11 @@ Grade-appropriate language based on difficulty level.`
       }
     }
     
+    // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
+    const formattedResult = enforceResponseFormatting(result);
+    
     console.log('Analysis successful');
-    res.json(result);
+    res.json(formattedResult);
   } catch (error) {
     console.error('Error analyzing text:', error);
     res.status(500).json({ error: 'Failed to analyze question' });
@@ -435,8 +506,11 @@ Grade-appropriate language based on difficulty level.`
       }
     }
     
+    // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
+    const formattedResult = enforceResponseFormatting(result);
+    
     console.log('Image analysis successful');
-    res.json(result);
+    res.json(formattedResult);
   } catch (error) {
     console.error('Error analyzing image:', error);
     res.status(500).json({ error: 'Failed to analyze image' });
@@ -487,8 +561,11 @@ Solution: ${context.solution}`
       }
     );
     
+    // ENFORCE PROPER FORMATTING on the answer text
+    const formattedAnswer = enforceProperFormatting(result);
+    
     console.log('Follow-up question answered');
-    res.json({ answer: result });
+    res.json({ answer: formattedAnswer });
   } catch (error) {
     console.error('Error answering question:', error);
     res.status(500).json({ error: 'Failed to answer question' });
