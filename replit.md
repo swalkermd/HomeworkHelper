@@ -34,16 +34,12 @@ A comprehensive AI-powered homework assistant mobile app built with React Native
      - Inline images (IMAGE: desc](url)
    - Grade-appropriate language adaptation
    - Final answer card with green gradient
-   - ✅ **Automatic Diagram Generation**:
-     - AI intelligently detects when visual diagrams would help
-     - Automatically generates diagrams using GPT-Image-1 for:
-       - Geometry problems (rectangles, triangles, circles with labeled dimensions)
-       - Graphs and coordinate planes
-       - Physics diagrams (force diagrams, motion diagrams)
-       - Charts and visual representations
-     - Clean whiteboard-style diagrams with labels and measurements
-     - Diagrams saved as PNG files and served via absolute URLs
-     - Embedded directly in solution steps for better understanding
+   - ❌ **Automatic Diagram Generation** (NOT POSSIBLE - Platform Limitation):
+     - **Diagram Generation Works:** Backend successfully generates diagrams using GPT-Image-1, saves PNG files, and provides correct URLs
+     - **React Native Web Cannot Display Them:** RNW's Image component crashes when rendering, regardless of URL format
+     - **Root Cause:** Fundamental React Native Web limitation - Image component is incompatible with dynamic image rendering in this context
+     - **Attempted Solutions:** Tried data URLs, file URLs, absolute URLs, static serving - all crash the app
+     - **Resolution:** Feature disabled - would require native mobile app or complete rewrite without RNW
 
 4. ✅ **Interactive Features**
    - Follow-up Q&A chat modal with context preservation

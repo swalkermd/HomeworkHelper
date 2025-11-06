@@ -552,18 +552,13 @@ Grade-appropriate language based on difficulty level.`
     }
     console.log('========================\n');
     
-    // Check if any step needs a diagram and generate it
+    // DIAGRAMS DISABLED: React Native Web Image component crashes when rendering
+    // Generated diagrams save successfully, URLs are correct, but RNW cannot display them
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
-        const diagramDescription = diagramMatch[1];
-        const diagramUrl = await generateDiagram(diagramDescription);
-        if (diagramUrl) {
-          // Replace [DIAGRAM NEEDED: description] with (IMAGE: description](url)
-          const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
-          step.content = step.content.replace(diagramMatch[0], imageTag);
-          console.log('✓ Diagram embedded:', diagramUrl);
-        }
+        // Remove diagram marker
+        step.content = step.content.replace(diagramMatch[0], '');
       }
     }
     
