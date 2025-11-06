@@ -263,7 +263,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'baseline',
-    marginVertical: 2,
   },
   fractionContainer: {
     alignItems: 'center',

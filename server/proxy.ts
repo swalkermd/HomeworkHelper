@@ -485,6 +485,7 @@ app.post('/api/analyze-text', async (req, res) => {
 - Use [red:result] for the outcome (e.g., "= [red:24]")
 - Example: "Multiply both sides by [blue:8]: [blue:8] × {1/8}(3d - 2) = [blue:8] × {1/4}(d + 5) simplifies to (3d - 2) = [red:2(d + 5)]"
 - NEVER skip color highlighting - it's essential for student understanding!
+- **CRITICAL:** Keep all text (including punctuation) on the SAME LINE as color tags. NEVER write: "[red:phototropism]\n." Instead write: "[red:phototropism]."
 
 RESPONSE FORMAT (JSON):
 {
