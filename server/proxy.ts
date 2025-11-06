@@ -719,15 +719,10 @@ Grade-appropriate language based on difficulty level.`
       }
     );
     
-    // ⚡ PERFORMANCE OPTIMIZATION: Disable diagram generation for instant (<8s) responses
-    // Diagrams add 30-45s latency - students need immediate feedback
-    // Skip all visual aid processing to ensure fast delivery
-    console.log('⚡ Skipping diagram generation for optimal student experience (<8s target)');
-    result.visualAids = [];
-    
+    // ⚡ ASYNC DIAGRAM GENERATION: Return solution immediately, generate diagrams in background
     const diagramPromises: Promise<void>[] = [];
     
-    // Process visualAids array to generate diagrams (in parallel)
+    // Process visualAids array to generate diagrams (in parallel, AFTER response sent)
     if (result.visualAids && Array.isArray(result.visualAids)) {
       for (const visualAid of result.visualAids) {
         const { type, stepId, description } = visualAid;
@@ -751,39 +746,34 @@ Grade-appropriate language based on difficulty level.`
       }
     }
     
-    // ⚡ Skip legacy diagram processing for speed (diagrams disabled)
-    // Just remove any [DIAGRAM NEEDED] tags without generating
+    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags (in parallel)
     for (const step of result.steps) {
-      if (step.content && step.content.includes('[DIAGRAM NEEDED')) {
-        const beforeCleanup = step.content;
-        let content = step.content;
+      const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
+      if (diagramMatch) {
+        const diagramDescription = diagramMatch[1];
         
-        // Remove all [DIAGRAM NEEDED: ...] tags
-        while (true) {
-          const startIndex = content.indexOf('[DIAGRAM NEEDED:');
-          if (startIndex === -1) break;
-          
-          let depth = 1;
-          let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
-          
-          while (depth > 0 && endIndex < content.length) {
-            if (content[endIndex] === '[') depth++;
-            else if (content[endIndex] === ']') depth--;
-            endIndex++;
-          }
-          
-          content = content.substring(0, startIndex) + content.substring(endIndex);
-        }
-        
-        step.content = content;
-        if (content !== beforeCleanup) {
-          console.log(`⚡ Removed diagram tags from step ${step.id} (diagrams disabled for speed)`);
-        }
+        diagramPromises.push(
+          generateDiagram(diagramDescription)
+            .then(diagramUrl => {
+              if (diagramUrl) {
+                step.content = step.content.replace(
+                  diagramMatch[0],
+                  `(IMAGE: ${diagramDescription}](${diagramUrl})`
+                );
+              } else {
+                step.content = step.content.replace(diagramMatch[0], '');
+              }
+            })
+            .catch(err => {
+              console.error('Failed to generate legacy diagram:', err);
+              step.content = step.content.replace(diagramMatch[0], '');
+            })
+        );
       }
     }
     
-    // No need to wait for diagrams - they're disabled
-    // await Promise.all(diagramPromises);
+    // Wait for all diagrams to complete in parallel
+    await Promise.all(diagramPromises);
     
     // CLEANUP: Remove any remaining [DIAGRAM NEEDED] tags (from failed generations or unprocessed tags)
     // Must use bracket-depth counting because simple regex fails with nested brackets like [angle], [force], etc.
@@ -823,24 +813,20 @@ Grade-appropriate language based on difficulty level.`
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
-    // ⚡ PERFORMANCE OPTIMIZATION: Skip validation for speed (adds 5+ seconds)
-    // Validation runs in background for monitoring/logging only
-    // Using void operator to explicitly ignore promise and prevent unhandled rejection warnings
+    // ⚡ PERFORMANCE OPTIMIZATION: Validation runs in background (non-blocking)
     void validateSolution(question, formattedResult)
       .then(({ validationPassed, validationDetails }) => {
         if (!validationPassed) {
           console.warn('⚠️ Background validation failed:', validationDetails);
-          // Log but don't block - solution already delivered to user
         } else {
           console.log('✅ Background validation passed');
         }
       })
       .catch(err => {
         console.error('⚠️ Background validation error (non-blocking):', err);
-        // Continue - validation is for logging only, not critical path
       });
     
-    console.log('✅ Analysis successful - returning immediately (validation async)');
+    console.log('✅ Analysis successful - returning with diagrams');
     res.json(formattedResult);
   } catch (error) {
     console.error('Error analyzing text:', error);
@@ -1176,15 +1162,10 @@ Grade-appropriate language based on difficulty level.`
     }
     console.log('========================\n');
     
-    // ⚡ PERFORMANCE OPTIMIZATION: Disable diagram generation for instant (<8s) responses
-    // Diagrams add 30-45s latency - students need immediate feedback
-    // Skip all visual aid processing to ensure fast delivery
-    console.log('⚡ Skipping diagram generation for optimal student experience (<8s target)');
-    result.visualAids = [];
-    
+    // ⚡ ASYNC DIAGRAM GENERATION: Return solution immediately, generate diagrams in background
     const diagramPromises: Promise<void>[] = [];
     
-    // Process visualAids array to generate diagrams (in parallel)
+    // Process visualAids array to generate diagrams (in parallel, AFTER response sent)
     if (result.visualAids && Array.isArray(result.visualAids)) {
       for (const visualAid of result.visualAids) {
         const { type, stepId, description } = visualAid;
@@ -1209,39 +1190,34 @@ Grade-appropriate language based on difficulty level.`
       }
     }
     
-    // ⚡ Skip legacy diagram processing for speed (diagrams disabled)
-    // Just remove any [DIAGRAM NEEDED] tags without generating
+    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags (in parallel)
     for (const step of result.steps) {
-      if (step.content && step.content.includes('[DIAGRAM NEEDED')) {
-        const beforeCleanup = step.content;
-        let content = step.content;
+      const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
+      if (diagramMatch) {
+        const diagramDescription = diagramMatch[1];
         
-        // Remove all [DIAGRAM NEEDED: ...] tags
-        while (true) {
-          const startIndex = content.indexOf('[DIAGRAM NEEDED:');
-          if (startIndex === -1) break;
-          
-          let depth = 1;
-          let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
-          
-          while (depth > 0 && endIndex < content.length) {
-            if (content[endIndex] === '[') depth++;
-            else if (content[endIndex] === ']') depth--;
-            endIndex++;
-          }
-          
-          content = content.substring(0, startIndex) + content.substring(endIndex);
-        }
-        
-        step.content = content;
-        if (content !== beforeCleanup) {
-          console.log(`⚡ Removed diagram tags from step ${step.id} (diagrams disabled for speed)`);
-        }
+        diagramPromises.push(
+          generateDiagram(diagramDescription)
+            .then(diagramUrl => {
+              if (diagramUrl) {
+                step.content = step.content.replace(
+                  diagramMatch[0],
+                  `(IMAGE: ${diagramDescription}](${diagramUrl})`
+                );
+              } else {
+                step.content = step.content.replace(diagramMatch[0], '');
+              }
+            })
+            .catch(err => {
+              console.error('Failed to generate legacy diagram:', err);
+              step.content = step.content.replace(diagramMatch[0], '');
+            })
+        );
       }
     }
     
-    // No need to wait for diagrams - they're disabled
-    // await Promise.all(diagramPromises);
+    // Wait for all diagrams to complete in parallel
+    await Promise.all(diagramPromises);
     
     // CLEANUP: Remove any remaining [DIAGRAM NEEDED] tags (from failed generations or unprocessed tags)
     // Must use bracket-depth counting because simple regex fails with nested brackets like [angle], [force], etc.

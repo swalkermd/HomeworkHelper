@@ -8,12 +8,12 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
     console.log('📡 Fetch starting...');
     console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // Reduced timeout to 30 seconds (diagrams disabled for speed)
+    // 60 second timeout for complete response with diagrams
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('⏱️ Timeout triggered after 30 seconds');
+      console.log('⏱️ Timeout triggered after 60 seconds');
       controller.abort();
-    }, 30000);
+    }, 60000);
     
     const response = await fetch(`${API_URL}/analyze-text`, {
       method: 'POST',
@@ -65,12 +65,12 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     console.log('Calling API:', `${API_URL}/analyze-image`);
     console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // Reduced timeout to 30 seconds (diagrams disabled for speed)
+    // 60 second timeout for complete response with diagrams
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('⏱️ Timeout triggered after 30 seconds');
+      console.log('⏱️ Timeout triggered after 60 seconds');
       controller.abort();
-    }, 30000);
+    }, 60000);
     
     console.log('📡 Sending request...');
     const response = await fetch(`${API_URL}/analyze-image`, {
@@ -107,7 +107,7 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     console.error('❌ Error type:', error instanceof Error ? error.name : typeof error);
     console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Analysis timed out after 30 seconds. Please try again.');
+      throw new Error('Analysis timed out after 60 seconds. Please try again.');
     }
     throw error;
   }
