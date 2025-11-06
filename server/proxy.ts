@@ -144,7 +144,7 @@ async function generateDiagram(description: string): Promise<string> {
     
     const response = await openai.images.generate({
       model: "gpt-image-1",
-      prompt: `Educational ${visualType}: ${cleanDescription}. ${styleGuide} White background, black lines, labeled clearly.`,
+      prompt: `Educational ${visualType}: ${cleanDescription}. ${styleGuide} White background, black lines, labeled clearly. IMPORTANT: Use US decimal notation with periods (e.g., 9.8, 15.5) not commas.`,
       size: "1024x1024",
       n: 1
     });
@@ -232,16 +232,26 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   });
   
   // 0. Normalize whitespace: replace ALL newlines with spaces for continuous text flow
+  // EXCEPT for multi-part answers (a), b), c) which should stay on separate lines
   // First, normalize all line endings to \n
   formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   // Remove zero-width characters and other invisible Unicode whitespace that AI might generate
   formatted = formatted.replace(/[\u200B-\u200D\uFEFF]/g, '');
-  // Convert ALL newlines (single or multiple) to single space
+  
+  // Preserve newlines before multi-part answer markers by using a temporary placeholder
+  // Match patterns like "\n a)" or "\n b)" or "\n c)" etc.
+  formatted = formatted.replace(/\n\s*([a-z]\))/gi, '__LINEBREAK__$1');
+  
+  // Convert ALL other newlines (single or multiple) to single space
   formatted = formatted.replace(/\n+/g, ' ');
-  // Clean up multiple spaces (including NBSP)
-  formatted = formatted.replace(/[\s\u00A0\u202F]+/g, ' ');
-  // CRITICAL: Remove ALL whitespace (including Unicode) before punctuation
-  formatted = formatted.replace(/[\s\u00A0\u202F]+([.,!?;:])/g, '$1');
+  
+  // Restore preserved line breaks for multi-part answers
+  formatted = formatted.replace(/__LINEBREAK__/g, '\n');
+  
+  // Clean up multiple spaces (including NBSP) but NOT newlines
+  formatted = formatted.replace(/[ \t\u00A0\u202F]+/g, ' ');
+  // CRITICAL: Remove ALL whitespace (including Unicode) before punctuation (but not newlines)
+  formatted = formatted.replace(/[ \t\u00A0\u202F]+([.,!?;:])/g, '$1');
   // Trim leading/trailing whitespace
   formatted = formatted.trim();
   
@@ -282,9 +292,20 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   
   // CRITICAL: Final whitespace scrub AFTER all transformations (including image restoration)
   // This catches any newlines that may have been reintroduced by image tags or other operations
+  // BUT preserve multi-part answer line breaks (a), b), c))
+  
+  // First, preserve multi-part answer line breaks again
+  formatted = formatted.replace(/\n\s*([a-z]\))/gi, '__LINEBREAK__$1');
+  
+  // Remove other line separator characters
   formatted = formatted.replace(/[\r\n\u2028\u2029]+/g, ' ');  // All line separator characters
-  formatted = formatted.replace(/[\s\u00A0\u202F]+/g, ' ');     // Normalize all whitespace
-  formatted = formatted.replace(/[\s\u00A0\u202F]+([.,!?;:])/g, '$1');  // Remove spaces before punctuation
+  
+  // Restore multi-part answer line breaks
+  formatted = formatted.replace(/__LINEBREAK__/g, '\n');
+  
+  // Normalize all whitespace (but not newlines we just restored)
+  formatted = formatted.replace(/[ \t\u00A0\u202F]+/g, ' ');     // Normalize spaces/tabs but not newlines
+  formatted = formatted.replace(/[ \t\u00A0\u202F]+([.,!?;:])/g, '$1');  // Remove spaces before punctuation
   formatted = formatted.trim();
   
   // Enhanced debug logging - show full text for blue highlighting issues
@@ -623,6 +644,9 @@ RESPONSE FORMAT (JSON):
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
+- **MULTI-PART ANSWERS:** If the question has multiple parts (a, b, c), put each part on its own line:
+  - CORRECT: "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
+  - WRONG: "a) v = 15 m/s, b) h = 11.5 m, c) t = 3.1 s" (all on one line)
 
 **CRITICAL: visualAids array is REQUIRED for:**
 - Physics: projectile motion, force diagrams, circuits, kinematics
@@ -1041,6 +1065,9 @@ RESPONSE FORMAT (JSON):
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
+- **MULTI-PART ANSWERS:** If the question has multiple parts (a, b, c), put each part on its own line:
+  - CORRECT: "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
+  - WRONG: "a) v = 15 m/s, b) h = 11.5 m, c) t = 3.1 s" (all on one line)
 
 **CRITICAL: visualAids array is REQUIRED for:**
 - Physics: projectile motion, force diagrams, circuits, kinematics
