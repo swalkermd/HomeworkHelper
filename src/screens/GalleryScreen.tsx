@@ -49,33 +49,33 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
       
       input.onchange = async (e: any) => {
         console.log('🖼️ Gallery: onChange triggered');
-      const file = e.target.files?.[0];
-      if (!file) {
-        console.log('🖼️ Gallery: No file selected');
-        navigation.navigate('Home');
-        return;
-      }
+        const file = e.target.files?.[0];
+        if (!file) {
+          console.log('🖼️ Gallery: No file selected');
+          navigation.navigate('Home');
+          return;
+        }
 
-      console.log('🖼️ Gallery: File selected:', file.name);
-      
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const uri = event.target?.result as string;
-        const img = new Image();
-        img.onload = () => {
-          console.log('🖼️ Gallery: Image loaded, dimensions:', img.width, 'x', img.height);
-          setCurrentImage({
-            uri,
-            width: img.width,
-            height: img.height,
-          });
-          navigation.navigate('ProblemSelection');
+        console.log('🖼️ Gallery: File selected:', file.name);
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const uri = event.target?.result as string;
+          const img = new Image();
+          img.onload = () => {
+            console.log('🖼️ Gallery: Image loaded, dimensions:', img.width, 'x', img.height);
+            setCurrentImage({
+              uri,
+              width: img.width,
+              height: img.height,
+            });
+            navigation.navigate('ProblemSelection');
+          };
+          img.src = uri;
         };
-        img.src = uri;
+        reader.readAsDataURL(file);
       };
-      reader.readAsDataURL(file);
-    };
-    
+      
       input.oncancel = () => {
         console.log('🖼️ Gallery: File picker canceled');
         navigation.navigate('Home');
