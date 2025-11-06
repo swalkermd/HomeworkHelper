@@ -28,12 +28,17 @@ The application features a responsive design with distinct typography for portra
 - **Interactive Features:** Includes a follow-up Q&A chat modal with context preservation and navigation for asking new questions or returning home.
 - **OCR Accuracy Improvements:** Specific instructions and examples for AI to improve transcription of mathematical expressions, fractions, and coefficients from images.
 - **Server-Side Formatting Enforcement:** A post-processing layer on the server ensures consistent mathematical formatting, converting all fractions to vertical {num/den} format and handling decimal-to-fraction conversions.
-- **Quality Control & Validation System:** Multi-stage validation pipeline that ensures solution accuracy before presenting to students:
+- **Quality Control & Validation System:** Multi-stage validation pipeline that ensures solution accuracy:
   - **Structural Validation**: Verifies JSON schema compliance, required fields, and proper formatting
   - **Cross-Model Verification**: Independent AI verification call reviews solution accuracy, calculations, and final answers
   - **Confidence Scoring**: Solutions must pass 70% confidence threshold
   - **Comprehensive Logging**: Timestamps, validation metrics, errors, and warnings logged for quality monitoring
-  - **Non-Blocking Design**: Logs concerns but doesn't prevent delivery (ensures smooth user experience while improving quality)
+  - **Async Background Execution**: Validation runs in background after delivering solution to user (non-blocking for speed)
+- **Performance Optimizations (Nov 2025):** Target processing time <15 seconds for complex problems:
+  - **Parallel Diagram Generation**: All visual aids generate concurrently using Promise.all instead of sequentially
+  - **Async Validation**: Quality control runs in background (non-blocking) for logging/monitoring only
+  - **Robust Error Handling**: Diagram generation failures gracefully degrade without breaking UX
+  - **Timeout Configuration**: Server timeout 300s, client fetch timeout 120s (intentional mismatch provides safety margin)
 
 ### System Design Choices
 The application uses a proxy server architecture (running on port 5000) that handles API endpoints and proxies frontend requests to the Expo dev server (port 8081). This setup centralizes OpenAI API integration, CORS handling, and ensures all interactions occur through a single exposed port in the Replit environment.

@@ -1,3 +1,18 @@
+/**
+ * HOMEWORK HELPER API SERVER
+ * 
+ * Performance Optimizations:
+ * - Diagram generation runs in parallel using Promise.all
+ * - Validation runs async in background (non-blocking)
+ * - Target processing time: <15 seconds for complex problems
+ * 
+ * Timeout Configuration:
+ * - Server timeout: 300s (5 min) - generous buffer for AI operations
+ * - Client fetch timeout: 120s (2 min) - reasonable UX limit
+ * - Mismatch is intentional: server timeout > client timeout provides safety margin
+ *   while client timeout ensures user doesn't wait indefinitely
+ */
+
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import cors from 'cors';
@@ -680,14 +695,19 @@ Grade-appropriate language based on difficulty level.`
         const diagramDescription = `type=${type} - ${description}`;
         
         diagramPromises.push(
-          generateDiagram(diagramDescription).then(diagramUrl => {
-            if (diagramUrl) {
-              const step = result.steps.find((s: any) => s.id === stepId);
-              if (step) {
-                step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
+          generateDiagram(diagramDescription)
+            .then(diagramUrl => {
+              if (diagramUrl) {
+                const step = result.steps.find((s: any) => s.id === stepId);
+                if (step) {
+                  step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
+                }
               }
-            }
-          })
+            })
+            .catch(err => {
+              console.error(`Failed to generate diagram for step ${stepId}:`, err);
+              // Continue without diagram - don't break the user experience
+            })
         );
       }
     }
@@ -699,19 +719,28 @@ Grade-appropriate language based on difficulty level.`
         const diagramDescription = diagramMatch[1];
         
         diagramPromises.push(
-          generateDiagram(diagramDescription).then(diagramUrl => {
-            if (diagramUrl) {
-              step.content = step.content.replace(
-                diagramMatch[0],
-                `(IMAGE: ${diagramDescription}](${diagramUrl})`
-              );
-            }
-          })
+          generateDiagram(diagramDescription)
+            .then(diagramUrl => {
+              if (diagramUrl) {
+                step.content = step.content.replace(
+                  diagramMatch[0],
+                  `(IMAGE: ${diagramDescription}](${diagramUrl})`
+                );
+              } else {
+                // Remove [DIAGRAM NEEDED] tag if generation failed
+                step.content = step.content.replace(diagramMatch[0], '');
+              }
+            })
+            .catch(err => {
+              console.error('Failed to generate legacy diagram:', err);
+              // Remove [DIAGRAM NEEDED] tag on error
+              step.content = step.content.replace(diagramMatch[0], '');
+            })
         );
       }
     }
     
-    // Wait for all diagrams to complete in parallel
+    // Wait for all diagrams to complete in parallel (errors already handled per-promise)
     await Promise.all(diagramPromises);
     
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
@@ -719,16 +748,20 @@ Grade-appropriate language based on difficulty level.`
     
     // ⚡ PERFORMANCE OPTIMIZATION: Skip validation for speed (adds 5+ seconds)
     // Validation runs in background for monitoring/logging only
-    validateSolution(question, formattedResult).then(({ validationPassed, validationDetails }) => {
-      if (!validationPassed) {
-        console.warn('⚠️ Background validation failed:', validationDetails);
-        // Log but don't block - solution already delivered to user
-      } else {
-        console.log('✅ Background validation passed');
-      }
-    }).catch(err => {
-      console.error('Background validation error:', err);
-    });
+    // Using void operator to explicitly ignore promise and prevent unhandled rejection warnings
+    void validateSolution(question, formattedResult)
+      .then(({ validationPassed, validationDetails }) => {
+        if (!validationPassed) {
+          console.warn('⚠️ Background validation failed:', validationDetails);
+          // Log but don't block - solution already delivered to user
+        } else {
+          console.log('✅ Background validation passed');
+        }
+      })
+      .catch(err => {
+        console.error('⚠️ Background validation error (non-blocking):', err);
+        // Continue - validation is for logging only, not critical path
+      });
     
     console.log('✅ Analysis successful - returning immediately (validation async)');
     res.json(formattedResult);
@@ -1061,15 +1094,20 @@ Grade-appropriate language based on difficulty level.`
         const diagramDescription = `type=${type} - ${description}`;
         
         diagramPromises.push(
-          generateDiagram(diagramDescription).then(diagramUrl => {
-            if (diagramUrl) {
-              const step = result.steps.find((s: any) => s.id === stepId);
-              if (step) {
-                step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
-                console.log('✓ Diagram embedded:', diagramUrl);
+          generateDiagram(diagramDescription)
+            .then(diagramUrl => {
+              if (diagramUrl) {
+                const step = result.steps.find((s: any) => s.id === stepId);
+                if (step) {
+                  step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
+                  console.log('✓ Diagram embedded:', diagramUrl);
+                }
               }
-            }
-          })
+            })
+            .catch(err => {
+              console.error(`Failed to generate diagram for step ${stepId}:`, err);
+              // Continue without diagram - don't break the user experience
+            })
         );
       }
     }
@@ -1081,18 +1119,27 @@ Grade-appropriate language based on difficulty level.`
         const diagramDescription = diagramMatch[1];
         
         diagramPromises.push(
-          generateDiagram(diagramDescription).then(diagramUrl => {
-            if (diagramUrl) {
-              const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
-              step.content = step.content.replace(diagramMatch[0], imageTag);
-              console.log('✓ Diagram embedded:', diagramUrl);
-            }
-          })
+          generateDiagram(diagramDescription)
+            .then(diagramUrl => {
+              if (diagramUrl) {
+                const imageTag = `(IMAGE: ${diagramDescription}](${diagramUrl})`;
+                step.content = step.content.replace(diagramMatch[0], imageTag);
+                console.log('✓ Diagram embedded:', diagramUrl);
+              } else {
+                // Remove [DIAGRAM NEEDED] tag if generation failed
+                step.content = step.content.replace(diagramMatch[0], '');
+              }
+            })
+            .catch(err => {
+              console.error('Failed to generate legacy diagram:', err);
+              // Remove [DIAGRAM NEEDED] tag on error
+              step.content = step.content.replace(diagramMatch[0], '');
+            })
         );
       }
     }
     
-    // Wait for all diagrams to complete in parallel
+    // Wait for all diagrams to complete in parallel (errors already handled per-promise)
     await Promise.all(diagramPromises);
     
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
@@ -1100,17 +1147,21 @@ Grade-appropriate language based on difficulty level.`
     
     // ⚡ PERFORMANCE OPTIMIZATION: Skip validation for speed (adds 5+ seconds)
     // Validation runs in background for monitoring/logging only
+    // Using void operator to explicitly ignore promise and prevent unhandled rejection warnings
     const problemText = `${formattedResult.problem}${problemNumber ? ` (Problem #${problemNumber})` : ''}`;
-    validateSolution(problemText, formattedResult).then(({ validationPassed, validationDetails }) => {
-      if (!validationPassed) {
-        console.warn('⚠️ Background validation failed:', validationDetails);
-        // Log but don't block - solution already delivered to user
-      } else {
-        console.log('✅ Background validation passed');
-      }
-    }).catch(err => {
-      console.error('Background validation error:', err);
-    });
+    void validateSolution(problemText, formattedResult)
+      .then(({ validationPassed, validationDetails }) => {
+        if (!validationPassed) {
+          console.warn('⚠️ Background validation failed:', validationDetails);
+          // Log but don't block - solution already delivered to user
+        } else {
+          console.log('✅ Background validation passed');
+        }
+      })
+      .catch(err => {
+        console.error('⚠️ Background validation error (non-blocking):', err);
+        // Continue - validation is for logging only, not critical path
+      });
     
     console.log('✅ Image analysis successful - returning immediately (validation async)');
     res.json(formattedResult);
