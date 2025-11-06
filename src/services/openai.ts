@@ -4,7 +4,9 @@ const API_URL = '/api';
 
 export async function analyzeTextQuestion(question: string): Promise<any> {
   try {
-    console.log('Calling API:', `${API_URL}/analyze-text`);
+    console.log('📡 Calling API:', `${API_URL}/analyze-text`);
+    console.log('📡 Fetch starting...');
+    
     const response = await fetch(`${API_URL}/analyze-text`, {
       method: 'POST',
       headers: {
@@ -13,13 +15,18 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
       body: JSON.stringify({ question }),
     });
     
+    console.log('📡 Response received! Status:', response.status, 'OK:', response.ok);
+    
     if (!response.ok) {
+      console.error('❌ Response not OK:', response.status);
       const errorData = await response.json().catch(() => ({}));
-      console.error('API Error Response:', response.status, errorData);
+      console.error('❌ Error data:', errorData);
       throw new Error(errorData.error || 'Failed to analyze question');
     }
     
+    console.log('📡 Parsing JSON response...');
     const result = await response.json();
+    console.log('✅ JSON parsed successfully!');
     console.log('✓ Text API Response:', {
       hasSteps: !!result?.steps,
       stepsCount: result?.steps?.length,
@@ -29,7 +36,9 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
     });
     return result;
   } catch (error) {
-    console.error('❌ Error analyzing text question:', error);
+    console.error('❌ FETCH ERROR:', error);
+    console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
     throw error;
   }
 }
