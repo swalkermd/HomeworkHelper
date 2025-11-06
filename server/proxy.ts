@@ -32,7 +32,7 @@ async function generateDiagram(description: string): Promise<string> {
       n: 1,
     });
     
-    const imageUrl = response.data[0]?.url || '';
+    const imageUrl = response.data?.[0]?.url || '';
     console.log('Diagram generated successfully');
     return imageUrl;
   } catch (error) {
@@ -81,12 +81,94 @@ RESPONSE FORMAT (JSON):
   "finalAnswer": "Plain text final answer"
 }
 
-FORMATTING RULES:
-- Math: Use {num/den} for fractions, highlight operations in [red:term], show steps with ->
-- Chemistry: Use _subscript_ (H_2_O), ^superscript^ (Ca^2+^)
-- Physics: Include units, use +italic+_subscript_ for variables (v_0_)
-- VISUAL DIAGRAMS: For problems involving geometry, graphs, coordinate planes, shapes, physics diagrams, or any visual representation, add [DIAGRAM NEEDED: detailed description] in the FIRST step where it would be helpful. Be specific about what to show (e.g., "Rectangle with length 8 units and width 5 units, labeled dimensions", "Coordinate plane showing line y=2x+3 from x=-5 to x=5", "Right triangle with sides 3, 4, 5 labeled")
-- Grade-appropriate language based on difficulty level`
+CRITICAL MATHEMATICAL FORMATTING RULES:
+
+**FRACTIONS - ABSOLUTELY MANDATORY VERTICAL FORMAT:**
+- ALWAYS use {num/den} for ALL fractions at ALL stages - NEVER use inline format like "a/b", (a/b), or decimals
+- Simple fractions: {5/6}, {3/4}, {12/7}
+- Complex fractions: {12/{3d - 1}}, {{-b ± √{b^2^ - 4ac}}/{2a}}, {{x + 5}/{x - 2}}
+- ALWAYS simplify fractions before presenting: {12/8} -> {3/2}
+- For improper fractions in FINAL ANSWER ONLY, show both reduced fraction AND mixed number: {7/3} = 2{1/3} or {17/5} = 3{2/5}
+- NEVER convert to decimals at ANY step unless user explicitly requests decimal form
+- Arithmetic with fractions stays as fractions: {2/3} + {1/4} = {8/12} + {3/12} = {11/12}
+
+**COLOR HIGHLIGHTING - CLARITY FOR EVERY OPERATION:**
+- [blue:term] = the specific value/variable/operation being applied in THIS step
+- [red:result] = the outcome or simplified result
+- Use highlighting to show EXACTLY what changes: "Multiply by [blue:5]: 3x = 15 -> [blue:5] × 3x = [blue:5] × 15 -> 15x = [red:75]"
+- When substituting: "Substitute [blue:d = 1]: {12/{3([blue:1]) - 1}} = {12/[red:2]} = [red:6]"
+- Multiple operations: use blue for operation, red for result, keep unhighlighted text as context
+
+**ALGEBRAIC EQUATIONS - SHOW EVERY TRANSFORMATION:**
+- Always use vertical fractions: {12/{3d - 1}} = d + 5
+- Show progression with arrows: equation_before -> equation_after
+- Quadratic formula MUST be: x = {{-b ± √{b^2^ - 4ac}}/{2a}} with full braces on numerator
+- Example substitution: a=[blue:3], b=[blue:14], c=[blue:-17]
+  x = {{-[blue:14] ± √{[blue:14]^2^ - 4([blue:3])([blue:-17])}}/{2([blue:3])}}
+  x = {{-14 ± √{196 + 204}}/{6}}
+  x = {{-14 ± √400}/{6}}
+  x = {{-14 ± 20}/{6}}
+  Two solutions: x = {{-14 + 20}/{6}} = {6/6} = [red:1] OR x = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]
+
+**SQUARE ROOTS, EXPONENTS, AND SPECIAL SYMBOLS:**
+- Square roots: √16 = 4, √{25} = 5, √{b^2^ - 4ac}
+- Exponents: x^2^, 3^4^ = 81, (2x)^3^ = 8x^3^
+- Plus-minus: ±
+- Nested: √{x^2^ + y^2^}
+
+**STEP CLARITY - EACH STEP TELLS A STORY:**
+- Title: Concise action verb phrase ("Multiply both sides by (3d - 1)", "Apply quadratic formula", "Simplify the fraction")
+- Content: Show WHAT you're doing, WHY, and the RESULT
+- Before and after: Show equation before operation, highlight what changes, show result
+- Example full step:
+  Title: "Clear the fraction by multiplying both sides"
+  Content: "Multiply both sides by [blue:(3d - 1)] to eliminate the fraction:
+  [blue:(3d - 1)] × {12/{3d - 1}} = [blue:(3d - 1)] × (d + 5)
+  -> 12 = [red:(3d - 1)(d + 5)]"
+
+**COMPLETE WORKED EXAMPLE - SOLVING {12/{3d - 1}} = d + 5:**
+
+Step 1 Title: "Rewrite as a fraction equation"
+Content: "{12/{3d - 1}} = d + 5"
+
+Step 2 Title: "Clear the fraction by multiplying both sides"
+Content: "Multiply both sides by [blue:(3d - 1)]:
+[blue:(3d - 1)] × {12/{3d - 1}} = [blue:(3d - 1)] × (d + 5)
+-> 12 = [red:(d + 5)(3d - 1)]"
+
+Step 3 Title: "Expand the right side"
+Content: "Expand [blue:(d + 5)(3d - 1)]:
+12 = d([blue:3d]) + d([blue:-1]) + 5([blue:3d]) + 5([blue:-1])
+12 = 3d^2^ - d + 15d - 5
+-> 12 = [red:3d^2^ + 14d - 5]"
+
+Step 4 Title: "Set to standard quadratic form"
+Content: "Subtract [blue:12] from both sides:
+12 [blue:- 12] = 3d^2^ + 14d - 5 [blue:- 12]
+-> 0 = [red:3d^2^ + 14d - 17]"
+
+Step 5 Title: "Apply the quadratic formula"
+Content: "For 3d^2^ + 14d - 17 = 0, use d = {{-b ± √{b^2^ - 4ac}}/{2a}}
+where a=[blue:3], b=[blue:14], c=[blue:-17]
+
+Discriminant: Δ = [blue:14]^2^ - 4([blue:3])([blue:-17]) = 196 + 204 = [red:400]
+
+d = {{-14 ± √400}/{6}} = {{-14 ± 20}/{6}}
+
+Two solutions:
+d = {{-14 + 20}/{6}} = {6/6} = [red:1]
+d = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]"
+
+**VISUAL DIAGRAMS:**
+- For geometry, graphs, coordinate planes, add [DIAGRAM NEEDED: detailed description] in first step
+- Example: [DIAGRAM NEEDED: Rectangle with length 8 units and width 5 units, clearly labeled dimensions]
+
+**CHEMISTRY/PHYSICS:**
+- Subscripts: H_2_O, v_0_, x_n_
+- Superscripts: Ca^2+^, x^3^
+- Units: 5 m/s^2^, 3.2 × 10^-5^ mol
+
+Grade-appropriate language based on difficulty level.`
               },
               {
                 role: "user",
@@ -171,12 +253,95 @@ RESPONSE FORMAT (JSON):
   "finalAnswer": "Plain text final answer"
 }
 
-FORMATTING RULES:
-- Math: Use {num/den} for fractions, [red:term] for highlighting, -> for arrows
-- Chemistry: _subscript_ (H_2_O), ^superscript^ (Ca^2+^)
-- Physics: Include units, +italic+_subscript_ (v_0_)
-- VISUAL DIAGRAMS: For problems involving geometry, graphs, coordinate planes, shapes, physics diagrams, or any visual representation, add [DIAGRAM NEEDED: detailed description] in the FIRST step where it would be helpful. Be specific about what to show (e.g., "Rectangle with length 8 units and width 5 units, labeled dimensions", "Coordinate plane showing line y=2x+3 from x=-5 to x=5", "Right triangle with sides 3, 4, 5 labeled")
-- For rectangle area problems, ALWAYS include a diagram showing the rectangle with labeled dimensions`
+CRITICAL MATHEMATICAL FORMATTING RULES:
+
+**FRACTIONS - ABSOLUTELY MANDATORY VERTICAL FORMAT:**
+- ALWAYS use {num/den} for ALL fractions at ALL stages - NEVER use inline format like "a/b", (a/b), or decimals
+- Simple fractions: {5/6}, {3/4}, {12/7}
+- Complex fractions: {12/{3d - 1}}, {{-b ± √{b^2^ - 4ac}}/{2a}}, {{x + 5}/{x - 2}}
+- ALWAYS simplify fractions before presenting: {12/8} -> {3/2}
+- For improper fractions in FINAL ANSWER ONLY, show both reduced fraction AND mixed number: {7/3} = 2{1/3} or {17/5} = 3{2/5}
+- NEVER convert to decimals at ANY step unless user explicitly requests decimal form
+- Arithmetic with fractions stays as fractions: {2/3} + {1/4} = {8/12} + {3/12} = {11/12}
+
+**COLOR HIGHLIGHTING - CLARITY FOR EVERY OPERATION:**
+- [blue:term] = the specific value/variable/operation being applied in THIS step
+- [red:result] = the outcome or simplified result
+- Use highlighting to show EXACTLY what changes: "Multiply by [blue:5]: 3x = 15 -> [blue:5] × 3x = [blue:5] × 15 -> 15x = [red:75]"
+- When substituting: "Substitute [blue:d = 1]: {12/{3([blue:1]) - 1}} = {12/[red:2]} = [red:6]"
+- Multiple operations: use blue for operation, red for result, keep unhighlighted text as context
+
+**ALGEBRAIC EQUATIONS - SHOW EVERY TRANSFORMATION:**
+- Always use vertical fractions: {12/{3d - 1}} = d + 5
+- Show progression with arrows: equation_before -> equation_after
+- Quadratic formula MUST be: x = {{-b ± √{b^2^ - 4ac}}/{2a}} with full braces on numerator
+- Example substitution: a=[blue:3], b=[blue:14], c=[blue:-17]
+  x = {{-[blue:14] ± √{[blue:14]^2^ - 4([blue:3])([blue:-17])}}/{2([blue:3])}}
+  x = {{-14 ± √{196 + 204}}/{6}}
+  x = {{-14 ± √400}/{6}}
+  x = {{-14 ± 20}/{6}}
+  Two solutions: x = {{-14 + 20}/{6}} = {6/6} = [red:1] OR x = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]
+
+**SQUARE ROOTS, EXPONENTS, AND SPECIAL SYMBOLS:**
+- Square roots: √16 = 4, √{25} = 5, √{b^2^ - 4ac}
+- Exponents: x^2^, 3^4^ = 81, (2x)^3^ = 8x^3^
+- Plus-minus: ±
+- Nested: √{x^2^ + y^2^}
+
+**STEP CLARITY - EACH STEP TELLS A STORY:**
+- Title: Concise action verb phrase ("Multiply both sides by (3d - 1)", "Apply quadratic formula", "Simplify the fraction")
+- Content: Show WHAT you're doing, WHY, and the RESULT
+- Before and after: Show equation before operation, highlight what changes, show result
+- Example full step:
+  Title: "Clear the fraction by multiplying both sides"
+  Content: "Multiply both sides by [blue:(3d - 1)] to eliminate the fraction:
+  [blue:(3d - 1)] × {12/{3d - 1}} = [blue:(3d - 1)] × (d + 5)
+  -> 12 = [red:(d + 5)(3d - 1)]"
+
+**COMPLETE WORKED EXAMPLE - SOLVING {12/{3d - 1}} = d + 5:**
+
+Step 1 Title: "Rewrite as a fraction equation"
+Content: "{12/{3d - 1}} = d + 5"
+
+Step 2 Title: "Clear the fraction by multiplying both sides"
+Content: "Multiply both sides by [blue:(3d - 1)]:
+[blue:(3d - 1)] × {12/{3d - 1}} = [blue:(3d - 1)] × (d + 5)
+-> 12 = [red:(d + 5)(3d - 1)]"
+
+Step 3 Title: "Expand the right side"
+Content: "Expand [blue:(d + 5)(3d - 1)]:
+12 = d([blue:3d]) + d([blue:-1]) + 5([blue:3d]) + 5([blue:-1])
+12 = 3d^2^ - d + 15d - 5
+-> 12 = [red:3d^2^ + 14d - 5]"
+
+Step 4 Title: "Set to standard quadratic form"
+Content: "Subtract [blue:12] from both sides:
+12 [blue:- 12] = 3d^2^ + 14d - 5 [blue:- 12]
+-> 0 = [red:3d^2^ + 14d - 17]"
+
+Step 5 Title: "Apply the quadratic formula"
+Content: "For 3d^2^ + 14d - 17 = 0, use d = {{-b ± √{b^2^ - 4ac}}/{2a}}
+where a=[blue:3], b=[blue:14], c=[blue:-17]
+
+Discriminant: Δ = [blue:14]^2^ - 4([blue:3])([blue:-17]) = 196 + 204 = [red:400]
+
+d = {{-14 ± √400}/{6}} = {{-14 ± 20}/{6}}
+
+Two solutions:
+d = {{-14 + 20}/{6}} = {6/6} = [red:1]
+d = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]"
+
+**VISUAL DIAGRAMS:**
+- For geometry, graphs, coordinate planes, add [DIAGRAM NEEDED: detailed description] in first step
+- Example: [DIAGRAM NEEDED: Rectangle with length 8 units and width 5 units, clearly labeled dimensions]
+- For rectangle area problems, ALWAYS include a diagram
+
+**CHEMISTRY/PHYSICS:**
+- Subscripts: H_2_O, v_0_, x_n_
+- Superscripts: Ca^2+^, x^3^
+- Units: 5 m/s^2^, 3.2 × 10^-5^ mol
+
+Grade-appropriate language based on difficulty level.`
               },
               {
                 role: "user",
