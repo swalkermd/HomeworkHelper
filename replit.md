@@ -208,10 +208,11 @@ The proxy server (`server/proxy.ts`) provides:
 
 ## Recent Changes
 - November 6, 2025: **OCR ACCURACY IMPROVEMENTS** - Enhanced image analysis:
-  - Added critical OCR accuracy instructions to carefully transcribe mathematical notation
-  - Double-check requirements for fractions, coefficients, variables, parentheses, signs
-  - Explicit guidance to use simplest appropriate method (avoid overcomplicating)
-  - Common OCR error prevention (fraction misreads, coefficient confusion, missing parentheses)
+  - Character-by-character transcription instructions with specific pattern examples
+  - Explicit guidance for fraction coefficients before parentheses (e.g., "1/8(3d - 2)")
+  - OCR double-check checklist before solving (fractions, parentheses, signs, squared terms)
+  - Clear linear vs quadratic equation detection to use simplest method
+  - Specific examples of common linear equation patterns from homework
   - Exact problem transcription required in response for verification
 - November 6, 2025: **MAJOR UPDATE** - Comprehensive math formatting improvements:
   - All fractions now display in proper vertical format {num/den} - never inline or decimal
