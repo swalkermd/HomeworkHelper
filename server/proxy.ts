@@ -713,6 +713,9 @@ CRITICAL MATHEMATICAL FORMATTING RULES:
 - For improper fractions in FINAL ANSWER ONLY, show both reduced fraction AND mixed number: {7/3} = 2{1/3} or {17/5} = 3{2/5}
 - NEVER convert to decimals at ANY step unless user explicitly requests decimal form
 - Arithmetic with fractions stays as fractions: {2/3} + {1/4} = {8/12} + {3/12} = {11/12}
+- **CRITICAL: When finding common denominators, EXPLICITLY STATE what the common denominator is and SHOW the conversion:**
+  - GOOD: "Find a common denominator of [blue:5]: {12/5}h - 2h. Convert 2h to fifths: [blue:2h = {10/5}h]. This gives us: [blue:{12/5}h - {10/5}h] = [red:{2/5}h]"
+  - BAD: "Simplify by finding a common denominator: {12/5}h - {10/5}h = {2/5}h" (doesn't explain what the denominator is or show conversion)
 
 **COLOR HIGHLIGHTING - CLARITY FOR EVERY OPERATION:**
 - [blue:term] = the specific value/variable/operation being applied in THIS step
@@ -1119,6 +1122,9 @@ CRITICAL MATHEMATICAL FORMATTING RULES:
 - For improper fractions in FINAL ANSWER ONLY, show both reduced fraction AND mixed number: {7/3} = 2{1/3} or {17/5} = 3{2/5}
 - NEVER convert to decimals at ANY step unless user explicitly requests decimal form
 - Arithmetic with fractions stays as fractions: {2/3} + {1/4} = {8/12} + {3/12} = {11/12}
+- **CRITICAL: When finding common denominators, EXPLICITLY STATE what the common denominator is and SHOW the conversion:**
+  - GOOD: "Find a common denominator of [blue:5]: {12/5}h - 2h. Convert 2h to fifths: [blue:2h = {10/5}h]. This gives us: [blue:{12/5}h - {10/5}h] = [red:{2/5}h]"
+  - BAD: "Simplify by finding a common denominator: {12/5}h - {10/5}h = {2/5}h" (doesn't explain what the denominator is or show conversion)
 
 **COLOR HIGHLIGHTING - CLARITY FOR EVERY OPERATION:**
 - [blue:term] = the specific value/variable/operation being applied in THIS step
