@@ -56,7 +56,8 @@ async function generateDiagram(description: string): Promise<string> {
       fs.writeFileSync(filepath, buffer);
       
       // Return absolute URL (relative paths resolve to Expo dev server, not our API server)
-      const url = `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/diagrams/${filename}`;
+      const domain = process.env.REPLIT_DEV_DOMAIN || `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+      const url = `https://${domain}/diagrams/${filename}`;
       console.log('✓ Diagram saved:', url);
       return url;
     }
