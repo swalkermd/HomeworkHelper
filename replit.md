@@ -9,7 +9,7 @@ None documented yet.
 ## System Architecture
 
 ### UI/UX Decisions
-The application features a responsive design with distinct typography for portrait and landscape modes. Gradient buttons are used for key actions (Type Question: Indigo-Purple; Take Photo: Pink-Orange; Choose from Gallery: Green-Cyan). Color schemes prioritize readability and user engagement, utilizing primary indigo, secondary emerald green, and a range of grays for text and backgrounds. Animations with React Native Reanimated provide a smooth and interactive user experience, including progressive step reveals and haptic feedback.
+The application features a responsive design with distinct typography for portrait and landscape modes. The hero section features a gold graduation cap icon (#fbbf24→#f59e0b gradient). Gradient buttons are used for key actions (Type Question: Indigo-Purple; Take Photo: Pink-Orange; Choose from Gallery: Green-Cyan). Color schemes prioritize readability and user engagement, utilizing primary indigo, secondary emerald green, and a range of grays for text and backgrounds. Animations with React Native Reanimated provide a smooth and interactive user experience, including progressive step reveals and haptic feedback.
 
 **Solution Screen Action Bar (Nov 2025):** Redesigned two-row card layout with grouped actions:
 - **Row 1 - "Need More Help?"**: Two equal-width buttons side-by-side

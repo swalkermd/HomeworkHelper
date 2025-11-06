@@ -23,7 +23,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       <View style={styles.hero}>
         <View style={styles.iconContainer}>
           <LinearGradient
-            colors={['#8b5cf6', '#6366f1']}
+            colors={['#fbbf24', '#f59e0b']}
             style={styles.iconGradient}
           >
             <Ionicons name="school" size={48} color="#ffffff" />
