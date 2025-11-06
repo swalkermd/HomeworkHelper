@@ -31,11 +31,23 @@ const SUBSCRIPT_MAP: { [key: string]: string } = {
 };
 
 export default function MathText({ content, fontSize = 14, color = colors.textPrimary, isOnGreenBackground = false }: MathTextProps) {
-  const parsedContent = parseContent(content);
+  // Split by newlines first to preserve line breaks
+  const lines = content.split('\n');
 
   return (
-    <View style={styles.container}>
-      {parsedContent.map((part, index) => renderPart(part, index, fontSize, color, isOnGreenBackground))}
+    <View>
+      {lines.map((line, lineIndex) => {
+        const parsedContent = parseContent(line);
+        return (
+          <View key={lineIndex} style={styles.lineContainer}>
+            {parsedContent.map((part, index) => (
+              <React.Fragment key={`${lineIndex}-${index}`}>
+                {renderPart(part, index, fontSize, color, isOnGreenBackground)}
+              </React.Fragment>
+            ))}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -235,10 +247,11 @@ function getHighlightColor(colorName: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  lineContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'baseline',
+    marginVertical: 2,
   },
   fractionContainer: {
     alignItems: 'center',
