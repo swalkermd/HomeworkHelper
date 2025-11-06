@@ -140,19 +140,15 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
     return `__IMAGE_PLACEHOLDER_${imageTags.length - 1}__`;
   });
   
-  // 0. Normalize whitespace: replace single newlines with spaces, preserve double newlines (paragraph breaks)
+  // 0. Normalize whitespace: replace ALL newlines with spaces for continuous text flow
   // First, normalize all line endings to \n
   formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   // Remove zero-width characters and other invisible Unicode whitespace that AI might generate
   formatted = formatted.replace(/[\u200B-\u200D\uFEFF]/g, '');
-  // Protect intentional paragraph breaks (double newlines) by converting to placeholder
-  formatted = formatted.replace(/\n\n+/g, '___PARAGRAPH_BREAK___');
-  // Now replace ALL remaining single newlines with spaces (these are awkward mid-sentence breaks)
-  formatted = formatted.replace(/\n/g, ' ');
+  // Convert ALL newlines (single or multiple) to single space
+  formatted = formatted.replace(/\n+/g, ' ');
   // Clean up multiple spaces (including NBSP)
   formatted = formatted.replace(/[\s\u00A0\u202F]+/g, ' ');
-  // Restore paragraph breaks as single newlines (MathText will handle rendering)
-  formatted = formatted.replace(/___PARAGRAPH_BREAK___/g, '\n');
   // CRITICAL: Remove ALL whitespace (including Unicode) before punctuation
   formatted = formatted.replace(/[\s\u00A0\u202F]+([.,!?;:])/g, '$1');
   // Trim leading/trailing whitespace
