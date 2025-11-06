@@ -17,33 +17,51 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
   }, []);
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (!permissionResult.granted) {
+    try {
+      console.log('🖼️ Gallery: Starting image picker...');
+      
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('🖼️ Gallery: Permission result:', permissionResult);
+      
+      if (!permissionResult.granted) {
+        console.log('🖼️ Gallery: Permission denied');
+        Alert.alert(
+          'Permission Required',
+          'Please grant permission to access your photo library.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+        return;
+      }
+
+      console.log('🖼️ Gallery: Launching image library...');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+      
+      console.log('🖼️ Gallery: Image picker result:', result);
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        console.log('🖼️ Gallery: Image selected:', asset.uri);
+        setCurrentImage({
+          uri: asset.uri,
+          width: asset.width,
+          height: asset.height,
+        });
+        navigation.navigate('ProblemSelection');
+      } else {
+        console.log('🖼️ Gallery: Selection canceled or no asset');
+        navigation.goBack();
+      }
+    } catch (error) {
+      console.error('🖼️ Gallery: Error picking image:', error);
       Alert.alert(
-        'Permission Required',
-        'Please grant permission to access your photo library.',
+        'Error',
+        'Failed to open photo library. Please try again.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 1,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setCurrentImage({
-        uri: asset.uri,
-        width: asset.width,
-        height: asset.height,
-      });
-      navigation.navigate('ProblemSelection');
-    } else {
-      navigation.goBack();
     }
   };
 
