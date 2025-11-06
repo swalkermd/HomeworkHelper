@@ -435,8 +435,21 @@ RESPONSE FORMAT (JSON):
       "content": "Solution step with proper formatting (use {num/den} for fractions, _subscript_, ^superscript^, [red:text] for colors, -> for arrows)"
     }
   ],
-  "finalAnswer": "Plain text final answer"
+  "finalAnswer": "Plain text final answer",
+  "visualAids": [
+    {
+      "type": "physics|geometry|graph|chart|illustration",
+      "stepId": "1",
+      "description": "Detailed description of what to visualize with all measurements and labels"
+    }
+  ]
 }
+
+**CRITICAL: visualAids array is REQUIRED for:**
+- Physics: projectile motion, force diagrams, circuits, kinematics
+- Geometry: shapes, angles, spatial relationships
+- Data: surveys, percentages, comparing quantities, proportions
+- Leave empty [] ONLY if truly no visual would help
 
 📊 INTELLIGENT VISUAL AIDS - WHEN AND WHAT TYPE TO CREATE 📊
 
@@ -632,7 +645,43 @@ Grade-appropriate language based on difficulty level.`
       }
     );
     
-    // Check if any step needs a diagram and generate it
+    // Post-processing: Add missing visual aids for survey/data problems
+    if (!result.visualAids || result.visualAids.length === 0) {
+      const questionLower = question.toLowerCase();
+      const isSurveyOrData = questionLower.includes('survey') || 
+                             questionLower.includes('percentage') || 
+                             questionLower.includes('poll') ||
+                             questionLower.includes('preferred') ||
+                             questionLower.includes('fraction of');
+      
+      if (isSurveyOrData && result.subject === 'Math') {
+        console.log('📊 Detected survey/data problem - injecting default pie chart');
+        result.visualAids = [{
+          type: 'chart',
+          stepId: '1',
+          description: `Pie chart showing the distribution of responses with percentages for each category. Use distinct colors for each segment and label with both category name and percentage value.`
+        }];
+      }
+    }
+    
+    // Process visualAids array to generate diagrams
+    if (result.visualAids && Array.isArray(result.visualAids)) {
+      for (const visualAid of result.visualAids) {
+        const { type, stepId, description } = visualAid;
+        const diagramDescription = `type=${type} - ${description}`;
+        const diagramUrl = await generateDiagram(diagramDescription);
+        
+        if (diagramUrl) {
+          // Find the step and add the image to its content
+          const step = result.steps.find((s: any) => s.id === stepId);
+          if (step) {
+            step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
+          }
+        }
+      }
+    }
+    
+    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
@@ -728,8 +777,21 @@ RESPONSE FORMAT (JSON):
       "content": "Solution step with proper formatting"
     }
   ],
-  "finalAnswer": "Plain text final answer"
+  "finalAnswer": "Plain text final answer",
+  "visualAids": [
+    {
+      "type": "physics|geometry|graph|chart|illustration",
+      "stepId": "1",
+      "description": "Detailed description of what to visualize with all measurements and labels"
+    }
+  ]
 }
+
+**CRITICAL: visualAids array is REQUIRED for:**
+- Physics: projectile motion, force diagrams, circuits, kinematics
+- Geometry: shapes, angles, spatial relationships
+- Data: surveys, percentages, comparing quantities, proportions
+- Leave empty [] ONLY if truly no visual would help
 
 📊 INTELLIGENT VISUAL AIDS - WHEN AND WHAT TYPE TO CREATE 📊
 
@@ -949,7 +1011,44 @@ Grade-appropriate language based on difficulty level.`
     }
     console.log('========================\n');
     
-    // Check if any step needs a diagram and generate it
+    // Post-processing: Add missing visual aids for survey/data problems
+    if (!result.visualAids || result.visualAids.length === 0) {
+      const problemLower = result.problem.toLowerCase();
+      const isSurveyOrData = problemLower.includes('survey') || 
+                             problemLower.includes('percentage') || 
+                             problemLower.includes('poll') ||
+                             problemLower.includes('preferred') ||
+                             problemLower.includes('fraction of');
+      
+      if (isSurveyOrData && result.subject === 'Math') {
+        console.log('📊 Detected survey/data problem - injecting default pie chart');
+        result.visualAids = [{
+          type: 'chart',
+          stepId: '1',
+          description: `Pie chart showing the distribution of responses with percentages for each category. Use distinct colors for each segment and label with both category name and percentage value.`
+        }];
+      }
+    }
+    
+    // Process visualAids array to generate diagrams
+    if (result.visualAids && Array.isArray(result.visualAids)) {
+      for (const visualAid of result.visualAids) {
+        const { type, stepId, description } = visualAid;
+        const diagramDescription = `type=${type} - ${description}`;
+        const diagramUrl = await generateDiagram(diagramDescription);
+        
+        if (diagramUrl) {
+          // Find the step and add the image to its content
+          const step = result.steps.find((s: any) => s.id === stepId);
+          if (step) {
+            step.content = `(IMAGE: ${description}](${diagramUrl})\n\n` + step.content;
+            console.log('✓ Diagram embedded:', diagramUrl);
+          }
+        }
+      }
+    }
+    
+    // Legacy support: Check if any step has old-style [DIAGRAM NEEDED: ...] tags
     for (const step of result.steps) {
       const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
       if (diagramMatch) {
