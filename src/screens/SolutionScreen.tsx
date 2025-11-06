@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: '#800000',
     paddingVertical: spacing.md,
     borderRadius: 12,
     alignItems: 'center',

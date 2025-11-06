@@ -141,12 +141,14 @@ function enforceProperFormatting(text: string | null | undefined): string {
   // 0. Normalize whitespace: replace single newlines with spaces, preserve double newlines (paragraph breaks)
   // First, normalize all line endings to \n
   formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  // Replace single newlines (not followed by another newline) with a space
-  formatted = formatted.replace(/\n(?!\n)/g, ' ');
+  // Protect intentional paragraph breaks (double newlines) by converting to placeholder
+  formatted = formatted.replace(/\n\n+/g, '___PARAGRAPH_BREAK___');
+  // Now replace ALL remaining single newlines with spaces (these are awkward mid-sentence breaks)
+  formatted = formatted.replace(/\n/g, ' ');
   // Clean up multiple spaces
   formatted = formatted.replace(/ +/g, ' ');
-  // Preserve double newlines as paragraph breaks
-  formatted = formatted.replace(/\n\n+/g, '\n\n');
+  // Restore paragraph breaks as single newlines (MathText will handle rendering)
+  formatted = formatted.replace(/___PARAGRAPH_BREAK___/g, '\n');
   
   // 1. Convert common decimals to fractions (only standalone decimals, not part of larger numbers)
   const decimalToFraction: { [key: string]: string } = {
@@ -466,7 +468,7 @@ RESPONSE FORMAT (JSON):
       "content": "Solution step with proper formatting (use {num/den} for fractions, _subscript_, ^superscript^, [red:text] for colors, -> for arrows)"
     }
   ],
-  "finalAnswer": "Plain text final answer",
+  "finalAnswer": "Final answer with KEY TERMS highlighted using [red:term] syntax for important concepts, formulas, or vocabulary (e.g., [red:phototropism], [red:auxin], [red:quadratic formula])",
   "visualAids": [
     {
       "type": "physics|geometry|graph|chart|illustration",
@@ -475,6 +477,13 @@ RESPONSE FORMAT (JSON):
     }
   ]
 }
+
+**FINAL ANSWER HIGHLIGHTING - CRITICAL:**
+- ALWAYS highlight key technical terms, concepts, or vocabulary in the final answer using [red:term]
+- Examples: [red:phototropism], [red:auxin], [red:mitochondria], [red:Pythagorean theorem], [red:oxidation]
+- For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
+- For science: highlight phenomena, hormones, processes, chemical names
+- For any subject: highlight the most important 2-3 terms that answer the core question
 
 **CRITICAL: visualAids array is REQUIRED for:**
 - Physics: projectile motion, force diagrams, circuits, kinematics
@@ -876,7 +885,7 @@ RESPONSE FORMAT (JSON):
       "content": "Solution step with proper formatting"
     }
   ],
-  "finalAnswer": "Plain text final answer",
+  "finalAnswer": "Final answer with KEY TERMS highlighted using [red:term] syntax for important concepts, formulas, or vocabulary (e.g., [red:phototropism], [red:auxin], [red:quadratic formula])",
   "visualAids": [
     {
       "type": "physics|geometry|graph|chart|illustration",
@@ -885,6 +894,13 @@ RESPONSE FORMAT (JSON):
     }
   ]
 }
+
+**FINAL ANSWER HIGHLIGHTING - CRITICAL:**
+- ALWAYS highlight key technical terms, concepts, or vocabulary in the final answer using [red:term]
+- Examples: [red:phototropism], [red:auxin], [red:mitochondria], [red:Pythagorean theorem], [red:oxidation]
+- For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
+- For science: highlight phenomena, hormones, processes, chemical names
+- For any subject: highlight the most important 2-3 terms that answer the core question
 
 **CRITICAL: visualAids array is REQUIRED for:**
 - Physics: projectile motion, force diagrams, circuits, kinematics
