@@ -744,13 +744,36 @@ Grade-appropriate language based on difficulty level.`
     await Promise.all(diagramPromises);
     
     // CLEANUP: Remove any remaining [DIAGRAM NEEDED] tags (from failed generations or unprocessed tags)
-    // Using [\s\S]*? to match any content including nested brackets, newlines, etc.
+    // Must use bracket-depth counting because simple regex fails with nested brackets like [angle], [force], etc.
     for (const step of result.steps) {
       if (step.content) {
         const beforeCleanup = step.content;
-        step.content = step.content.replace(/\[DIAGRAM NEEDED:[\s\S]*?\]/g, '');
-        if (beforeCleanup !== step.content) {
-          console.log(`⚠️ Removed [DIAGRAM NEEDED] placeholder from step ${step.id} (diagram generation likely failed)`);
+        let content = step.content;
+        let changed = false;
+        
+        // Find and remove all [DIAGRAM NEEDED: ...] tags with proper bracket matching
+        while (true) {
+          const startIndex = content.indexOf('[DIAGRAM NEEDED:');
+          if (startIndex === -1) break;
+          
+          // Track bracket depth to find the matching closing bracket
+          let depth = 1; // We've seen the opening '['
+          let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
+          
+          while (depth > 0 && endIndex < content.length) {
+            if (content[endIndex] === '[') depth++;
+            else if (content[endIndex] === ']') depth--;
+            endIndex++;
+          }
+          
+          // Remove the entire tag (from startIndex to endIndex)
+          content = content.substring(0, startIndex) + content.substring(endIndex);
+          changed = true;
+        }
+        
+        step.content = content;
+        if (changed) {
+          console.log(`⚠️ Removed [DIAGRAM NEEDED] placeholder(s) from step ${step.id} (diagram generation likely failed)`);
         }
       }
     }
@@ -1155,13 +1178,36 @@ Grade-appropriate language based on difficulty level.`
     await Promise.all(diagramPromises);
     
     // CLEANUP: Remove any remaining [DIAGRAM NEEDED] tags (from failed generations or unprocessed tags)
-    // Using [\s\S]*? to match any content including nested brackets, newlines, etc.
+    // Must use bracket-depth counting because simple regex fails with nested brackets like [angle], [force], etc.
     for (const step of result.steps) {
       if (step.content) {
         const beforeCleanup = step.content;
-        step.content = step.content.replace(/\[DIAGRAM NEEDED:[\s\S]*?\]/g, '');
-        if (beforeCleanup !== step.content) {
-          console.log(`⚠️ Removed [DIAGRAM NEEDED] placeholder from step ${step.id} (diagram generation likely failed)`);
+        let content = step.content;
+        let changed = false;
+        
+        // Find and remove all [DIAGRAM NEEDED: ...] tags with proper bracket matching
+        while (true) {
+          const startIndex = content.indexOf('[DIAGRAM NEEDED:');
+          if (startIndex === -1) break;
+          
+          // Track bracket depth to find the matching closing bracket
+          let depth = 1; // We've seen the opening '['
+          let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
+          
+          while (depth > 0 && endIndex < content.length) {
+            if (content[endIndex] === '[') depth++;
+            else if (content[endIndex] === ']') depth--;
+            endIndex++;
+          }
+          
+          // Remove the entire tag (from startIndex to endIndex)
+          content = content.substring(0, startIndex) + content.substring(endIndex);
+          changed = true;
+        }
+        
+        step.content = content;
+        if (changed) {
+          console.log(`⚠️ Removed [DIAGRAM NEEDED] placeholder(s) from step ${step.id} (diagram generation likely failed)`);
         }
       }
     }
