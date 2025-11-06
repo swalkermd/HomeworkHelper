@@ -34,6 +34,34 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 
+// In-memory store for async diagram generation
+interface DiagramStatus {
+  stepId: string;
+  type: string;
+  description: string;
+  status: 'pending' | 'generating' | 'ready' | 'failed';
+  imageUrl?: string;
+  error?: string;
+}
+
+interface SolutionDiagrams {
+  diagrams: DiagramStatus[];
+  timestamp: number;
+  complete: boolean;
+}
+
+const solutionDiagramStore = new Map<string, SolutionDiagrams>();
+
+// Cleanup old solutions after 1 hour
+setInterval(() => {
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  for (const [id, data] of solutionDiagramStore.entries()) {
+    if (data.timestamp < oneHourAgo) {
+      solutionDiagramStore.delete(id);
+    }
+  }
+}, 5 * 60 * 1000); // Run every 5 minutes
+
 // Serve diagram images from public/diagrams
 app.use('/diagrams', express.static(path.join(process.cwd(), 'public', 'diagrams')));
 
