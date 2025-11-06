@@ -6,10 +6,14 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
   try {
     console.log('📡 Calling API:', `${API_URL}/analyze-text`);
     console.log('📡 Fetch starting...');
+    console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // Create AbortController with 120 second timeout (enough for complex problems with diagrams)
+    // Increase timeout to 180 seconds (3 minutes) for complex problems with diagrams
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    const timeoutId = setTimeout(() => {
+      console.log('⏱️ Timeout triggered after 180 seconds');
+      controller.abort();
+    }, 180000);
     
     const response = await fetch(`${API_URL}/analyze-text`, {
       method: 'POST',
@@ -59,11 +63,16 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
 export async function analyzeImageQuestion(imageUri: string, problemNumber?: string): Promise<any> {
   try {
     console.log('Calling API:', `${API_URL}/analyze-image`);
+    console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // Create AbortController with 120 second timeout
+    // Increase timeout to 180 seconds (3 minutes) for complex problems with diagrams
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    const timeoutId = setTimeout(() => {
+      console.log('⏱️ Timeout triggered after 180 seconds');
+      controller.abort();
+    }, 180000);
     
+    console.log('📡 Sending request...');
     const response = await fetch(`${API_URL}/analyze-image`, {
       method: 'POST',
       headers: {
@@ -73,6 +82,7 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
       signal: controller.signal,
     });
     
+    console.log('📥 Response received, status:', response.status);
     clearTimeout(timeoutId);
     
     if (!response.ok) {
@@ -81,17 +91,24 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
       throw new Error(errorData.error || 'Failed to analyze image');
     }
     
+    console.log('🔍 Parsing response JSON...');
     const result = await response.json();
-    console.log('✓ Image API Response:', {
+    console.log('✓ Image API Response parsed successfully:', {
       hasSteps: !!result?.steps,
       stepsCount: result?.steps?.length,
       subject: result?.subject,
       difficulty: result?.difficulty,
       hasProblem: !!result?.problem
     });
+    console.log('⏱️ Analysis completed at:', new Date().toISOString());
     return result;
   } catch (error) {
     console.error('❌ Error analyzing image question:', error);
+    console.error('❌ Error type:', error instanceof Error ? error.name : typeof error);
+    console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Analysis timed out after 3 minutes. Please try a simpler question or try again.');
+    }
     throw error;
   }
 }

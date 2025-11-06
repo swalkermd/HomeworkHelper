@@ -40,7 +40,7 @@ The application features a responsive design with distinct typography for portra
   - **Async Validation**: Quality control runs in background (non-blocking) for logging/monitoring only
   - **Simplified Prompts**: Reduced diagram prompts from 150 words to 20 words for faster generation
   - **Robust Error Handling**: Diagram generation failures gracefully degrade without breaking UX
-  - **Timeout Configuration**: Server timeout 300s, client fetch timeout 120s (intentional mismatch provides safety margin)
+  - **Timeout Configuration**: Server timeout 300s, client fetch timeout 180s (intentional mismatch provides safety margin for complex problems with diagrams)
   - **Image Size**: Diagrams generated at 1024x1024 for optimal quality and compatibility
 
 ### System Design Choices
