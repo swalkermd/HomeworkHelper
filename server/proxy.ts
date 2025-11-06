@@ -227,9 +227,20 @@ Two solutions:
 d = {{-14 + 20}/{6}} = {6/6} = [red:1]
 d = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]"
 
-**VISUAL DIAGRAMS:**
-- For geometry, graphs, coordinate planes, add [DIAGRAM NEEDED: detailed description] in first step
-- Example: [DIAGRAM NEEDED: Rectangle with length 8 units and width 5 units, clearly labeled dimensions]
+**MANDATORY VISUAL DIAGRAMS:**
+For the following problem types, you MUST add [DIAGRAM NEEDED: detailed description] in the FIRST step where the diagram would help:
+
+**REQUIRED for:**
+- Geometry: rectangles, triangles, circles, polygons → [DIAGRAM NEEDED: Rectangle ABCD with length 8 units (AB) and width 5 units (BC), all corners labeled]
+- Coordinate planes/graphs → [DIAGRAM NEEDED: Coordinate plane showing line y=2x+3 with y-intercept at (0,3) and point (2,7) labeled]
+- Physics diagrams: forces, motion, circuits → [DIAGRAM NEEDED: Free body diagram showing box on inclined plane at 30°, with force vectors for weight (mg), normal force (N), and friction (f)]
+- Charts/visual comparisons → [DIAGRAM NEEDED: Bar chart comparing heights of three buildings]
+
+**Examples of [DIAGRAM NEEDED: ...]:**
+- [DIAGRAM NEEDED: Isosceles triangle OPQ with base PQ=6 units labeled at bottom, equal sides OP and OQ both 5 units, altitude of 4 units from O perpendicular to PQ at midpoint]
+- [DIAGRAM NEEDED: Rectangle PQRS with width PS=4 units on left side and length PQ=6 units on top, all corners labeled clockwise starting from P]
+
+The description must be detailed enough to draw the exact diagram with all dimensions, labels, and angles.
 
 **CHEMISTRY/PHYSICS:**
 - Subscripts: H_2_O, v_0_, x_n_
@@ -427,10 +438,20 @@ Two solutions:
 d = {{-14 + 20}/{6}} = {6/6} = [red:1]
 d = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]"
 
-**VISUAL DIAGRAMS:**
-- For geometry, graphs, coordinate planes, add [DIAGRAM NEEDED: detailed description] in first step
-- Example: [DIAGRAM NEEDED: Rectangle with length 8 units and width 5 units, clearly labeled dimensions]
-- For rectangle area problems, ALWAYS include a diagram
+**MANDATORY VISUAL DIAGRAMS:**
+For the following problem types, you MUST add [DIAGRAM NEEDED: detailed description] in the FIRST step where the diagram would help:
+
+**REQUIRED for:**
+- Geometry: rectangles, triangles, circles, polygons → [DIAGRAM NEEDED: Rectangle ABCD with length 8 units (AB) and width 5 units (BC), all corners labeled]
+- Coordinate planes/graphs → [DIAGRAM NEEDED: Coordinate plane showing line y=2x+3 with y-intercept at (0,3) and point (2,7) labeled]
+- Physics diagrams: forces, motion, circuits → [DIAGRAM NEEDED: Free body diagram showing box on inclined plane at 30°, with force vectors for weight (mg), normal force (N), and friction (f)]
+- Charts/visual comparisons → [DIAGRAM NEEDED: Bar chart comparing heights of three buildings]
+
+**Examples of [DIAGRAM NEEDED: ...]:**
+- [DIAGRAM NEEDED: Isosceles triangle OPQ with base PQ=6 units labeled at bottom, equal sides OP and OQ both 5 units, altitude of 4 units from O perpendicular to PQ at midpoint]
+- [DIAGRAM NEEDED: Rectangle PQRS with width PS=4 units on left side and length PQ=6 units on top, all corners labeled clockwise starting from P]
+
+The description must be detailed enough to draw the exact diagram with all dimensions, labels, and angles.
 
 **CHEMISTRY/PHYSICS:**
 - Subscripts: H_2_O, v_0_, x_n_

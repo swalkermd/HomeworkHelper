@@ -207,6 +207,13 @@ The proxy server (`server/proxy.ts`) provides:
 - [ ] Offline mode with cached solutions
 
 ## Recent Changes
+- November 6, 2025: **DIAGRAM GENERATION FIX** - Strengthened AI prompt to ensure diagrams are generated:
+  - Made diagram instructions **MANDATORY** instead of optional suggestions
+  - Moved diagram instructions to prominent position before chemistry/physics formatting
+  - Added specific requirements for geometry (rectangles, triangles, circles, polygons)
+  - Added detailed examples showing exact format for [DIAGRAM NEEDED: ...] markers
+  - Specified that descriptions must be detailed enough to draw exact diagrams with all dimensions, labels, and angles
+  - Applied to both analyze-text and analyze-image endpoints
 - November 6, 2025: **MATHTEXT LINE BREAK FIX** - Fixed improper line breaking in solution steps:
   - Restructured MathText component to split content by newlines first
   - Each line now renders in its own flex-row container, preserving AI's intended line structure
