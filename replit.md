@@ -207,6 +207,13 @@ The proxy server (`server/proxy.ts`) provides:
 - [ ] Offline mode with cached solutions
 
 ## Recent Changes
+- November 6, 2025: **SERVER-SIDE FORMATTING ENFORCEMENT** - Critical fix for math formatting:
+  - Added server-side post-processing layer that forcefully converts ALL fractions to {num/den} format
+  - Automatic decimal-to-fraction conversion (0.125→{1/8}, 0.25→{1/4}, 0.5→{1/2}, etc.) with boundary checks to avoid corrupting larger numbers
+  - Converts inline fractions (1/8, 3/4) to vertical format {1/8}, {3/4} while preserving URLs and already-formatted fractions
+  - Applied to all API endpoints: analyze-text, analyze-image, and ask-question
+  - Enforces formatting on problem field, all step titles/content, and final answers
+  - This server-side enforcement overrides any AI formatting mistakes before sending to client
 - November 6, 2025: **OCR ACCURACY IMPROVEMENTS** - Enhanced image analysis:
   - Character-by-character transcription instructions with specific pattern examples
   - Explicit guidance for fraction coefficients before parentheses (e.g., "1/8(3d - 2)")
