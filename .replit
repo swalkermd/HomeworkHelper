@@ -27,7 +27,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash -c \"npx tsx server/index.ts & PORT=5000 npx expo start --web --port 5000\""
+args = "bash -c \"PORT=8080 npx tsx server/index.ts & sleep 2 && PORT=5000 npx expo start --web --port 5000\""
 waitForPort = 5000
 
 [[ports]]
@@ -39,12 +39,8 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 33279
-externalPort = 3001
-
-[[ports]]
-localPort = 38377
-externalPort = 3000
+localPort = 8080
+externalPort = 8080
 
 [[ports]]
 localPort = 41717

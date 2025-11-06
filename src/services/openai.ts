@@ -1,14 +1,17 @@
 const getApiUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    
     if (hostname.includes('replit.dev')) {
-      return `https://${hostname.replace('-00-', '-03-')}`;
+      const apiHost = hostname.replace('-00-', '-08-');
+      return `${protocol}//${apiHost}/api`;
     }
   }
-  return 'http://localhost:3000';
+  return 'http://localhost:8080/api';
 };
 
-const API_URL = `${getApiUrl()}/api`;
+const API_URL = getApiUrl();
 
 export async function analyzeTextQuestion(question: string): Promise<any> {
   try {
@@ -21,7 +24,9 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
     });
     
     if (!response.ok) {
-      throw new Error('Failed to analyze question');
+      const errorData = await response.json().catch(() => ({}));
+      console.error('API Error Response:', errorData);
+      throw new Error(errorData.error || 'Failed to analyze question');
     }
     
     return await response.json();
@@ -42,7 +47,9 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     });
     
     if (!response.ok) {
-      throw new Error('Failed to analyze image');
+      const errorData = await response.json().catch(() => ({}));
+      console.error('API Error Response:', errorData);
+      throw new Error(errorData.error || 'Failed to analyze image');
     }
     
     return await response.json();
@@ -66,7 +73,9 @@ export async function askFollowUpQuestion(
     });
     
     if (!response.ok) {
-      throw new Error('Failed to ask question');
+      const errorData = await response.json().catch(() => ({}));
+      console.error('API Error Response:', errorData);
+      throw new Error(errorData.error || 'Failed to ask question');
     }
     
     const data = await response.json();
