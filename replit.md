@@ -35,13 +35,11 @@ The application features a responsive design with distinct typography for portra
   - **Confidence Scoring**: Solutions must pass 70% confidence threshold
   - **Comprehensive Logging**: Timestamps, validation metrics, errors, and warnings logged for quality monitoring
   - **Async Background Execution**: Validation runs in background after delivering solution to user (non-blocking for speed)
-- **Performance Optimizations (Nov 2025):** Target processing time <15 seconds for complex problems (achieved: 3-7s avg):
-  - **Parallel Diagram Generation**: All visual aids generate concurrently using Promise.all instead of sequentially
+- **Performance Optimizations (Nov 2025):** Target processing time <8 seconds for ALL problems (achieved: 3-7s consistently):
+  - **Diagram Generation Disabled**: Visual aids temporarily disabled to prioritize instant student feedback over visual enhancement (diagrams added 30-45s latency per problem)
   - **Async Validation**: Quality control runs in background (non-blocking) for logging/monitoring only
-  - **Simplified Prompts**: Reduced diagram prompts from 150 words to 20 words for faster generation
-  - **Robust Error Handling**: Diagram generation failures gracefully degrade without breaking UX
-  - **Timeout Configuration**: Server timeout 300s, client fetch timeout 180s (intentional mismatch provides safety margin for complex problems with diagrams)
-  - **Image Size**: Diagrams generated at 1024x1024 for optimal quality and compatibility
+  - **Fast Response Time**: All solutions delivered in 3-7 seconds regardless of complexity
+  - **Timeout Configuration**: Server timeout 300s, client fetch timeout 30s (reduced from 180s after diagram removal)
 
 ### System Design Choices
 The application uses a proxy server architecture (running on port 5000) that handles API endpoints and proxies frontend requests to the Expo dev server (port 8081). This setup centralizes OpenAI API integration, CORS handling, and ensures all interactions occur through a single exposed port in the Replit environment.

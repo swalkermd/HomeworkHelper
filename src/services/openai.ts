@@ -8,12 +8,12 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
     console.log('📡 Fetch starting...');
     console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // Increase timeout to 180 seconds (3 minutes) for complex problems with diagrams
+    // Reduced timeout to 30 seconds (diagrams disabled for speed)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('⏱️ Timeout triggered after 180 seconds');
+      console.log('⏱️ Timeout triggered after 30 seconds');
       controller.abort();
-    }, 180000);
+    }, 30000);
     
     const response = await fetch(`${API_URL}/analyze-text`, {
       method: 'POST',
@@ -65,12 +65,12 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     console.log('Calling API:', `${API_URL}/analyze-image`);
     console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // Increase timeout to 180 seconds (3 minutes) for complex problems with diagrams
+    // Reduced timeout to 30 seconds (diagrams disabled for speed)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('⏱️ Timeout triggered after 180 seconds');
+      console.log('⏱️ Timeout triggered after 30 seconds');
       controller.abort();
-    }, 180000);
+    }, 30000);
     
     console.log('📡 Sending request...');
     const response = await fetch(`${API_URL}/analyze-image`, {
@@ -107,7 +107,7 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     console.error('❌ Error type:', error instanceof Error ? error.name : typeof error);
     console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Analysis timed out after 3 minutes. Please try a simpler question or try again.');
+      throw new Error('Analysis timed out after 30 seconds. Please try again.');
     }
     throw error;
   }
