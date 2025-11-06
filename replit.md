@@ -207,6 +207,13 @@ The proxy server (`server/proxy.ts`) provides:
 - [ ] Offline mode with cached solutions
 
 ## Recent Changes
+- November 6, 2025: **MAJOR UPDATE** - Comprehensive math formatting improvements:
+  - All fractions now display in proper vertical format {num/den} - never inline or decimal
+  - Color highlighting added: blue for operations being performed, red for results
+  - No decimal conversions at any step unless explicitly requested
+  - Improper fractions in final answers show both forms: {7/3} = 2{1/3}
+  - Complete worked examples in AI prompts ensure consistent formatting
+  - Enhanced step clarity with clear before/after states and highlighted changes
 - November 6, 2025: Added automatic diagram generation with DALL-E 3 for visual problems (geometry, graphs, physics diagrams, charts)
 - November 6, 2025: Initial MVP implementation complete
   - All core screens and navigation
