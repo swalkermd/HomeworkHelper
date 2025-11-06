@@ -45,11 +45,16 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      console.log('🖼️ Gallery: File input created:', input);
+      input.style.display = 'none';
+      console.log('🖼️ Gallery: File input created');
       
       input.onchange = async (e: any) => {
         console.log('🖼️ Gallery: onChange triggered');
         const file = e.target.files?.[0];
+        
+        // Clean up input from DOM
+        document.body.removeChild(input);
+        
         if (!file) {
           console.log('🖼️ Gallery: No file selected');
           navigation.navigate('Home');
@@ -71,19 +76,26 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
             });
             navigation.navigate('ProblemSelection');
           };
+          img.onerror = () => {
+            console.error('🖼️ Gallery: Failed to load image');
+            navigation.navigate('Home');
+          };
           img.src = uri;
+        };
+        reader.onerror = () => {
+          console.error('🖼️ Gallery: Failed to read file');
+          navigation.navigate('Home');
         };
         reader.readAsDataURL(file);
       };
       
-      input.oncancel = () => {
-        console.log('🖼️ Gallery: File picker canceled');
-        navigation.navigate('Home');
-      };
+      // Append to DOM before clicking (required for some browsers)
+      console.log('🖼️ Gallery: Appending input to DOM...');
+      document.body.appendChild(input);
       
-      console.log('🖼️ Gallery: Clicking input to trigger file picker...');
+      console.log('🖼️ Gallery: Triggering file picker...');
       input.click();
-      console.log('🖼️ Gallery: input.click() executed');
+      console.log('🖼️ Gallery: File picker triggered');
     } catch (error) {
       console.error('🖼️ Gallery: Error in pickImageWeb:', error);
       navigation.navigate('Home');
