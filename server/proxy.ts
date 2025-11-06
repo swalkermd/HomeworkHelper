@@ -149,6 +149,10 @@ function enforceProperFormatting(text: string | null | undefined): string {
   formatted = formatted.replace(/ +/g, ' ');
   // Restore paragraph breaks as single newlines (MathText will handle rendering)
   formatted = formatted.replace(/___PARAGRAPH_BREAK___/g, '\n');
+  // CRITICAL: Remove spaces before punctuation (caused by newline-to-space conversion)
+  formatted = formatted.replace(/\s+([.,!?;:])/g, '$1');
+  // Trim leading/trailing whitespace
+  formatted = formatted.trim();
   
   // 1. Convert common decimals to fractions (only standalone decimals, not part of larger numbers)
   const decimalToFraction: { [key: string]: string } = {
