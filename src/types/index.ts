@@ -28,6 +28,7 @@ export interface HomeworkSolution {
   difficulty: string;
   steps: SolutionStep[];
   finalAnswer: string;
+  solutionId?: string;
 }
 
 export interface ChatMessage {

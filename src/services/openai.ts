@@ -8,12 +8,12 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
     console.log('📡 Fetch starting...');
     console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // 60 second timeout for complete response with diagrams
+    // 30 second timeout for initial response (diagrams load async)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('⏱️ Timeout triggered after 60 seconds');
+      console.log('⏱️ Timeout triggered after 30 seconds');
       controller.abort();
-    }, 60000);
+    }, 30000);
     
     const response = await fetch(`${API_URL}/analyze-text`, {
       method: 'POST',
@@ -65,12 +65,12 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     console.log('Calling API:', `${API_URL}/analyze-image`);
     console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // 60 second timeout for complete response with diagrams
+    // 30 second timeout for initial response (diagrams load async)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('⏱️ Timeout triggered after 60 seconds');
+      console.log('⏱️ Timeout triggered after 30 seconds');
       controller.abort();
-    }, 60000);
+    }, 30000);
     
     console.log('📡 Sending request...');
     const response = await fetch(`${API_URL}/analyze-image`, {
@@ -107,7 +107,7 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     console.error('❌ Error type:', error instanceof Error ? error.name : typeof error);
     console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Analysis timed out after 60 seconds. Please try again.');
+      throw new Error('Analysis timed out after 30 seconds. Please try again.');
     }
     throw error;
   }
@@ -175,4 +175,39 @@ export async function getSimplifiedExplanations(solution: HomeworkSolution): Pro
 
 export async function generateDiagram(description: string): Promise<string> {
   return '';
+}
+
+export interface DiagramStatus {
+  stepId: string;
+  type: string;
+  description: string;
+  status: 'pending' | 'generating' | 'ready' | 'failed';
+  imageUrl?: string;
+  error?: string;
+}
+
+export interface DiagramsResponse {
+  diagrams: DiagramStatus[];
+  complete: boolean;
+}
+
+export async function pollForDiagrams(solutionId: string): Promise<DiagramsResponse> {
+  try {
+    const response = await fetch(`${API_URL}/diagrams/${solutionId}`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.warn('Solution not found, marking complete');
+        return { diagrams: [], complete: true };
+      }
+      console.warn('Temporary error fetching diagrams, will retry');
+      return { diagrams: [], complete: false };
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.warn('Network error polling diagrams, will retry:', error);
+    return { diagrams: [], complete: false };
+  }
 }

@@ -3,13 +3,14 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useHomeworkStore } from '../store/homeworkStore';
 import { RootStackParamList } from '../navigation/types';
 import MathText from '../components/MathText';
 import { colors, typography, spacing } from '../constants/theme';
-import { getSimplifiedExplanations } from '../services/openai';
+import { getSimplifiedExplanations, pollForDiagrams, DiagramStatus } from '../services/openai';
 import { SimplifiedExplanation } from '../types';
 
 type SolutionScreenProps = {
@@ -23,6 +24,8 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const [simplifiedMode, setSimplifiedMode] = useState(false);
   const [simplifiedExplanations, setSimplifiedExplanations] = useState<SimplifiedExplanation[]>([]);
   const [loadingSimplified, setLoadingSimplified] = useState(false);
+  const [diagrams, setDiagrams] = useState<DiagramStatus[]>([]);
+  const [diagramsComplete, setDiagramsComplete] = useState(false);
 
   useEffect(() => {
     console.log('🔍 SolutionScreen mounted. Has solution:', !!currentSolution);
@@ -30,7 +33,8 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
       hasSteps: !!currentSolution.steps,
       stepsCount: currentSolution.steps?.length,
       subject: currentSolution.subject,
-      difficulty: currentSolution.difficulty
+      difficulty: currentSolution.difficulty,
+      solutionId: currentSolution.solutionId
     } : 'No solution');
     
     if (!currentSolution) {
@@ -53,6 +57,36 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
 
     return () => clearInterval(timer);
   }, [currentSolution]);
+
+  useEffect(() => {
+    if (!currentSolution?.solutionId || diagramsComplete) return;
+
+    console.log('🎨 Starting diagram polling for solution:', currentSolution.solutionId);
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const result = await pollForDiagrams(currentSolution.solutionId!);
+        
+        console.log('📊 Diagram status:', {
+          count: result.diagrams.length,
+          complete: result.complete,
+          ready: result.diagrams.filter(d => d.status === 'ready').length
+        });
+        
+        setDiagrams(result.diagrams);
+        
+        if (result.complete) {
+          console.log('✅ All diagrams complete!');
+          setDiagramsComplete(true);
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error('Error polling diagrams:', error);
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [currentSolution?.solutionId, diagramsComplete]);
 
   const handleSimplifyExplanation = async () => {
     if (!currentSolution || loadingSimplified) return;
@@ -101,6 +135,8 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
 
         {currentSolution.steps.map((step, index) => {
           const simplified = simplifiedExplanations.find(exp => exp.stepNumber === index + 1);
+          const stepDiagram = diagrams.find(d => d.stepId === step.id);
+          
           return (
             <Animated.View
               key={step.id}
@@ -118,6 +154,24 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
               </View>
               
               <Text style={styles.stepTitle}>{step.title}</Text>
+              
+              {stepDiagram && stepDiagram.status === 'ready' && stepDiagram.imageUrl && (
+                <View style={styles.diagramContainer}>
+                  <Text style={styles.diagramLabel}>Visual Aid:</Text>
+                  <Image 
+                    source={{ uri: stepDiagram.imageUrl }} 
+                    style={styles.diagramImage}
+                    contentFit="contain"
+                  />
+                </View>
+              )}
+              
+              {stepDiagram && stepDiagram.status === 'generating' && (
+                <View style={styles.diagramContainer}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.diagramLoading}>Generating diagram...</Text>
+                </View>
+              )}
               
               <View style={styles.stepContent}>
                 <MathText content={step.content} fontSize={typography.mathMedium.fontSize} />
@@ -389,6 +443,30 @@ const styles = StyleSheet.create({
   },
   simplifyButtonActive: {
     backgroundColor: '#10b981',
+  },
+  diagramContainer: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 8,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  diagramLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  diagramImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 8,
+  },
+  diagramLoading: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
   simplifyButtonText: {
     fontSize: typography.bodyLarge.fontSize,

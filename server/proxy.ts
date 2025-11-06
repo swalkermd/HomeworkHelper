@@ -1347,30 +1347,6 @@ app.get('/api/diagrams/:solutionId', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch diagrams' });
   }
 });
-    // Validation runs in background for monitoring/logging only
-    // Using void operator to explicitly ignore promise and prevent unhandled rejection warnings
-    const problemText = `${formattedResult.problem}${problemNumber ? ` (Problem #${problemNumber})` : ''}`;
-    void validateSolution(problemText, formattedResult)
-      .then(({ validationPassed, validationDetails }) => {
-        if (!validationPassed) {
-          console.warn('⚠️ Background validation failed:', validationDetails);
-          // Log but don't block - solution already delivered to user
-        } else {
-          console.log('✅ Background validation passed');
-        }
-      })
-      .catch(err => {
-        console.error('⚠️ Background validation error (non-blocking):', err);
-        // Continue - validation is for logging only, not critical path
-      });
-    
-    console.log('✅ Image analysis successful - returning immediately (validation async)');
-    res.json(formattedResult);
-  } catch (error) {
-    console.error('Error analyzing image:', error);
-    res.status(500).json({ error: 'Failed to analyze image' });
-  }
-});
 
 app.post('/api/simplify-explanation', async (req, res) => {
   try {

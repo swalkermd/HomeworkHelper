@@ -35,11 +35,12 @@ The application features a responsive design with distinct typography for portra
   - **Confidence Scoring**: Solutions must pass 70% confidence threshold
   - **Comprehensive Logging**: Timestamps, validation metrics, errors, and warnings logged for quality monitoring
   - **Async Background Execution**: Validation runs in background after delivering solution to user (non-blocking for speed)
-- **Performance Optimizations (Nov 2025):** Optimized for best balance of speed and visual aids:
-  - **Parallel Diagram Generation**: All visual aids generate concurrently using Promise.all
+- **Performance Optimizations (Nov 2025):** Asynchronous architecture for instant responses with progressive diagram loading:
+  - **Async Diagram Generation**: Solutions return immediately (<8s), diagrams generate in background and load progressively as ready
   - **Async Validation**: Quality control runs in background (non-blocking) for logging/monitoring only
-  - **Response Time**: Text solutions 3-7s, problems with diagrams 30-50s (includes visual generation)
-  - **Timeout Configuration**: Server timeout 300s, client fetch timeout 60s (allows time for diagram generation)
+  - **Client Polling**: Frontend polls for diagram updates every 2 seconds, rendering them as they become available
+  - **Response Time**: ALL solutions delivered in 3-7s, diagrams appear within 30-50s asynchronously
+  - **Timeout Configuration**: Server timeout 300s, client fetch timeout 30s for initial response
 
 ### System Design Choices
 The application uses a proxy server architecture (running on port 5000) that handles API endpoints and proxies frontend requests to the Expo dev server (port 8081). This setup centralizes OpenAI API integration, CORS handling, and ensures all interactions occur through a single exposed port in the Replit environment.
