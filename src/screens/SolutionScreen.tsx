@@ -1,0 +1,311 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import { useHomeworkStore } from '../store/homeworkStore';
+import { RootStackParamList } from '../navigation/types';
+import MathText from '../components/MathText';
+import { colors, typography, spacing } from '../constants/theme';
+
+type SolutionScreenProps = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Solution'>;
+};
+
+export default function SolutionScreen({ navigation }: SolutionScreenProps) {
+  const currentSolution = useHomeworkStore((state) => state.currentSolution);
+  const [revealedSteps, setRevealedSteps] = useState(0);
+  const [allRevealed, setAllRevealed] = useState(false);
+
+  useEffect(() => {
+    if (!currentSolution) {
+      navigation.navigate('Home');
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setRevealedSteps((prev) => {
+        if (prev < currentSolution.steps.length) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          return prev + 1;
+        }
+        setAllRevealed(true);
+        clearInterval(timer);
+        return prev;
+      });
+    }, 800);
+
+    return () => clearInterval(timer);
+  }, [currentSolution]);
+
+  if (!currentSolution) return null;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Solution</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        <Animated.View entering={FadeInUp.duration(500)} style={styles.problemCard}>
+          <View style={styles.problemIconContainer}>
+            <Ionicons name="document-text" size={24} color={colors.primary} />
+          </View>
+          <Text style={styles.problemLabel}>Problem</Text>
+          <View style={styles.problemTextContainer}>
+            <MathText content={currentSolution.problem} fontSize={typography.bodyLarge.fontSize} />
+          </View>
+        </Animated.View>
+
+        {currentSolution.steps.map((step, index) => (
+          <Animated.View
+            key={step.id}
+            entering={FadeInDown.duration(600).delay(200 * index)}
+            style={[
+              styles.stepCard,
+              index >= revealedSteps && styles.stepCardPending,
+            ]}
+          >
+            <View style={[
+              styles.stepBadge,
+              index < revealedSteps ? styles.stepBadgeRevealed : styles.stepBadgePending,
+            ]}>
+              <Text style={styles.stepBadgeText}>{index + 1}</Text>
+            </View>
+            
+            <Text style={styles.stepTitle}>{step.title}</Text>
+            
+            <View style={styles.stepContent}>
+              <MathText content={step.content} fontSize={typography.mathMedium.fontSize} />
+            </View>
+            
+            {step.explanation && (
+              <View style={styles.explanationBox}>
+                <Text style={styles.explanationText}>{step.explanation}</Text>
+              </View>
+            )}
+          </Animated.View>
+        ))}
+
+        {allRevealed && (
+          <Animated.View entering={FadeInUp.duration(600)}>
+            <LinearGradient
+              colors={['#10b981', '#059669']}
+              style={styles.finalAnswerCard}
+            >
+              <Ionicons name="checkmark-circle" size={32} color="#ffffff" />
+              <Text style={styles.finalAnswerLabel}>Final Answer</Text>
+              <View style={styles.finalAnswerBox}>
+                <MathText
+                  content={currentSolution.finalAnswer}
+                  fontSize={typography.mathLarge.fontSize}
+                  color={colors.textPrimary}
+                />
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        )}
+      </ScrollView>
+
+      <View style={styles.actionBar}>
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Question')}
+          >
+            <Text style={styles.actionButtonText}>Ask Question</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.actionButtonOutline}
+            onPress={() => navigation.navigate('Home')}
+          >
+            <Text style={styles.actionButtonOutlineText}>New Problem</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    paddingTop: 50,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerTitle: {
+    fontSize: typography.titleLarge.fontSize,
+    lineHeight: typography.titleLarge.lineHeight,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: spacing.lg,
+  },
+  problemCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  problemIconContainer: {
+    marginBottom: spacing.sm,
+  },
+  problemLabel: {
+    fontSize: typography.bodyLarge.fontSize,
+    lineHeight: typography.bodyLarge.lineHeight,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  problemTextContainer: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: spacing.md,
+  },
+  stepCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  stepCardPending: {
+    opacity: 0.3,
+  },
+  stepBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  stepBadgeRevealed: {
+    backgroundColor: colors.secondary,
+  },
+  stepBadgePending: {
+    backgroundColor: colors.border,
+  },
+  stepBadgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  stepTitle: {
+    fontSize: typography.bodyLarge.fontSize,
+    lineHeight: typography.bodyLarge.lineHeight,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  stepContent: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: spacing.md,
+  },
+  explanationBox: {
+    backgroundColor: '#fef3c7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
+    borderRadius: 8,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  explanationText: {
+    fontSize: typography.bodyLarge.fontSize,
+    lineHeight: typography.bodyLarge.lineHeight,
+    color: '#92400e',
+  },
+  finalAnswerCard: {
+    borderRadius: 12,
+    padding: spacing.xl,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  finalAnswerLabel: {
+    fontSize: typography.titleLarge.fontSize,
+    lineHeight: typography.titleLarge.lineHeight,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginVertical: spacing.sm,
+  },
+  finalAnswerBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 8,
+    padding: spacing.lg,
+    width: '100%',
+    alignItems: 'center',
+  },
+  actionBar: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    padding: spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    fontSize: typography.bodyLarge.fontSize,
+    lineHeight: typography.bodyLarge.lineHeight,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  actionButtonOutline: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: colors.border,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  actionButtonOutlineText: {
+    fontSize: typography.bodyLarge.fontSize,
+    lineHeight: typography.bodyLarge.lineHeight,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+});

@@ -1,0 +1,36 @@
+export interface HomeworkImage {
+  uri: string;
+  width: number;
+  height: number;
+}
+
+export interface SelectedProblem {
+  imageUri: string;
+  problemArea?: string;
+  problemNumber?: string;
+}
+
+export interface SolutionStep {
+  id: string;
+  title: string;
+  content: string;
+  explanation?: string;
+}
+
+export interface HomeworkSolution {
+  problem: string;
+  subject: string;
+  difficulty: string;
+  steps: SolutionStep[];
+  finalAnswer: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+export type Subject = 'Math' | 'Chemistry' | 'Physics' | 'Bible Studies' | 'Language Arts' | 'Geography' | 'General';
+export type Difficulty = 'K-5' | '6-8' | '9-12' | 'College+';
