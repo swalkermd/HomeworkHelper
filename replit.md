@@ -58,10 +58,13 @@ The application features a responsive design with distinct typography for portra
 The application uses a proxy server architecture (running on port 5000) that handles API endpoints and, in development, proxies frontend requests to the Expo dev server (port 8081). This setup centralizes OpenAI API integration, CORS handling, and ensures all interactions occur through a single exposed port in the Replit environment.
 
 **Deployment Configuration (Nov 2025):** The server is configured for Autoscale deployment with environment-aware behavior:
-- **Development**: Proxies root (/) requests to Expo dev server on port 8081 for live frontend development
-- **Production**: Root (/) endpoint returns HTTP 200 health check with API endpoint documentation, satisfying deployment health checks
-- **Conditional Proxying**: Frontend proxy only runs when `NODE_ENV !== 'production'`, preventing failed connections to non-existent Expo dev server in production
-- **Health Checks**: GET / responds with status, message, and available API endpoints for monitoring
+- **Development**: Proxies root (/) requests to Expo dev server on port 8081 for live frontend development with hot module reloading
+- **Production**: Serves the built Expo web app from the `dist/` directory as static files, with a build step (`npx expo export --platform web`) that runs before deployment
+- **Environment-Aware Serving**: 
+  - When `NODE_ENV === 'production'`: Serves static files from `dist/` directory with SPA routing (all non-API routes serve `index.html`)
+  - When `NODE_ENV !== 'production'`: Proxies to Expo dev server on port 8081
+- **Build & Run Process**: Build command creates the web bundle, run command (`npx tsx server/proxy.ts`) starts the server which serves both API endpoints and the frontend
+- **API Endpoints**: All `/api/*` routes remain functional in both development and production modes
 
 ## External Dependencies
 - **AI Integration:** OpenAI GPT-4o via Replit AI Integrations for vision analysis, text analysis, Q&A chat, and image generation (gpt-image-1). No external API key is required, and charges are billed to Replit credits.
