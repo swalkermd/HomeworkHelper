@@ -32,6 +32,11 @@ const SUBSCRIPT_MAP: { [key: string]: string } = {
 };
 
 export default function MathText({ content, fontSize = 14, color = colors.textPrimary, isOnGreenBackground = false }: MathTextProps) {
+  // DEBUG: Check for newlines in content
+  if (content && content.includes('\n')) {
+    console.log('⚠️ MathText received content with newlines:', JSON.stringify(content.substring(0, 200)));
+  }
+  
   // Split by newlines first to preserve line breaks
   const lines = content.split('\n');
 
