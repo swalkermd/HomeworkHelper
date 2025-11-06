@@ -60,10 +60,14 @@ The application uses a proxy server architecture (running on port 5000) that han
 **Deployment Configuration (Nov 2025):** The server is configured for Autoscale deployment with environment-aware behavior:
 - **Development**: Proxies root (/) requests to Expo dev server on port 8081 for live frontend development with hot module reloading
 - **Production**: Serves the built Expo web app from the `dist/` directory as static files, with a build step (`npx expo export --platform web`) that runs before deployment
-- **Health Checks**: Dedicated `/health` endpoint responds with immediate 200 status before static file serving, ensuring fast health check responses for autoscale deployments
+- **Health Checks**: Dedicated `/health` endpoint registered at the very top of the server file (before all middleware) responds with immediate 200 status, ensuring fast health check responses for autoscale deployments
+- **Smart Environment Detection**: 
+  - Server automatically detects production mode if `dist/` directory exists with `index.html`, even if `NODE_ENV` isn't explicitly set
+  - Logic: `const isProduction = process.env.NODE_ENV === 'production' || hasDistBuild`
+  - This ensures deployment works correctly without requiring manual environment variable configuration
 - **Environment-Aware Serving**: 
-  - When `NODE_ENV === 'production'`: Serves static files from `dist/` directory with SPA routing (all non-API routes serve `index.html`), with validation that dist/ exists
-  - When `NODE_ENV !== 'production'`: Proxies to Expo dev server on port 8081
+  - When production mode detected: Serves static files from `dist/` directory with SPA routing (catch-all serves `index.html`)
+  - When development mode: Proxies to Expo dev server on port 8081
 - **Build & Run Process**: Build command (`npx expo export --platform web`) creates the web bundle, run command (`npx tsx server/proxy.ts`) starts the server which serves both API endpoints and the frontend
 - **API Endpoints**: All `/api/*` routes remain functional in both development and production modes
 - **Error Handling**: Provides helpful error messages if build step fails or dist/ directory is missing
