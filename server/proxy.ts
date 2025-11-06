@@ -708,26 +708,6 @@ Grade-appropriate language based on difficulty level.`
           
           const content = response.choices[0]?.message?.content || "{}";
           const parsed = JSON.parse(content);
-          
-          // ⚠️ POST-OCR VALIDATION: Detect suspicious patterns that indicate hallucinations
-          if (parsed.problem) {
-            const suspiciousPatterns = [
-              /12\d*\(.*?\)\s*\+/,  // Hallucinated "12(d) +" or similar
-              /12\s*\/\s*\{?\s*8/,  // Misread "1/8" as "12/8"
-              /12\s*\(\s*3d/,       // Misread "1/8(3d" as "12(3d"
-              /\d{2,}\/\d+\s*\(/,   // Double-digit numerator before parenthesis (suspicious for simple equations)
-            ];
-            
-            const hasSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(parsed.problem));
-            
-            if (hasSuspiciousPattern) {
-              console.warn('⚠️ Suspicious OCR pattern detected:', parsed.problem);
-              console.warn('   This may be a misread. Common issue: "1/8" read as "12" or "12/8"');
-              // Throw to trigger retry with fresh attempt
-              throw new Error('Suspicious OCR pattern detected - retrying');
-            }
-          }
-          
           return parsed;
         } catch (error: any) {
           console.error('OpenAI API error:', error);
@@ -924,13 +904,17 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
    - These are LINEAR equations, NOT fractions equal to expressions
    - The equation should have TWO sides separated by "=" - do NOT add extra terms!
    
-2. **⚠️ COMMON OCR MISTAKES TO AVOID:**
-   - DO NOT misread "1/8" as "12/8", "18", or add "12(d) +" - look carefully for SINGLE digit 1
-   - DO NOT misread "1/4" as "14" or "1/14" - look for the slash carefully
+2. **⚠️ COMMON OCR MISTAKES TO AVOID - CRITICALLY IMPORTANT:**
+   - **FRACTION COEFFICIENTS:** Look VERY carefully at fractions before parentheses
+     * If you see "1/8(3d-2)", it's ONE-EIGHTH times (3d-2), NOT "12(3d-2)" or "12/8(3d-2)"
+     * The numerator is the digit "1" (one), NOT "12" (twelve)
+     * Common error: misreading the "1/" as "12" - VERIFY the numerator is a SINGLE digit
+   - DO NOT misread "1/8" as "12/8", "18", "12", or add "12(d) +" - the numerator is ALWAYS "1" (one)
+   - DO NOT misread "1/4" as "14", "12/4", or "1/14" - look for the slash carefully
    - DO NOT misread "+" as missing - "(d + 5)" must keep the plus sign
    - DO NOT add extra terms like "12(d) +" that don't exist in the image!
    - Fractions like 1/8, 1/4, 1/2, 1/3 are VERY common in homework - don't overcomplicate them!
-   - If you see what looks like "12" or extra digits, it's probably just "1" followed by "/" - verify carefully!
+   - **SPECIFIC EXAMPLE:** Image shows "1/8(3d-2)=1/4(d+5)" → Transcribe as EXACTLY that, NOT "12(3d-2)=1/4(d+5)"
    
 3. **Common patterns you might see:**
    - "1/8(3d - 2) = 1/4(d + 5)" → This is LINEAR (no d² term), solve with basic algebra
@@ -1169,26 +1153,6 @@ Grade-appropriate language based on difficulty level.`
           
           const content = response.choices[0]?.message?.content || "{}";
           const parsed = JSON.parse(content);
-          
-          // ⚠️ POST-OCR VALIDATION: Detect suspicious patterns that indicate hallucinations
-          if (parsed.problem) {
-            const suspiciousPatterns = [
-              /12\d*\(.*?\)\s*\+/,  // Hallucinated "12(d) +" or similar
-              /12\s*\/\s*\{?\s*8/,  // Misread "1/8" as "12/8"
-              /12\s*\(\s*3d/,       // Misread "1/8(3d" as "12(3d"
-              /\d{2,}\/\d+\s*\(/,   // Double-digit numerator before parenthesis (suspicious for simple equations)
-            ];
-            
-            const hasSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(parsed.problem));
-            
-            if (hasSuspiciousPattern) {
-              console.warn('⚠️ Suspicious OCR pattern detected:', parsed.problem);
-              console.warn('   This may be a misread. Common issue: "1/8" read as "12" or "12/8"');
-              // Throw to trigger retry with fresh attempt
-              throw new Error('Suspicious OCR pattern detected - retrying');
-            }
-          }
-          
           return parsed;
         } catch (error: any) {
           console.error('OpenAI API error:', error);
