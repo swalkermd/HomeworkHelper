@@ -32,28 +32,17 @@ const SUBSCRIPT_MAP: { [key: string]: string } = {
 };
 
 export default function MathText({ content, fontSize = 14, color = colors.textPrimary, isOnGreenBackground = false }: MathTextProps) {
-  // DEBUG: Check for newlines in content
-  if (content && content.includes('\n')) {
-    console.log('⚠️ MathText received content with newlines:', JSON.stringify(content.substring(0, 200)));
-  }
-  
-  // Split by newlines first to preserve line breaks
-  const lines = content.split('\n');
+  // Parse the content directly without splitting on newlines
+  // All newlines are already removed server-side
+  const parsedContent = parseContent(content);
 
   return (
-    <View>
-      {lines.map((line, lineIndex) => {
-        const parsedContent = parseContent(line);
-        return (
-          <View key={lineIndex} style={styles.lineContainer}>
-            {parsedContent.map((part, index) => (
-              <React.Fragment key={`${lineIndex}-${index}`}>
-                {renderPart(part, index, fontSize, color, isOnGreenBackground)}
-              </React.Fragment>
-            ))}
-          </View>
-        );
-      })}
+    <View style={styles.lineContainer}>
+      {parsedContent.map((part, index) => (
+        <React.Fragment key={index}>
+          {renderPart(part, index, fontSize, color, isOnGreenBackground)}
+        </React.Fragment>
+      ))}
     </View>
   );
 }
