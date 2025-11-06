@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,8 @@ import { useHomeworkStore } from '../store/homeworkStore';
 import { RootStackParamList } from '../navigation/types';
 import MathText from '../components/MathText';
 import { colors, typography, spacing } from '../constants/theme';
+import { getSimplifiedExplanations } from '../services/openai';
+import { SimplifiedExplanation } from '../types';
 
 type SolutionScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Solution'>;
@@ -18,6 +20,9 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const currentSolution = useHomeworkStore((state) => state.currentSolution);
   const [revealedSteps, setRevealedSteps] = useState(0);
   const [allRevealed, setAllRevealed] = useState(false);
+  const [simplifiedMode, setSimplifiedMode] = useState(false);
+  const [simplifiedExplanations, setSimplifiedExplanations] = useState<SimplifiedExplanation[]>([]);
+  const [loadingSimplified, setLoadingSimplified] = useState(false);
 
   useEffect(() => {
     if (!currentSolution) {
@@ -39,6 +44,28 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
 
     return () => clearInterval(timer);
   }, [currentSolution]);
+
+  const handleSimplifyExplanation = async () => {
+    if (!currentSolution || loadingSimplified) return;
+    
+    if (simplifiedMode) {
+      setSimplifiedMode(false);
+      return;
+    }
+
+    setLoadingSimplified(true);
+    try {
+      const explanations = await getSimplifiedExplanations(currentSolution);
+      setSimplifiedExplanations(explanations);
+      setSimplifiedMode(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('Error getting simplified explanations:', error);
+      alert('Failed to generate simplified explanations. Please try again.');
+    } finally {
+      setLoadingSimplified(false);
+    }
+  };
 
   if (!currentSolution) return null;
 
@@ -63,35 +90,46 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
           </View>
         </Animated.View>
 
-        {currentSolution.steps.map((step, index) => (
-          <Animated.View
-            key={step.id}
-            entering={FadeInDown.duration(600).delay(200 * index)}
-            style={[
-              styles.stepCard,
-              index >= revealedSteps && styles.stepCardPending,
-            ]}
-          >
-            <View style={[
-              styles.stepBadge,
-              index < revealedSteps ? styles.stepBadgeRevealed : styles.stepBadgePending,
-            ]}>
-              <Text style={styles.stepBadgeText}>{index + 1}</Text>
-            </View>
-            
-            <Text style={styles.stepTitle}>{step.title}</Text>
-            
-            <View style={styles.stepContent}>
-              <MathText content={step.content} fontSize={typography.mathMedium.fontSize} />
-            </View>
-            
-            {step.explanation && (
-              <View style={styles.explanationBox}>
-                <Text style={styles.explanationText}>{step.explanation}</Text>
+        {currentSolution.steps.map((step, index) => {
+          const simplified = simplifiedExplanations.find(exp => exp.stepNumber === index + 1);
+          return (
+            <Animated.View
+              key={step.id}
+              entering={FadeInDown.duration(600).delay(200 * index)}
+              style={[
+                styles.stepCard,
+                index >= revealedSteps && styles.stepCardPending,
+              ]}
+            >
+              <View style={[
+                styles.stepBadge,
+                index < revealedSteps ? styles.stepBadgeRevealed : styles.stepBadgePending,
+              ]}>
+                <Text style={styles.stepBadgeText}>{index + 1}</Text>
               </View>
-            )}
-          </Animated.View>
-        ))}
+              
+              <Text style={styles.stepTitle}>{step.title}</Text>
+              
+              <View style={styles.stepContent}>
+                <MathText content={step.content} fontSize={typography.mathMedium.fontSize} />
+              </View>
+              
+              {simplifiedMode && simplified && (
+                <View style={styles.simplifiedBox}>
+                  <View style={styles.simplifiedHeader}>
+                    <Ionicons name="bulb" size={20} color="#f59e0b" />
+                    <Text style={styles.simplifiedLabel}>Simpler Explanation</Text>
+                  </View>
+                  <MathText 
+                    content={simplified.simplifiedExplanation} 
+                    fontSize={typography.bodyLarge.fontSize}
+                    color="#92400e"
+                  />
+                </View>
+              )}
+            </Animated.View>
+          );
+        })}
 
         {allRevealed && (
           <Animated.View entering={FadeInUp.duration(600)}>
@@ -129,6 +167,27 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
             <Text style={styles.actionButtonOutlineText}>New Problem</Text>
           </TouchableOpacity>
         </View>
+        
+        <TouchableOpacity
+          style={[styles.simplifyButton, simplifiedMode && styles.simplifyButtonActive]}
+          onPress={handleSimplifyExplanation}
+          disabled={loadingSimplified}
+        >
+          {loadingSimplified ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <>
+              <Ionicons 
+                name={simplifiedMode ? "checkmark-circle" : "help-circle"} 
+                size={20} 
+                color="#ffffff" 
+              />
+              <Text style={styles.simplifyButtonText}>
+                {simplifiedMode ? "Hide Simpler Explanations" : "I Still Don't Get It"}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -307,5 +366,45 @@ const styles = StyleSheet.create({
     lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  simplifyButton: {
+    backgroundColor: '#f97316',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  simplifyButtonActive: {
+    backgroundColor: '#10b981',
+  },
+  simplifyButtonText: {
+    fontSize: typography.bodyLarge.fontSize,
+    lineHeight: typography.bodyLarge.lineHeight,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  simplifiedBox: {
+    backgroundColor: '#fef3c7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
+    borderRadius: 8,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  simplifiedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  simplifiedLabel: {
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
+    fontWeight: '600',
+    color: '#f59e0b',
   },
 });

@@ -1,3 +1,5 @@
+import { HomeworkSolution, SimplifiedExplanation } from '../types';
+
 const API_URL = '/api';
 
 export async function analyzeTextQuestion(question: string): Promise<any> {
@@ -77,6 +79,37 @@ export async function askFollowUpQuestion(
     return data.answer;
   } catch (error) {
     console.error('Error asking follow-up question:', error);
+    throw error;
+  }
+}
+
+export async function getSimplifiedExplanations(solution: HomeworkSolution): Promise<SimplifiedExplanation[]> {
+  try {
+    console.log('Calling API:', `${API_URL}/simplify-explanation`);
+    const response = await fetch(`${API_URL}/simplify-explanation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        problem: solution.problem,
+        subject: solution.subject,
+        difficulty: solution.difficulty,
+        steps: solution.steps,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('API Error Response:', response.status, errorData);
+      throw new Error(errorData.error || 'Failed to get simplified explanations');
+    }
+    
+    const data = await response.json();
+    console.log('Simplified explanations received successfully');
+    return data.simplifiedExplanations;
+  } catch (error) {
+    console.error('Error getting simplified explanations:', error);
     throw error;
   }
 }

@@ -17,6 +17,11 @@ export interface SolutionStep {
   explanation?: string;
 }
 
+export interface SimplifiedExplanation {
+  stepNumber: number;
+  simplifiedExplanation: string;
+}
+
 export interface HomeworkSolution {
   problem: string;
   subject: string;
