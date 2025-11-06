@@ -7,13 +7,20 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
     console.log('📡 Calling API:', `${API_URL}/analyze-text`);
     console.log('📡 Fetch starting...');
     
+    // Create AbortController with 120 second timeout (enough for complex problems with diagrams)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    
     const response = await fetch(`${API_URL}/analyze-text`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ question }),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
     
     console.log('📡 Response received! Status:', response.status, 'OK:', response.ok);
     
@@ -39,6 +46,12 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
     console.error('❌ FETCH ERROR:', error);
     console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
     console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
+    
+    // Check if it's a timeout/abort error
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timed out. The problem might be too complex. Please try again.');
+    }
+    
     throw error;
   }
 }
@@ -46,13 +59,21 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
 export async function analyzeImageQuestion(imageUri: string, problemNumber?: string): Promise<any> {
   try {
     console.log('Calling API:', `${API_URL}/analyze-image`);
+    
+    // Create AbortController with 120 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    
     const response = await fetch(`${API_URL}/analyze-image`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ imageUri, problemNumber }),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
