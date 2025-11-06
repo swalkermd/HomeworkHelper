@@ -707,7 +707,28 @@ Grade-appropriate language based on difficulty level.`
           });
           
           const content = response.choices[0]?.message?.content || "{}";
-          return JSON.parse(content);
+          const parsed = JSON.parse(content);
+          
+          // ⚠️ POST-OCR VALIDATION: Detect suspicious patterns that indicate hallucinations
+          if (parsed.problem) {
+            const suspiciousPatterns = [
+              /12\d*\(.*?\)\s*\+/,  // Hallucinated "12(d) +" or similar
+              /12\s*\/\s*\{?\s*8/,  // Misread "1/8" as "12/8"
+              /12\s*\(\s*3d/,       // Misread "1/8(3d" as "12(3d"
+              /\d{2,}\/\d+\s*\(/,   // Double-digit numerator before parenthesis (suspicious for simple equations)
+            ];
+            
+            const hasSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(parsed.problem));
+            
+            if (hasSuspiciousPattern) {
+              console.warn('⚠️ Suspicious OCR pattern detected:', parsed.problem);
+              console.warn('   This may be a misread. Common issue: "1/8" read as "12" or "12/8"');
+              // Throw to trigger retry with fresh attempt
+              throw new Error('Suspicious OCR pattern detected - retrying');
+            }
+          }
+          
+          return parsed;
         } catch (error: any) {
           console.error('OpenAI API error:', error);
           if (isRateLimitError(error)) {
@@ -874,10 +895,14 @@ app.post('/api/analyze-image', async (req, res) => {
         try {
           const response = await openai.chat.completions.create({
             model: "gpt-4o",
+            temperature: 0.1,
+            response_format: { type: "json_object" },
             messages: [
               {
                 role: "system",
                 content: `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
+
+⚠️ CRITICAL: You MUST respond with valid JSON only.
 
 ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multiple problems exist, solve the most prominent one.'}
 
@@ -1144,7 +1169,28 @@ Grade-appropriate language based on difficulty level.`
           });
           
           const content = response.choices[0]?.message?.content || "{}";
-          return JSON.parse(content);
+          const parsed = JSON.parse(content);
+          
+          // ⚠️ POST-OCR VALIDATION: Detect suspicious patterns that indicate hallucinations
+          if (parsed.problem) {
+            const suspiciousPatterns = [
+              /12\d*\(.*?\)\s*\+/,  // Hallucinated "12(d) +" or similar
+              /12\s*\/\s*\{?\s*8/,  // Misread "1/8" as "12/8"
+              /12\s*\(\s*3d/,       // Misread "1/8(3d" as "12(3d"
+              /\d{2,}\/\d+\s*\(/,   // Double-digit numerator before parenthesis (suspicious for simple equations)
+            ];
+            
+            const hasSuspiciousPattern = suspiciousPatterns.some(pattern => pattern.test(parsed.problem));
+            
+            if (hasSuspiciousPattern) {
+              console.warn('⚠️ Suspicious OCR pattern detected:', parsed.problem);
+              console.warn('   This may be a misread. Common issue: "1/8" read as "12" or "12/8"');
+              // Throw to trigger retry with fresh attempt
+              throw new Error('Suspicious OCR pattern detected - retrying');
+            }
+          }
+          
+          return parsed;
         } catch (error: any) {
           console.error('OpenAI API error:', error);
           if (isRateLimitError(error)) {
