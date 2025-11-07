@@ -1,7 +1,7 @@
 # Homework Helper - AI-Powered Educational Assistant
 
 ## Overview
-Homework Helper is an AI-powered mobile application built with React Native and Expo, designed to assist students with homework across various subjects (Math, Chemistry, Physics, Bible Studies, Language Arts, Geography). Its core purpose is to provide clear, step-by-step visual solutions, leveraging world-class teaching principles and grade-appropriate explanations. The app aims to enhance understanding through beautiful formatting and interactive features, ultimately fostering deeper learning.
+Homework Helper is an AI-powered mobile application built with React Native and Expo. It assists students with homework across various subjects by providing clear, step-by-step visual solutions. The app leverages AI to offer grade-appropriate explanations, beautiful formatting, and interactive features to foster deeper learning and understanding.
 
 ## User Preferences
 None documented yet.
@@ -9,78 +9,34 @@ None documented yet.
 ## System Architecture
 
 ### UI/UX Decisions
-The application features a responsive design with distinct typography for portrait and landscape modes. The hero section features a gold graduation cap icon (#fbbf24→#f59e0b gradient). Gradient buttons are used for key actions (Type Question: Indigo-Purple; Take Photo: Pink-Orange; Choose from Gallery: Green-Cyan). Color schemes prioritize readability and user engagement, utilizing primary indigo, secondary emerald green, and a range of grays for text and backgrounds. Animations with React Native Reanimated provide a smooth and interactive user experience, including progressive step reveals and haptic feedback.
-
-**Solution Screen Action Bar (Nov 2025):** Redesigned two-row card layout with grouped actions:
-- **Row 1 - "Need More Help?"**: Two equal-width buttons side-by-side
-  - "Simplify" button (yellow gradient #fbbf24→#f59e0b, turns green when active)
-  - "Ask Question" button (blue gradient #3b82f6→#2563eb with white text/icon)
-- **Row 2**: Full-width button (reduced spacing for cleaner layout)
-  - "New Problem" button (white background with thick maroon border #991b1b)
-- Clean visual hierarchy with gradient and outlined button styles, icons, and consistent spacing for a polished, modern appearance.
-- **Visual Continuity:** Simplified explanation dialogue boxes use matching yellow color scheme (#fde68a background with #fbbf24 border) to maintain visual connection with the Simplify button.
+The application features a responsive design with distinct typography and a color scheme emphasizing readability and user engagement (primary indigo, secondary emerald green, grays). Gradient buttons and a gold graduation cap icon are used for key interactions. Animations with React Native Reanimated provide a smooth, interactive experience with progressive step reveals and haptic feedback. The solution screen includes a redesigned two-row action bar with "Simplify," "Ask Question," and "New Problem" buttons, maintaining visual continuity with matching color schemes for related features.
 
 ### Technical Implementations
-- **Framework & Language:** React Native 0.81.5 with Expo SDK 54, TypeScript.
-- **Navigation:** React Navigation v7 (Native Stack Navigator).
-- **State Management:** Zustand (non-persisted for privacy).
-- **Styling:** NativeWind v4 (TailwindCSS for React Native).
-- **Animations & Gestures:** React Native Reanimated v3 and React Native Gesture Handler.
-- **Custom MathText Component:** Renders mathematical notation including vertical fractions {num/den}, subscripts, superscripts, color highlighting [red:text], arrows, italic variables, and inline images. **Critical rendering optimization (Nov 2025):** Implements intelligent text grouping to prevent unwanted line breaks in React Native's flexbox layout. Groups consecutive text parts (including highlighted terms) into single nested Text components for proper inline flow, while keeping fractions/images as separate layout elements. Server-side whitespace normalization removes all newlines and Unicode whitespace characters, ensuring clean text delivery.
-- **Intelligent Visual Aid Generation:** AI uses sophisticated screening logic to determine IF, WHEN, and WHAT TYPE of visual aid would best enhance understanding. Supports 5 visual types (geometric diagrams, graphs/coordinate planes, charts/data viz, physics diagrams, process illustrations) with type-specific prompts and style guides. Visuals are grade-level aware (prioritizing K-8), placement-flexible (can appear in any step), and selectively generated only when they significantly enhance understanding, not as decoration. Generates clean, whiteboard-style PNG images with labels served via absolute URLs. **Biology/Chemistry Visual Requirements (Nov 2025):** Mandatory diagram generation for metabolic cycles and cellular processes. Keyword-based detection system automatically ensures visual aids for 10 major biology topics (Krebs cycle, citric acid cycle, electron transport chain, Calvin cycle, photosynthesis, cellular respiration, protein synthesis, DNA replication, glycolysis, cell cycle). When these keywords are detected in questions, the system guarantees type=illustration diagrams showing pathways, inputs, outputs, and intermediate steps, even if the AI initially omits them. This addresses the critical need for process visualizations in complex biological topics.
-- **"I Still Don't Get It" Feature:** Provides simplified, intuitive, and grade-appropriate explanations for each solution step, focusing on reasoning rather than just operations, using everyday language and analogies.
+The app is built with React Native 0.81.5, Expo SDK 54, and TypeScript, utilizing React Navigation v7 for navigation, Zustand for state management, and NativeWind v4 for styling. Animations are handled by React Native Reanimated and Gesture Handler.
 
-### Feature Specifications
-- **Multiple Input Methods:** Text input, photo capture (native camera with Expo Camera), and gallery upload. Includes comprehensive permission handling.
-- **AI-Powered Problem Analysis:** Utilizes GPT-4o vision for image analysis and GPT-4o for text-based questions, automatically detecting subject, difficulty, and optional problem numbers.
-- **Step-by-Step Solutions:** Features progressive reveal animations, haptic feedback, custom math notation rendering, and grade-appropriate language adaptation. Final answers are highlighted.
-- **Interactive Features:** Includes a follow-up Q&A chat modal with context preservation and navigation for asking new questions or returning home.
-- **OCR Accuracy Improvements:** Specific instructions and examples for AI to improve transcription of mathematical expressions, fractions, and coefficients from images.
-- **Number Format Matching (Nov 2025):** AI prompts explicitly instruct the model to MATCH the input format. If the problem uses decimals (0.5, 2.75), the solution uses decimals. If the problem uses fractions (1/2, 3/4), the solution uses vertical fractions {num/den} including mixed numbers when appropriate (e.g., {1{1/2}} for 1½). This ensures the solution format aligns with the student's learning context and problem presentation.
-- **Common Denominator Explanations (Nov 2025):** When combining fractions with different denominators, the AI explicitly states what the common denominator is and shows the conversion step (e.g., "Find a common denominator of 5: Convert 2h to fifths: 2h = {10/5}h"). This provides clearer explanations for students learning fraction operations.
-- **Essay Question Format (Nov 2025):** For questions requiring essay or written responses (common in Language Arts, Bible Studies, History), the AI uses a specialized format with ONLY ONE step titled "Key Concepts for Your Essay" containing guidance and recommendations on themes and structure. The Final Answer section contains the ACTUAL COMPLETE POLISHED ESSAY (not advice or instructions), written as a finished piece with introduction, body paragraphs, and conclusion, with key terms highlighted using [red:term] throughout. The system explicitly distinguishes between Step 1 (guidance for the student) and Final Answer (the essay itself) with clear examples in prompts to prevent the AI from returning essay-writing advice in the final answer.
-- **Multiple Choice Question Format (Nov 2025):** When answering multiple choice questions with lettered options (A, B, C, D), the AI includes the correct letter in the final answer (e.g., "[red:C) Mitochondrion]") to clearly indicate which option is correct, not just the answer text alone.
-- **Server-Side Formatting Enforcement:** A post-processing layer on the server ensures consistent mathematical formatting, converting OCR-detected fractions (like "1/8") to vertical {num/den} format while preserving the number format from the input. **Color-Tag Fraction Formatting (Nov 2025):** Regex processing now converts fractions inside [blue:] and [red:] highlighting tags (e.g., [blue:12/5h - 10/5h] → [blue:{12/5}h - {10/5}h]) before handling standalone fractions, ensuring proper vertical fraction rendering in all colored mathematical expressions. **Whitespace normalization (Nov 2025):** Comprehensive cleanup of all newline characters (\n, \r, \u2028, \u2029), zero-width characters, and non-breaking spaces applied after all transformations (including image placeholder restoration) to ensure continuous text flow without mid-sentence breaks. **Multi-Part Answer Formatting (Nov 2025):** For questions with multiple parts or answers with numbered/lettered lists, the AI places each item on its own line in the final answer section. The whitespace normalization logic preserves these intentional line breaks while removing mid-sentence breaks. Pattern /\n\s*([a-z]\)|\d+\.|\d+\))/gi protects newlines before enumerators (a), 1., 1), etc.) during text cleanup.
-- **Quality Control & Validation System:** Multi-stage validation pipeline that ensures solution accuracy:
-  - **Structural Validation**: Verifies JSON schema compliance, required fields, and proper formatting
-  - **Cross-Model Verification**: Independent AI verification call reviews solution accuracy, calculations, and final answers
-  - **Confidence Scoring**: Solutions must pass 70% confidence threshold
-  - **Comprehensive Logging**: Timestamps, validation metrics, errors, and warnings logged for quality monitoring
-  - **Async Background Execution**: Validation runs in background after delivering solution to user (non-blocking for speed)
-- **Performance Optimizations (Nov 2025):** Asynchronous architecture for instant responses with progressive diagram loading:
-  - **Async Diagram Generation**: Solutions return immediately (<8s), diagrams generate in background and load progressively as ready
-  - **Async Validation**: Quality control runs in background (non-blocking) for logging/monitoring only
-  - **Client Polling**: Frontend polls for diagram updates every 2 seconds, rendering them as they become available
-  - **Response Time**: ALL solutions delivered in 3-7s, diagrams appear within 30-50s asynchronously
-  - **Timeout Configuration**: Server timeout 300s, client fetch timeout 30s for initial response
-- **Production Diagram URL Fix (Nov 2025):** Diagram URLs now use request hostname for proper production deployment:
-  - **Dynamic Hostname Detection**: API endpoints capture request hostname via `req.get('host')` and pass it to diagram generation
-  - **Environment-Aware URLs**: Production uses actual deployment domain (e.g., "your-app.replit.app"), development falls back to `REPLIT_DEV_DOMAIN`
-  - **URL Construction**: `https://${hostname}/diagrams/${filename}.png` ensures diagrams load correctly in both dev and production
-  - **Backward Compatible**: Preserves development workflow with automatic fallback to environment variables when hostname not provided
-  - **Critical Fix**: Resolved blank diagram rendering in deployed web version caused by hardcoded development domain URLs
+A custom `MathText` component renders complex mathematical notation, including vertical fractions, subscripts, superscripts, and inline images, with critical rendering optimizations to prevent unwanted line breaks. Server-side whitespace normalization ensures clean text delivery.
+
+Intelligent Visual Aid Generation uses AI to determine the optimal type and placement of visual aids (geometric diagrams, graphs, charts, physics diagrams, process illustrations), ensuring they are grade-level aware and enhance understanding. Mandatory diagram generation is enforced for key biology/chemistry topics like metabolic cycles.
+
+A comprehensive cross-platform image conversion solution handles various image formats and URIs, ensuring accurate base64 conversion with multi-layer MIME type detection across web, iOS, and Android.
+
+The "I Still Don't Get It" feature provides simplified, intuitive, and grade-appropriate explanations for each solution step, focusing on reasoning and analogies.
+
+Feature specifications include multiple input methods (text, photo, gallery), AI-powered problem analysis (GPT-4o Vision for images, GPT-4o for text), progressive step-by-step solutions with interactive elements, and improved OCR accuracy. The AI is instructed to match the input number format (decimals or fractions) in solutions and to explicitly state common denominators when combining fractions. For essay questions, the AI provides guidance in Step 1 and a complete, polished essay in the Final Answer section. For multiple-choice questions, the correct letter option is included in the final answer.
+
+Server-side formatting enforcement includes post-processing for consistent mathematical formatting (e.g., converting "1/8" to "{1/8}"), color-tag fraction formatting, and comprehensive whitespace normalization. Multi-part answers are formatted with preserved line breaks for readability.
+
+A multi-stage Quality Control & Validation System ensures solution accuracy through structural validation, cross-model verification, confidence scoring, and comprehensive logging, running asynchronously for performance.
+
+Performance optimizations include an asynchronous architecture for instant responses with progressive diagram loading and validation running in the background. Diagram URLs are dynamically generated using the request hostname for proper production deployment.
 
 ### System Design Choices
-The application uses a proxy server architecture (running on port 5000) that handles API endpoints and, in development, proxies frontend requests to the Expo dev server (port 8081). This setup centralizes OpenAI API integration, CORS handling, and ensures all interactions occur through a single exposed port in the Replit environment.
-
-**Deployment Configuration (Nov 2025):** The server is configured for Autoscale deployment with environment-aware behavior:
-- **Development**: Proxies root (/) requests to Expo dev server on port 8081 for live frontend development with hot module reloading
-- **Production**: Serves the built Expo web app from the `dist/` directory as static files, with a build step (`npx expo export --platform web`) that runs before deployment
-- **Health Checks**: Dedicated `/health` endpoint registered at the very top of the server file (before all middleware) responds with immediate 200 status, ensuring fast health check responses for autoscale deployments
-- **Smart Environment Detection**: 
-  - Server automatically detects production mode if `dist/` directory exists with `index.html`, even if `NODE_ENV` isn't explicitly set
-  - Logic: `const isProduction = process.env.NODE_ENV === 'production' || hasDistBuild`
-  - This ensures deployment works correctly without requiring manual environment variable configuration
-- **Environment-Aware Serving**: 
-  - When production mode detected: Serves static files from `dist/` directory with SPA routing (catch-all serves `index.html`)
-  - When development mode: Proxies to Expo dev server on port 8081
-- **Build & Run Process**: Build command (`npx expo export --platform web`) creates the web bundle, run command (`npx tsx server/proxy.ts`) starts the server which serves both API endpoints and the frontend
-- **API Endpoints**: All `/api/*` routes remain functional in both development and production modes
-- **Error Handling**: Provides helpful error messages if build step fails or dist/ directory is missing
+The application uses a proxy server architecture (port 5000) that centralizes API endpoints and handles CORS. In development, it proxies frontend requests to the Expo dev server; in production, it serves the built Expo web app from the `dist/` directory as static files. The server is configured for Autoscale deployment with environment-aware behavior, including health checks and smart environment detection that prioritizes the existence of a `dist/` directory for production mode.
 
 ## External Dependencies
-- **AI Integration:** OpenAI GPT-4o via Replit AI Integrations for vision analysis, text analysis, Q&A chat, and image generation (gpt-image-1). No external API key is required, and charges are billed to Replit credits.
-- **Image Handling:** `expo-camera`, `expo-image-picker`, `expo-image` for camera, gallery access, and image rendering.
+- **AI Integration:** OpenAI GPT-4o (vision, text analysis, Q&A, image generation) via Replit AI Integrations.
+- **Image Handling:** `expo-camera`, `expo-image-picker`, `expo-image`.
 - **Haptics:** `expo-haptics`.
 - **Icons:** `expo-vector-icons`.
-- **Concurrency & Retries:** `p-limit` and `p-retry` for managing concurrent AI requests and ensuring robustness.
+- **Concurrency & Retries:** `p-limit`, `p-retry`.
+- **Cross-Platform Base64:** `base-64`.
