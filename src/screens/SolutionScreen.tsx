@@ -19,6 +19,7 @@ type SolutionScreenProps = {
 
 export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const currentSolution = useHomeworkStore((state) => state.currentSolution);
+  const reset = useHomeworkStore((state) => state.reset);
   const [revealedSteps, setRevealedSteps] = useState(0);
   const [allRevealed, setAllRevealed] = useState(false);
   const [simplifiedMode, setSimplifiedMode] = useState(false);
@@ -38,7 +39,8 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
     } : 'No solution');
     
     if (!currentSolution) {
-      console.log('⚠️ No solution found, navigating back to Home');
+      console.log('⚠️ No solution found, resetting store and navigating to Home');
+      reset(); // Clear stale data from store
       navigation.navigate('Home');
       return;
     }

@@ -31,7 +31,8 @@ function detectMimeFromMagicBytes(base64Data: string): string | null {
       return 'image/webp';
     }
   } catch (e) {
-    console.warn('Failed to detect MIME from magic bytes:', e);
+    console.error('❌ Failed to detect MIME from magic bytes:', e);
+    // Still return null to allow fallback, but now logged for debugging
   }
   
   return null;
