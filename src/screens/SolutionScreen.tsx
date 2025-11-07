@@ -63,14 +63,41 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
 
     console.log('🎨 Starting diagram polling for solution:', currentSolution.solutionId);
     
+    const MAX_POLL_DURATION = 5 * 60 * 1000; // 5 minutes
+    const MAX_RETRIES = 150; // 150 retries * 2 seconds = 5 minutes
+    const POLL_INTERVAL = 2000; // 2 seconds
+    
+    let retryCount = 0;
+    const startTime = Date.now();
+    
     const pollInterval = setInterval(async () => {
       try {
+        // Check if we've exceeded time limit
+        const elapsedTime = Date.now() - startTime;
+        if (elapsedTime > MAX_POLL_DURATION) {
+          console.warn('⏱️ Diagram polling timeout: exceeded 5 minute limit');
+          clearInterval(pollInterval);
+          setDiagramsComplete(true); // Stop trying
+          return;
+        }
+        
+        // Check if we've exceeded retry limit
+        retryCount++;
+        if (retryCount > MAX_RETRIES) {
+          console.warn(`⚠️ Diagram polling stopped: exceeded ${MAX_RETRIES} retries`);
+          clearInterval(pollInterval);
+          setDiagramsComplete(true); // Stop trying
+          return;
+        }
+        
         const result = await pollForDiagrams(currentSolution.solutionId!);
         
         console.log('📊 Diagram status:', {
           count: result.diagrams.length,
           complete: result.complete,
-          ready: result.diagrams.filter(d => d.status === 'ready').length
+          ready: result.diagrams.filter(d => d.status === 'ready').length,
+          retry: retryCount,
+          elapsed: `${Math.round(elapsedTime / 1000)}s`
         });
         
         setDiagrams(result.diagrams);
@@ -82,8 +109,9 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
         }
       } catch (error) {
         console.error('Error polling diagrams:', error);
+        // Don't stop on individual errors, let retry limits handle it
       }
-    }, 2000);
+    }, POLL_INTERVAL);
 
     return () => clearInterval(pollInterval);
   }, [currentSolution?.solutionId, diagramsComplete]);
