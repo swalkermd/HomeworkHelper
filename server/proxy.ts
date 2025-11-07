@@ -71,7 +71,8 @@ setInterval(() => {
 async function generateDiagramsInBackground(
   solutionId: string,
   diagrams: DiagramStatus[],
-  steps: any[]
+  steps: any[],
+  hostname?: string
 ): Promise<void> {
   console.log(`🎨 Starting background generation of ${diagrams.length} diagrams for solution ${solutionId}`);
   
@@ -93,7 +94,7 @@ async function generateDiagramsInBackground(
       
       console.log(`🎨 Generating diagram ${index + 1}/${diagrams.length}: ${diagramDescription}`);
       
-      const imageUrl = await generateDiagram(diagramDescription);
+      const imageUrl = await generateDiagram(diagramDescription, hostname);
       
       if (imageUrl) {
         solutionData.diagrams[index].status = 'ready';
@@ -125,7 +126,7 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
 });
 
-async function generateDiagram(description: string): Promise<string> {
+async function generateDiagram(description: string, hostname?: string): Promise<string> {
   try {
     // Extract visual type from description if provided
     const typeMatch = description.match(/type=(\w+)/);
@@ -172,8 +173,8 @@ async function generateDiagram(description: string): Promise<string> {
       const buffer = Buffer.from(b64Data, 'base64');
       fs.writeFileSync(filepath, buffer);
       
-      // Return absolute URL (relative paths resolve to Expo dev server, not our API server)
-      const domain = process.env.REPLIT_DEV_DOMAIN || `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+      // Use request hostname if provided (for production), otherwise fall back to env vars (for dev)
+      const domain = hostname || process.env.REPLIT_DEV_DOMAIN || `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
       const url = `https://${domain}/diagrams/${filename}`;
       console.log(`✓ ${visualType} saved:`, url);
       return url;
@@ -1030,7 +1031,8 @@ Grade-appropriate language based on difficulty level.`
     
     // Generate diagrams in background if any exist
     if (diagrams.length > 0) {
-      void generateDiagramsInBackground(solutionId, diagrams, result.steps);
+      const hostname = req.get('host');
+      void generateDiagramsInBackground(solutionId, diagrams, result.steps, hostname);
     }
   } catch (error) {
     console.error('Error analyzing text:', error);
@@ -1502,7 +1504,8 @@ Grade-appropriate language based on difficulty level.`
     
     // Generate diagrams in background if any exist
     if (diagrams.length > 0) {
-      void generateDiagramsInBackground(solutionId, diagrams, result.steps);
+      const hostname = req.get('host');
+      void generateDiagramsInBackground(solutionId, diagrams, result.steps, hostname);
     }
   } catch (error) {
     console.error('Error analyzing image:', error);
