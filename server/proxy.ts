@@ -146,7 +146,7 @@ const openai = new OpenAI({
 interface DiagramCacheEntry {
   url: string;
   timestamp: number;
-  size: "1024x1024" | "512x512";
+  size: string;
   visualType: string;
 }
 
@@ -169,16 +169,8 @@ async function generateDiagram(description: string, hostname?: string): Promise<
     // Remove type tag from description for cleaner prompt
     const cleanDescription = description.replace(/type=\w+\s*-\s*/, '');
     
-    // Adaptive sizing based on visual complexity
-    const sizeConfig: { [key: string]: "1024x1024" | "512x512" } = {
-      geometry: "512x512",      // Simple shapes, triangles, angles
-      graph: "512x512",         // Coordinate planes, function plots  
-      chart: "512x512",         // Bar charts, pie charts, data viz
-      physics: "1024x1024",     // Force diagrams (needs detail for vectors)
-      illustration: "1024x1024" // Biology cycles, complex processes
-    };
-    
-    const size = sizeConfig[visualType] || "512x512";
+    // Use standard 1024x1024 size (API doesn't support 512x512)
+    const size = "1024x1024" as const;
     
     // Check cache before generating (hash includes description + size to avoid collisions)
     const cacheKey = crypto.createHash('md5').update(description + size).digest('hex');
