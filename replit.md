@@ -53,6 +53,12 @@ The application features a responsive design with distinct typography for portra
   - **Client Polling**: Frontend polls for diagram updates every 2 seconds, rendering them as they become available
   - **Response Time**: ALL solutions delivered in 3-7s, diagrams appear within 30-50s asynchronously
   - **Timeout Configuration**: Server timeout 300s, client fetch timeout 30s for initial response
+- **Production Diagram URL Fix (Nov 2025):** Diagram URLs now use request hostname for proper production deployment:
+  - **Dynamic Hostname Detection**: API endpoints capture request hostname via `req.get('host')` and pass it to diagram generation
+  - **Environment-Aware URLs**: Production uses actual deployment domain (e.g., "your-app.replit.app"), development falls back to `REPLIT_DEV_DOMAIN`
+  - **URL Construction**: `https://${hostname}/diagrams/${filename}.png` ensures diagrams load correctly in both dev and production
+  - **Backward Compatible**: Preserves development workflow with automatic fallback to environment variables when hostname not provided
+  - **Critical Fix**: Resolved blank diagram rendering in deployed web version caused by hardcoded development domain URLs
 
 ### System Design Choices
 The application uses a proxy server architecture (running on port 5000) that handles API endpoints and, in development, proxies frontend requests to the Expo dev server (port 8081). This setup centralizes OpenAI API integration, CORS handling, and ensures all interactions occur through a single exposed port in the Replit environment.
