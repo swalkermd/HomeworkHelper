@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { decode as base64Decode } from 'base-64';
 
@@ -10,7 +10,7 @@ function detectMimeFromMagicBytes(base64Data: string): string | null {
   try {
     // Decode base64 to get the actual bytes (cross-platform)
     const bytes = base64Decode(prefix);
-    const hex = Array.from(bytes).map(b => b.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+    const hex = Array.from(bytes).map((b: string) => b.charCodeAt(0).toString(16).padStart(2, '0')).join('');
     
     console.log('Magic bytes (hex):', hex.substring(0, 20) + '...');
     
