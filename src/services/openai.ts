@@ -120,13 +120,24 @@ export async function askFollowUpQuestion(
 ): Promise<string> {
   try {
     console.log('Calling API:', `${API_URL}/ask-question`);
+    
+    // 30 second timeout protection
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.log('⏱️ Follow-up question timeout triggered after 30 seconds');
+      controller.abort();
+    }, 30000);
+    
     const response = await fetch(`${API_URL}/ask-question`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ question, context }),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -139,6 +150,12 @@ export async function askFollowUpQuestion(
     return data.answer;
   } catch (error) {
     console.error('Error asking follow-up question:', error);
+    
+    // Handle timeout error
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Question timed out after 30 seconds. Please try again.');
+    }
+    
     throw error;
   }
 }
@@ -146,6 +163,14 @@ export async function askFollowUpQuestion(
 export async function getSimplifiedExplanations(solution: HomeworkSolution): Promise<SimplifiedExplanation[]> {
   try {
     console.log('Calling API:', `${API_URL}/simplify-explanation`);
+    
+    // 30 second timeout protection
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.log('⏱️ Simplified explanation timeout triggered after 30 seconds');
+      controller.abort();
+    }, 30000);
+    
     const response = await fetch(`${API_URL}/simplify-explanation`, {
       method: 'POST',
       headers: {
@@ -157,7 +182,10 @@ export async function getSimplifiedExplanations(solution: HomeworkSolution): Pro
         difficulty: solution.difficulty,
         steps: solution.steps,
       }),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -170,6 +198,12 @@ export async function getSimplifiedExplanations(solution: HomeworkSolution): Pro
     return data.simplifiedExplanations;
   } catch (error) {
     console.error('Error getting simplified explanations:', error);
+    
+    // Handle timeout error
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Simplification timed out after 30 seconds. Please try again.');
+    }
+    
     throw error;
   }
 }
