@@ -1,6 +1,7 @@
 import { HomeworkSolution, SimplifiedExplanation } from '../types';
+import { API_BASE_URL } from '../config/api';
 
-const API_URL = '/api';
+const API_URL = API_BASE_URL;
 
 export async function analyzeTextQuestion(question: string): Promise<any> {
   try {

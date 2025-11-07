@@ -20,6 +20,8 @@ Intelligent Visual Aid Generation uses AI to determine the optimal type and plac
 
 A comprehensive cross-platform image conversion solution handles various image formats and URIs, ensuring accurate base64 conversion with multi-layer MIME type detection across web, iOS, and Android.
 
+Cross-platform API communication is handled through platform-aware URL construction: web uses relative URLs (`/api`) that work with the proxy, while native platforms (iOS/Android) use absolute URLs constructed from Expo Constants. In development, the app automatically detects the dev server IP from the Expo manifest for Expo Go connections. In production, API URLs are configured via environment variables.
+
 The "I Still Don't Get It" feature provides simplified, intuitive, and grade-appropriate explanations for each solution step, focusing on reasoning and analogies.
 
 Feature specifications include multiple input methods (text, photo, gallery), AI-powered problem analysis (GPT-4o Vision for images, GPT-4o for text), progressive step-by-step solutions with interactive elements, and improved OCR accuracy. The AI is instructed to match the input number format (decimals or fractions) in solutions and to explicitly state common denominators when combining fractions. For essay questions, the AI provides guidance in Step 1 and a complete, polished essay in the Final Answer section. For multiple-choice questions, the correct letter option is included in the final answer.
@@ -35,8 +37,9 @@ The application uses a proxy server architecture (port 5000) that centralizes AP
 
 ## External Dependencies
 - **AI Integration:** OpenAI GPT-4o (vision, text analysis, Q&A, image generation) via Replit AI Integrations.
-- **Image Handling:** `expo-camera`, `expo-image-picker`, `expo-image`.
+- **Image Handling:** `expo-camera`, `expo-image-picker`, `expo-image`, `expo-file-system`.
+- **Platform Detection:** `expo-constants` for configuration and manifest access.
 - **Haptics:** `expo-haptics`.
 - **Icons:** `expo-vector-icons`.
 - **Concurrency & Retries:** `p-limit`, `p-retry`.
-- **Cross-Platform Base64:** `base-64`.
+- **Cross-Platform Base64:** `base-64` for magic byte detection on React Native.
