@@ -36,21 +36,28 @@ function getApiBaseUrl(): string {
     return envApiUrl;
   }
   
-  // 4. For deployed apps, try to get from manifest URL
-  if (Constants.manifest2?.runtimeVersion) {
-    // This is a production build, we need the deployment URL
-    // In Replit deployments, this should be set in environment
-    console.warn('Production build detected but no API URL configured');
-    console.warn('Please set EXPO_PUBLIC_API_URL environment variable');
-  }
+  // 4. Configuration error - throw descriptive error instead of returning placeholder
+  const errorMessage = `
+❌ API Configuration Error for ${Platform.OS}
+
+The app cannot determine the API URL for native platform (${Platform.OS}).
+This happens when the app is built for production without proper configuration.
+
+Required: Set one of the following:
+  1. app.json: Add "extra": { "apiUrl": "https://your-api.com/api" }
+  2. Environment variable: EXPO_PUBLIC_API_URL=https://your-api.com/api
+
+Current state:
+  - Platform: ${Platform.OS}
+  - Constants.expoConfig.extra.apiUrl: ${Constants.expoConfig?.extra?.apiUrl || 'NOT SET'}
+  - Constants.expoConfig.hostUri: ${Constants.expoConfig?.hostUri || 'NOT SET'}
+  - process.env.EXPO_PUBLIC_API_URL: ${process.env.EXPO_PUBLIC_API_URL || 'NOT SET'}
+  - Production build: ${!!Constants.manifest2?.runtimeVersion}
+
+Please configure the API URL before building for production.
+  `.trim();
   
-  // Last resort fallback - should not happen in production
-  console.error('❌ Could not determine API URL for native platform!');
-  console.error('Platform:', Platform.OS);
-  console.error('Please configure API_URL in app.json or set EXPO_PUBLIC_API_URL');
-  
-  // Return a placeholder that will fail but with a clear error
-  return 'https://CONFIGURE_API_URL_IN_APP_JSON/api';
+  throw new Error(errorMessage);
 }
 
 export const API_BASE_URL = getApiBaseUrl();
