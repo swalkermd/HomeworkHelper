@@ -504,7 +504,8 @@ const styles = StyleSheet.create({
   },
   diagramImage: {
     width: '100%',
-    height: 300,
+    aspectRatio: 1,
+    maxHeight: 400,
     borderRadius: 8,
   },
   diagramLoading: {
