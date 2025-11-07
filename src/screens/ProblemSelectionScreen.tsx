@@ -52,6 +52,7 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
       console.error('❌ Error analyzing image:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
       alert(`Failed to analyze image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
       setIsLoading(false);
     }
   };
