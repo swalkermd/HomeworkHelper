@@ -6,6 +6,7 @@ import { analyzeImageQuestion } from '../services/openai';
 import { RootStackParamList } from '../navigation/types';
 import { colors, typography, spacing } from '../constants/theme';
 import { convertImageToBase64 } from '../utils/imageConverter';
+import { getUserFriendlyErrorMessage } from '../utils/errorHandler';
 
 type ProblemSelectionScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'ProblemSelection'>;
@@ -57,7 +58,8 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
     } catch (error) {
       console.error('❌ Error analyzing image:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
-      alert(`Failed to analyze image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const userMessage = getUserFriendlyErrorMessage(error);
+      alert(userMessage);
     } finally {
       setIsLoading(false);
     }

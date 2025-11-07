@@ -12,6 +12,7 @@ import MathText from '../components/MathText';
 import { colors, typography, spacing } from '../constants/theme';
 import { getSimplifiedExplanations, pollForDiagrams, DiagramStatus } from '../services/openai';
 import { SimplifiedExplanation } from '../types';
+import { getUserFriendlyErrorMessage } from '../utils/errorHandler';
 
 type SolutionScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Solution'>;
@@ -134,7 +135,8 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error('Error getting simplified explanations:', error);
-      alert('Failed to generate simplified explanations. Please try again.');
+      const userMessage = getUserFriendlyErrorMessage(error);
+      alert(userMessage);
     } finally {
       setLoadingSimplified(false);
     }

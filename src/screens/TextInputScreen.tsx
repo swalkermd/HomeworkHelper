@@ -5,6 +5,7 @@ import { useHomeworkStore } from '../store/homeworkStore';
 import { analyzeTextQuestion } from '../services/openai';
 import { RootStackParamList } from '../navigation/types';
 import { colors, typography, spacing } from '../constants/theme';
+import { getUserFriendlyErrorMessage } from '../utils/errorHandler';
 
 type TextInputScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'TextInput'>;
@@ -28,7 +29,8 @@ export default function TextInputScreen({ navigation }: TextInputScreenProps) {
       navigation.navigate('Solution');
     } catch (error) {
       console.error('❌ Error analyzing question:', error);
-      alert('Failed to analyze question. Please try again.');
+      const userMessage = getUserFriendlyErrorMessage(error);
+      alert(userMessage);
     } finally {
       setIsLoading(false);
     }
