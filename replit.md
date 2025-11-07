@@ -6,6 +6,75 @@ Homework Helper is an AI-powered mobile application built with React Native and 
 ## User Preferences
 None documented yet.
 
+## Planned Features & Enhancements
+
+### 🎯 Two-Tier Contextual Explanations (Planned: December 2025)
+**Status:** Deferred - Scheduled for implementation next month  
+**Date Proposed:** November 7, 2025  
+**Priority:** Medium-High (educational value)  
+**Estimated Effort:** 2-3 hours  
+**Estimated Cost Impact:** Moderate (additional tokens per solve request)
+
+**Overview:**
+Enhance the learning experience by exposing step explanations directly in the solution view, providing immediate contextual understanding alongside mathematical notation. This creates a two-tier explanation system that balances conciseness with depth.
+
+**Current Limitation:**
+- The `SolutionStep.explanation` field exists but is never populated or displayed
+- Students only see procedural math (`step.content`) without context
+- "Simplify" feature requires manual click and generates separate on-demand explanations
+- Non-quantitative subjects (essays, history, science) lack narrative guidance in step displays
+
+**Proposed Solution:**
+
+1. **Two-Tier System:**
+   - **Built-in explanation** (always generated): 1 concise sentence providing immediate takeaway
+     - Example: "We're combining fractions by finding a common denominator."
+   - **Simplified explanation** (on-demand via "Simplify" button): 2-3 sentences with analogies for struggling students
+     - Example: "Think of fractions like pizza slices. Before we can add {1/3} + {1/4}, we need to cut all the slices the same size..."
+
+2. **Subject-Aware Verbosity:**
+   - Math/Physics: Minimal built-in explanations (focus on procedural work)
+   - Essays/History/Science: Verbose explanations (narrative is primary)
+   - Multiple Choice: Brief reasoning for option elimination logic
+
+3. **UI Implementation:**
+   - Display built-in explanations in muted text beneath `MathText` component
+   - Use subtle styling (gray color, smaller font) to avoid overwhelming users
+   - Maintain visual hierarchy: title → math → explanation → diagram
+   - Keep "Simplify" button for deeper, analogy-driven help
+
+4. **User Control:**
+   - Add settings toggle: "Show step explanations" (default: ON)
+   - Allows power users to hide for cleaner UI
+   - Ensures students who need guidance get it by default
+
+**Technical Changes Required:**
+- **Backend (`server/proxy.ts`):**
+  - Modify `/api/analyze` prompt to generate brief explanations for each step
+  - Update response schema validation to require `explanation` field
+  - Apply `enforceProperFormatting()` to explanation text
+  
+- **Frontend (`src/screens/SolutionScreen.tsx`):**
+  - Add explanation rendering below `MathText` component (lines ~178-179)
+  - Create new `explanationText` style (muted gray, smaller font)
+  - Wrap in conditional check for settings toggle
+  
+- **Types (`src/types/index.ts`):**
+  - Change `explanation?: string` to `explanation: string` (make required)
+
+- **State Management:**
+  - Add `showStepExplanations` boolean to settings store (if settings exist)
+  - Default to `true` for first-time users
+
+**Expected Benefits:**
+- ✅ Immediate learning context without extra clicks
+- ✅ Better support for non-math subjects with narrative needs
+- ✅ Reduced friction in understanding process
+- ✅ Shifts focus from "give me answers" to "help me learn"
+- ✅ Complementary to existing "Simplify" feature
+
+**Reminder:** User requested implementation in December 2025. Follow up next month.
+
 ## System Architecture
 
 ### UI/UX Decisions
