@@ -30,6 +30,22 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+// Cache statistics endpoint for monitoring performance
+app.get('/api/cache-stats', (req, res) => {
+  const hitRate = cacheStats.totalRequests > 0 
+    ? ((cacheStats.hits / cacheStats.totalRequests) * 100).toFixed(1)
+    : '0.0';
+  
+  res.json({
+    hits: cacheStats.hits,
+    misses: cacheStats.misses,
+    totalRequests: cacheStats.totalRequests,
+    hitRate: `${hitRate}%`,
+    cacheSize: diagramCache.size,
+    cacheTTL: '24 hours'
+  });
+});
+
 app.use(cors({
   origin: '*',
   credentials: true,
@@ -126,6 +142,24 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
 });
 
+// Diagram cache for avoiding regeneration of identical diagrams
+interface DiagramCacheEntry {
+  url: string;
+  timestamp: number;
+  size: "1024x1024" | "512x512";
+  visualType: string;
+}
+
+const diagramCache = new Map<string, DiagramCacheEntry>();
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+// Cache statistics for monitoring performance
+let cacheStats = {
+  hits: 0,
+  misses: 0,
+  totalRequests: 0
+};
+
 async function generateDiagram(description: string, hostname?: string): Promise<string> {
   try {
     // Extract visual type from description if provided
@@ -135,7 +169,31 @@ async function generateDiagram(description: string, hostname?: string): Promise<
     // Remove type tag from description for cleaner prompt
     const cleanDescription = description.replace(/type=\w+\s*-\s*/, '');
     
-    console.log(`Generating ${visualType} for:`, cleanDescription.substring(0, 100) + '...');
+    // Adaptive sizing based on visual complexity
+    const sizeConfig: { [key: string]: "1024x1024" | "512x512" } = {
+      geometry: "512x512",      // Simple shapes, triangles, angles
+      graph: "512x512",         // Coordinate planes, function plots  
+      chart: "512x512",         // Bar charts, pie charts, data viz
+      physics: "1024x1024",     // Force diagrams (needs detail for vectors)
+      illustration: "1024x1024" // Biology cycles, complex processes
+    };
+    
+    const size = sizeConfig[visualType] || "512x512";
+    
+    // Check cache before generating (hash includes description + size to avoid collisions)
+    const cacheKey = crypto.createHash('md5').update(description + size).digest('hex');
+    cacheStats.totalRequests++;
+    
+    const cached = diagramCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      cacheStats.hits++;
+      const hitRate = ((cacheStats.hits / cacheStats.totalRequests) * 100).toFixed(1);
+      console.log(`♻️  Cache HIT (${hitRate}% hit rate): ${visualType} ${size} - ${cacheKey.substring(0, 8)}`);
+      return cached.url;
+    }
+    
+    cacheStats.misses++;
+    console.log(`🎨 Cache MISS: Generating ${visualType} at ${size} for:`, cleanDescription.substring(0, 100) + '...');
     
     // Customize prompt based on visual type
     const styleGuides: { [key: string]: string } = {
@@ -151,7 +209,7 @@ async function generateDiagram(description: string, hostname?: string): Promise<
     const response = await openai.images.generate({
       model: "gpt-image-1",
       prompt: `Educational ${visualType}: ${cleanDescription}. ${styleGuide} White background, black lines, labeled clearly. IMPORTANT: Use US decimal notation with periods (e.g., 9.8, 15.5) not commas.`,
-      size: "1024x1024",
+      size: size,
       n: 1
     });
     
@@ -164,9 +222,9 @@ async function generateDiagram(description: string, hostname?: string): Promise<
         fs.mkdirSync(diagramsDir, { recursive: true });
       }
       
-      // Generate unique filename with type prefix
-      const hash = crypto.createHash('md5').update(description).digest('hex').substring(0, 8);
-      const filename = `${visualType}-${hash}.png`;
+      // Generate unique filename with type prefix (use cacheKey for consistency)
+      const hash = cacheKey.substring(0, 8);
+      const filename = `${visualType}-${size.replace('x', '-')}-${hash}.png`;
       const filepath = path.join(diagramsDir, filename);
       
       // Convert base64 to buffer and save
@@ -176,7 +234,16 @@ async function generateDiagram(description: string, hostname?: string): Promise<
       // Use request hostname if provided (for production), otherwise fall back to env vars (for dev)
       const domain = hostname || process.env.REPLIT_DEV_DOMAIN || `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
       const url = `https://${domain}/diagrams/${filename}`;
-      console.log(`✓ ${visualType} saved:`, url);
+      
+      // Store in cache for future requests
+      diagramCache.set(cacheKey, {
+        url,
+        timestamp: Date.now(),
+        size,
+        visualType
+      });
+      
+      console.log(`✓ ${visualType} (${size}) saved and cached:`, url);
       return url;
     }
     
