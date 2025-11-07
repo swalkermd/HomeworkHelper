@@ -37,8 +37,14 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
     try {
       console.log('Converting image to base64...');
       console.log('Image URI:', currentImage.uri.substring(0, 50) + '...');
+      console.log('Has base64 data:', !!currentImage.base64);
+      console.log('MIME type:', currentImage.mimeType);
       
-      const base64Image = await convertImageToBase64(currentImage.uri);
+      const base64Image = await convertImageToBase64(
+        currentImage.uri, 
+        currentImage.base64,
+        currentImage.mimeType
+      );
       console.log('Image converted, size:', base64Image.length, 'chars');
       console.log('Analyzing with problem number:', problemNumber || 'none');
       

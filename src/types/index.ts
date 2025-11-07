@@ -2,6 +2,8 @@ export interface HomeworkImage {
   uri: string;
   width: number;
   height: number;
+  base64?: string;
+  mimeType?: string;
 }
 
 export interface SelectedProblem {

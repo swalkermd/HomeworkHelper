@@ -124,6 +124,7 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 1,
+        base64: true,
       });
       
       console.log('🖼️ Gallery: Image picker result:', result);
@@ -131,10 +132,13 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         console.log('🖼️ Gallery: Image selected:', asset.uri);
+        console.log('🖼️ Gallery: MIME type:', asset.mimeType);
         setCurrentImage({
           uri: asset.uri,
           width: asset.width,
           height: asset.height,
+          base64: asset.base64,
+          mimeType: asset.mimeType,
         });
         navigation.navigate('ProblemSelection');
       } else {

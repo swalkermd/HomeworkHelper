@@ -38,13 +38,16 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
 
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const photo = await cameraRef.current.takePictureAsync();
+      const photo = await cameraRef.current.takePictureAsync({
+        base64: true,
+      });
       
       if (photo) {
         setCurrentImage({
           uri: photo.uri,
           width: photo.width,
           height: photo.height,
+          base64: photo.base64,
         });
         navigation.navigate('ProblemSelection');
       }
