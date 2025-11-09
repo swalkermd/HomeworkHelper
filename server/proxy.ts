@@ -200,7 +200,7 @@ async function generateDiagram(description: string, hostname?: string): Promise<
     
     const response = await openai.images.generate({
       model: "gpt-image-1",
-      prompt: `Educational ${visualType}: ${cleanDescription}. ${styleGuide} White background, black lines, labeled clearly. IMPORTANT: Leave generous margins (at least 10% padding) on all sides - do not place any content or labels near the edges. Center the main content with plenty of space around it. Use US decimal notation with periods (e.g., 9.8, 15.5) not commas.`,
+      prompt: `Educational ${visualType}: ${cleanDescription}. CRITICAL: All decimal numbers MUST use periods as decimal separators (14.14, 10.2, 40.9), NEVER commas. US/English number formatting only. ${styleGuide} White background, black lines, labeled clearly. IMPORTANT: Leave generous margins (at least 10% padding) on all sides - do not place any content or labels near the edges. Center the main content with plenty of space around it.`,
       size: size,
       n: 1
     });
