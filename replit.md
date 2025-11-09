@@ -105,6 +105,34 @@ Successfully implemented the two-tier contextual explanations feature with the f
 - `server/proxy.ts` - Updated prompts and formatting enforcement
 - `src/screens/SolutionScreen.tsx` - Added UI for explanations and toggle
 
+### ✅ Fixed: Vertical Fraction Rendering in Highlighted Text (November 9, 2025)
+**Status:** Completed  
+**Date Fixed:** November 9, 2025  
+**Priority:** Critical (visual formatting bug)
+
+**Problem:**
+Fractions inside color-highlighted sections (e.g., `[blue:(1/2) × base]`) were not rendering as vertical fractions. They appeared as inline text because the MathText parser only extracted highlighted text as plain strings without recursively parsing for nested `{num/den}` patterns.
+
+**Root Cause:**
+The `parseContent()` function treated `[color:...]` sections as simple highlighted text parts, never checking for fraction notation within them. This meant fractions like `{1/2}` inside blue or red tags stayed as text instead of becoming vertical fraction components.
+
+**Solution:**
+1. Created `parseHighlightedContent()` helper function that recursively parses highlighted text for fractions
+2. Modified color tag parsing to spread the recursively parsed parts (mix of highlighted text + fraction components)
+3. Updated fraction rendering to accept and apply a `color` property, ensuring highlighted fractions display with the correct color and bold weight
+4. Backend already converts `(1/2)` → `({1/2})` correctly; frontend now recognizes these inside color tags
+
+**Technical Changes:**
+- `src/components/MathText.tsx`:
+  - Added `parseHighlightedContent()` (lines 93-134) for recursive fraction parsing
+  - Updated color tag parsing (lines 156-168) to use helper and spread parts
+  - Enhanced fraction rendering (lines 304-317) to apply highlight colors with bold weight
+
+**Impact:**
+- All fractions inside `[blue:...]` and `[red:...]` tags now render as proper vertical fractions
+- Maintains color highlighting (blue for operations, red for results) as required
+- Consistent with non-highlighted fraction behavior
+
 ## System Architecture
 
 ### UI/UX Decisions
