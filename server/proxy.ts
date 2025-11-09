@@ -200,7 +200,7 @@ async function generateDiagram(description: string, hostname?: string): Promise<
     
     const response = await openai.images.generate({
       model: "gpt-image-1",
-      prompt: `Educational ${visualType}: ${cleanDescription}. CRITICAL: All decimal numbers MUST use periods as decimal separators (14.14, 10.2, 40.9), NEVER commas. US/English number formatting only. ${styleGuide} White background, black lines, labeled clearly. IMPORTANT: Leave generous margins (at least 10% padding) on all sides - do not place any content or labels near the edges. Center the main content with plenty of space around it.`,
+      prompt: `MANDATORY NUMBER FORMAT: USE PERIODS FOR DECIMALS - WRITE 14.14 NOT 14,14 - WRITE 3.92 NOT 3,92 - WRITE 10.2 NOT 10,2. Educational ${visualType}: ${cleanDescription}. ${styleGuide} White background, black lines, labeled clearly. ABSOLUTE REQUIREMENT: ALL DECIMAL NUMBERS USE PERIOD SEPARATORS (.) - AMERICAN/ENGLISH FORMAT ONLY - NEVER USE COMMAS (,) IN NUMBERS. Examples: 14.14, 3.92, 10.2, 19.6. IMPORTANT: Leave generous margins (at least 10% padding) on all sides - do not place any content or labels near the edges. Center the main content with plenty of space around it. REMINDER: Decimals use PERIODS not commas.`,
       size: size,
       n: 1
     });

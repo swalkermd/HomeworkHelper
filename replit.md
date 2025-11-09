@@ -22,7 +22,11 @@ None documented yet.
 
 ### ✅ Fixed: Diagram Decimal Formatting
 **Problem:** Generated diagrams used European decimal format (14,14 instead of 14.14).
-**Fix:** Emphasized US decimal notation in generation prompt with "CRITICAL" directive placed at beginning.
+**Fix:** Made decimal formatting instruction absolutely emphatic:
+- ALL CAPS directives at beginning, middle, and end of prompt
+- Explicit "DO NOT" examples: "WRITE 14.14 NOT 14,14"
+- Multiple reminders throughout prompt
+- Cache cleared on restart to prevent old diagrams from reappearing
 
 ### ✅ Two-Tier Contextual Explanations Feature  
 **Added:** Concise step explanations displayed by default with subject-aware verbosity. Toggle control added in action bar.
