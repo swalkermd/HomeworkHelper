@@ -6,6 +6,27 @@ Homework Helper is an AI-powered mobile application built with React Native and 
 ## User Preferences
 None documented yet.
 
+## Recent Fixes & Improvements (November 9, 2025)
+
+### ✅ Fixed: Vertical Fraction Rendering in Highlighted Text
+**Problem:** Fractions inside color-highlighted sections (`[blue:...]`, `[red:...]`) displayed as inline text instead of vertical fractions.
+**Fix:** Added recursive parsing for fractions within highlighted content. Fractions now render vertically with proper color highlighting.
+
+### ✅ Fixed: LaTeX Command Artifacts  
+**Problem:** LaTeX commands (`\text{kg}`, `\\,`, `m/s^2^`) appeared as literal text.
+**Fix:** Added comprehensive LaTeX stripping with iterative replacement, Greek symbol conversion, and double-caret cleanup.
+
+### ✅ Fixed: Decimal Division Bug
+**Problem:** Fraction regex incorrectly converted `{19.6/5.0}` to `{19.{6/5}.0}`.
+**Fix:** Updated regex to exclude decimal points: `(?<![{/.\d])(\d+)\/(\d+)(?![}./\d])`. Decimal divisions now remain intact.
+
+### ✅ Fixed: Diagram Decimal Formatting
+**Problem:** Generated diagrams used European decimal format (14,14 instead of 14.14).
+**Fix:** Emphasized US decimal notation in generation prompt with "CRITICAL" directive placed at beginning.
+
+### ✅ Two-Tier Contextual Explanations Feature  
+**Added:** Concise step explanations displayed by default with subject-aware verbosity. Toggle control added in action bar.
+
 ## System Architecture
 
 ### UI/UX Decisions
