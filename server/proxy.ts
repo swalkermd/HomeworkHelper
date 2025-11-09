@@ -296,7 +296,30 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
     return `__IMAGE_PLACEHOLDER_${imageTags.length - 1}__`;
   });
   
-  // 0. Normalize whitespace: replace ALL newlines with spaces for continuous text flow
+  // 0. Remove LaTeX commands that shouldn't be displayed as text
+  // Iteratively strip \command{text} patterns to handle nested commands
+  let prevFormatted;
+  do {
+    prevFormatted = formatted;
+    // Strip \text{...}, \textbf{...}, \textit{...}, etc. -> keep content only
+    formatted = formatted.replace(/\\[a-zA-Z]+\{([^{}]*)\}/g, '$1');
+  } while (formatted !== prevFormatted); // Keep going until no more changes
+  
+  // Strip LaTeX spacing and symbols
+  formatted = formatted.replace(/\\,/g, ''); // spacing
+  formatted = formatted.replace(/\\;/g, ''); // spacing
+  formatted = formatted.replace(/\\ /g, ' '); // spacing
+  formatted = formatted.replace(/\\times/g, '×');
+  formatted = formatted.replace(/\\cdot/g, '·');
+  formatted = formatted.replace(/\\Delta/g, 'Δ');
+  formatted = formatted.replace(/\\alpha/g, 'α');
+  formatted = formatted.replace(/\\beta/g, 'β');
+  formatted = formatted.replace(/\\theta/g, 'θ');
+  formatted = formatted.replace(/\\pi/g, 'π');
+  // Remove any remaining standalone backslash commands
+  formatted = formatted.replace(/\\[a-zA-Z]+\b/g, '');
+  
+  // 1. Normalize whitespace: replace ALL newlines with spaces for continuous text flow
   // EXCEPT for multi-part answers (a), b), c) which should stay on separate lines
   // First, normalize all line endings to \n
   formatted = formatted.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
