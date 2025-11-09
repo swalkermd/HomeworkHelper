@@ -87,6 +87,49 @@ export default function MathText({ content, fontSize = 14, color = colors.textPr
   );
 }
 
+// Helper function to parse highlighted content for nested fractions and formatting
+function parseHighlightedContent(content: string, color: string): ParsedPart[] {
+  const parts: ParsedPart[] = [];
+  let i = 0;
+  let currentText = '';
+
+  while (i < content.length) {
+    if (content[i] === '{' && content.indexOf('}', i) > i) {
+      // Found a potential fraction
+      if (currentText) {
+        parts.push({ type: 'highlighted', content: currentText, color });
+        currentText = '';
+      }
+      const endIndex = content.indexOf('}', i);
+      const fractionContent = content.substring(i + 1, endIndex);
+      const [num, den] = fractionContent.split('/');
+      if (num && den) {
+        // This is a fraction like {1/8} - render as fraction with color applied to numerator/denominator
+        parts.push({
+          type: 'fraction',
+          content: fractionContent,
+          numerator: num.trim(),
+          denominator: den.trim(),
+          color: color, // Store color to apply to fraction text
+        });
+      } else {
+        // Just text in braces, add back to current text
+        currentText += fractionContent;
+      }
+      i = endIndex + 1;
+    } else {
+      currentText += content[i];
+      i++;
+    }
+  }
+
+  if (currentText) {
+    parts.push({ type: 'highlighted', content: currentText, color });
+  }
+
+  return parts;
+}
+
 function parseContent(content: string): ParsedPart[] {
   const parts: ParsedPart[] = [];
   let i = 0;
@@ -122,11 +165,12 @@ function parseContent(content: string): ParsedPart[] {
       const endIndex = content.indexOf(']', i);
       const highlightContent = content.substring(i + 1, endIndex);
       const [colorName, ...textParts] = highlightContent.split(':');
-      parts.push({
-        type: 'highlighted',
-        content: textParts.join(':').trim(),
-        color: colorName.trim(),
-      });
+      const highlightedText = textParts.join(':').trim();
+      
+      // Recursively parse highlighted content for fractions and other formatting
+      const highlightedParts = parseHighlightedContent(highlightedText, colorName.trim());
+      parts.push(...highlightedParts);
+      
       i = endIndex + 1;
     } else if ((content.substring(i, i + 2) === '->' || content.substring(i, i + 2) === '=>')) {
       if (currentText) {
@@ -254,13 +298,16 @@ function renderTextPart(part: ParsedPart, index: number, baseFontSize: number, b
 function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseColor: string, isOnGreenBg: boolean): React.ReactNode {
   switch (part.type) {
     case 'fraction':
+      // Use the fraction's color if specified (for highlighted fractions), otherwise use base color
+      const fractionColor = part.color ? getHighlightColor(part.color) : baseColor;
+      const fractionWeight = part.color ? '600' : 'normal'; // Bold if highlighted
       return (
         <View key={index} style={styles.fractionContainer}>
-          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: baseColor }]}>
+          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: fractionColor, fontWeight: fractionWeight }]}>
             {part.numerator}
           </Text>
-          <View style={[styles.fractionLine, { backgroundColor: baseColor }]} />
-          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: baseColor }]}>
+          <View style={[styles.fractionLine, { backgroundColor: fractionColor }]} />
+          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: fractionColor, fontWeight: fractionWeight }]}>
             {part.denominator}
           </Text>
         </View>
