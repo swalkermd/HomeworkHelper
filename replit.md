@@ -6,14 +6,13 @@ Homework Helper is an AI-powered mobile application built with React Native and 
 ## User Preferences
 None documented yet.
 
-## Planned Features & Enhancements
+## Recent Features & Enhancements
 
-### 🎯 Two-Tier Contextual Explanations (Planned: December 2025)
-**Status:** Deferred - Scheduled for implementation next month  
-**Date Proposed:** November 7, 2025  
-**Priority:** Medium-High (educational value)  
-**Estimated Effort:** 2-3 hours  
-**Estimated Cost Impact:** Moderate (additional tokens per solve request)
+### ✅ Two-Tier Contextual Explanations (Implemented: November 9, 2025)
+**Status:** Completed  
+**Date Implemented:** November 9, 2025  
+**Original Proposal:** November 7, 2025  
+**Priority:** Medium-High (educational value)
 
 **Overview:**
 Enhance the learning experience by exposing step explanations directly in the solution view, providing immediate contextual understanding alongside mathematical notation. This creates a two-tier explanation system that balances conciseness with depth.
@@ -73,7 +72,38 @@ Enhance the learning experience by exposing step explanations directly in the so
 - ✅ Shifts focus from "give me answers" to "help me learn"
 - ✅ Complementary to existing "Simplify" feature
 
-**Reminder:** User requested implementation in December 2025. Follow up next month.
+**Implementation Summary:**
+
+Successfully implemented the two-tier contextual explanations feature with the following components:
+
+1. **Backend Changes:**
+   - Updated both `/api/analyze-text` and `/api/analyze-image` prompts with mandatory explanation field requirements
+   - Added subject-aware verbosity instructions (minimal for math/physics, verbose for essays/history/science)
+   - Implemented fallback mechanism in `enforceResponseFormatting()` to ensure all steps always have explanations
+   - Applied formatting enforcement to explanation text using `enforceProperFormatting()`
+   - Added warning logs when AI omits explanations (fallback triggers)
+
+2. **Frontend Changes:**
+   - Created `useSettingsStore` with `showStepExplanations` toggle (defaults to `true`)
+   - Added explanation display below step content with muted, italic styling
+   - Implemented "Show/Hide Tips" toggle in action bar header for user control
+   - Used subtle visual hierarchy to avoid overwhelming users
+
+3. **Type Safety:**
+   - Changed `SolutionStep.explanation?: string` to `explanation: string` (required)
+   - Guaranteed non-undefined explanations through fallback mechanism
+
+**User Experience:**
+- Students now see concise, contextual explanations for every step by default
+- "Simplify" button remains available for deeper, analogy-driven explanations
+- Users can toggle explanations on/off via the "Show/Hide Tips" button
+- Subject-aware verbosity ensures appropriate detail level for different subjects
+
+**Files Modified:**
+- `src/types/index.ts` - Made explanation required
+- `src/store/settingsStore.ts` - Created new settings store
+- `server/proxy.ts` - Updated prompts and formatting enforcement
+- `src/screens/SolutionScreen.tsx` - Added UI for explanations and toggle
 
 ## System Architecture
 

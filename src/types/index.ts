@@ -16,7 +16,7 @@ export interface SolutionStep {
   id: string;
   title: string;
   content: string;
-  explanation?: string;
+  explanation: string;
 }
 
 export interface SimplifiedExplanation {

@@ -7,6 +7,7 @@ import { Image } from 'expo-image';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useHomeworkStore } from '../store/homeworkStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { RootStackParamList } from '../navigation/types';
 import MathText from '../components/MathText';
 import { colors, typography, spacing } from '../constants/theme';
@@ -21,6 +22,7 @@ type SolutionScreenProps = {
 export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const currentSolution = useHomeworkStore((state) => state.currentSolution);
   const reset = useHomeworkStore((state) => state.reset);
+  const showStepExplanations = useSettingsStore((state) => state.showStepExplanations);
   const [revealedSteps, setRevealedSteps] = useState(0);
   const [allRevealed, setAllRevealed] = useState(false);
   const [simplifiedMode, setSimplifiedMode] = useState(false);
@@ -209,6 +211,12 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                 <MathText content={step.content} fontSize={typography.mathMedium.fontSize} />
               </View>
               
+              {showStepExplanations && step.explanation && (
+                <View style={styles.explanationContainer}>
+                  <Text style={styles.explanationText}>{step.explanation}</Text>
+                </View>
+              )}
+              
               {simplifiedMode && simplified && (
                 <View style={styles.simplifiedBox}>
                   <View style={styles.simplifiedHeader}>
@@ -247,7 +255,22 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
       </ScrollView>
 
       <View style={styles.actionBar}>
-        <Text style={styles.sectionLabel}>Need More Help?</Text>
+        <View style={styles.actionBarHeader}>
+          <Text style={styles.sectionLabel}>Need More Help?</Text>
+          <TouchableOpacity
+            onPress={() => useSettingsStore.getState().setShowStepExplanations(!showStepExplanations)}
+            style={styles.settingsToggle}
+          >
+            <Ionicons 
+              name={showStepExplanations ? "eye" : "eye-off"} 
+              size={20} 
+              color={colors.textSecondary} 
+            />
+            <Text style={styles.settingsToggleText}>
+              {showStepExplanations ? "Hide" : "Show"} Tips
+            </Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.actionRow}>
           <TouchableOpacity
             onPress={handleSimplifyExplanation}
@@ -401,11 +424,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginTop: spacing.md,
   },
-  explanationText: {
-    fontSize: typography.bodyLarge.fontSize,
-    lineHeight: typography.bodyLarge.lineHeight,
-    color: '#92400e',
-  },
   finalAnswerCard: {
     borderRadius: 12,
     padding: spacing.xl,
@@ -448,7 +466,23 @@ const styles = StyleSheet.create({
     lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
     color: colors.textSecondary,
+  },
+  actionBarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: spacing.sm,
+  },
+  settingsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  settingsToggleText: {
+    fontSize: 12,
+    color: colors.textSecondary,
   },
   actionRow: {
     flexDirection: 'row',
@@ -532,5 +566,17 @@ const styles = StyleSheet.create({
     lineHeight: typography.bodyLarge.lineHeight,
     fontWeight: '600',
     color: '#92400e',
+  },
+  explanationContainer: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(107, 114, 128, 0.2)',
+  },
+  explanationText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
 });

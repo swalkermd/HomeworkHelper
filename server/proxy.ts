@@ -402,13 +402,24 @@ function enforceResponseFormatting(response: any): any {
     console.log(`✅ AFTER formatting problem: "${formatted.problem}"`);
   }
   
-  // Fix all step content and titles
+  // Fix all step content, titles, and explanations (with fallback)
   if (formatted.steps && Array.isArray(formatted.steps)) {
-    formatted.steps = formatted.steps.map((step: any, index: number) => ({
-      ...step,
-      title: step.title ? enforceProperFormatting(step.title, `step${index+1}-title`) : step.title,
-      content: step.content ? enforceProperFormatting(step.content, `step${index+1}-content`) : step.content
-    }));
+    formatted.steps = formatted.steps.map((step: any, index: number) => {
+      // Provide a default explanation if missing (should never happen, but ensures type safety)
+      const defaultExplanation = "This step is part of solving the problem.";
+      const explanation = step.explanation ? enforceProperFormatting(step.explanation, `step${index+1}-explanation`) : defaultExplanation;
+      
+      if (!step.explanation) {
+        console.warn(`⚠️  Step ${index+1} missing explanation - using fallback`);
+      }
+      
+      return {
+        ...step,
+        title: step.title ? enforceProperFormatting(step.title, `step${index+1}-title`) : step.title,
+        content: step.content ? enforceProperFormatting(step.content, `step${index+1}-content`) : step.content,
+        explanation: explanation
+      };
+    });
   }
   
   // Fix final answer if present
@@ -737,6 +748,53 @@ app.post('/api/analyze-text', async (req, res) => {
   - finalAnswer (ACTUAL ESSAY): "In Harper Lee's novel To Kill a Mockingbird, the protagonist Scout Finch embarks on a transformative journey from innocence to moral awareness. The story explores how childhood experiences shape our understanding of justice and [red:prejudice] in society. Throughout the narrative, Scout's father Atticus serves as a moral compass, teaching her that true courage means standing up for what is right even when facing overwhelming opposition. The [red:symbolism] of the mockingbird represents innocence and the harm caused by destroying it without reason..."
   - WRONG finalAnswer: "To write this essay, you should discuss the protagonist's journey. Include examples from the text. Make sure to address symbolism..." (This is advice, not an essay!)
 
+💡 **STEP EXPLANATIONS - CONTEXTUAL LEARNING:**
+**MANDATORY: Every step must include a concise "explanation" field that provides immediate learning context.**
+
+**Purpose:** Help students understand WHY we're doing each step, not just WHAT we're doing.
+
+**Guidelines:**
+- **Length:** ONE concise sentence that captures the key insight or reasoning for this step
+- **Tone:** Conversational and encouraging, like a tutor sitting beside the student
+- **Focus:** Explain the PURPOSE or STRATEGY behind the step, not just repeat what's in the content
+
+**Subject-Aware Verbosity:**
+- **Math/Physics:** Keep explanations MINIMAL and focused on the mathematical operation
+  - Example: "We're finding a common denominator so we can add these fractions together."
+  - Example: "Isolating the variable on one side will help us find its value."
+- **Essays/History/Science (non-quantitative):** Use MORE VERBOSE explanations that provide narrative context
+  - Example: "This paragraph establishes your thesis by connecting the historical context to your main argument about social change."
+  - Example: "Understanding the hormone's role helps explain how the plant responds to environmental stimuli."
+- **Multiple Choice:** Brief reasoning about the elimination logic or why the correct answer fits
+  - Example: "We can eliminate options A and B because they don't account for the energy lost to friction."
+
+**What to Include:**
+✓ The strategic reason for this step ("We need to eliminate the fraction to solve for x")
+✓ The mathematical principle being applied ("Common denominators allow us to combine fractions")
+✓ The connection to the problem goal ("This brings us closer to finding the vertex coordinates")
+
+**What NOT to Include:**
+✗ Repeating what's already in the title or content
+✗ Generic statements like "This is an important step"
+✗ Procedural instructions that are already shown in the content
+
+**Examples:**
+
+For Math Step:
+- title: "Find a common denominator"
+- content: "{2/3} + {1/4} = {8/12} + {3/12} = {11/12}"
+- explanation: "Finding a common denominator of 12 allows us to add fractions by making the pieces the same size."
+
+For Physics Step:
+- title: "Apply Newton's Second Law"
+- content: "F = ma, so [blue:15 N] = [blue:3 kg] × a → a = [red:5 m/s²]"
+- explanation: "We're using the relationship between force, mass, and acceleration to find how quickly the object speeds up."
+
+For Essay Step:
+- title: "Develop Your Argument"
+- content: "Build three body paragraphs exploring [blue:character development], [blue:thematic symbolism], and [blue:narrative structure]..."
+- explanation: "Organizing your analysis into these three focused areas creates a clear, logical progression that strengthens your overall argument about the author's intent."
+
 RESPONSE FORMAT (JSON):
 {
   "problem": "Restate the problem clearly",
@@ -746,7 +804,8 @@ RESPONSE FORMAT (JSON):
     {
       "id": "1",
       "title": "Clear action heading",
-      "content": "Solution step with proper formatting (use {num/den} for fractions, _subscript_, ^superscript^, [red:text] for colors, -> for arrows)"
+      "content": "Solution step with proper formatting (use {num/den} for fractions, _subscript_, ^superscript^, [red:text] for colors, -> for arrows)",
+      "explanation": "One concise sentence explaining WHY this step matters or WHAT strategy it employs"
     }
   ],
   "finalAnswer": "Final answer with KEY TERMS highlighted using [red:term] syntax for important concepts, formulas, or vocabulary (e.g., [red:phototropism], [red:auxin], [red:quadratic formula])",
@@ -1187,6 +1246,53 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
    
 5. **Write the EXACT transcription in "problem" field** for verification
 
+💡 **STEP EXPLANATIONS - CONTEXTUAL LEARNING:**
+**MANDATORY: Every step must include a concise "explanation" field that provides immediate learning context.**
+
+**Purpose:** Help students understand WHY we're doing each step, not just WHAT we're doing.
+
+**Guidelines:**
+- **Length:** ONE concise sentence that captures the key insight or reasoning for this step
+- **Tone:** Conversational and encouraging, like a tutor sitting beside the student
+- **Focus:** Explain the PURPOSE or STRATEGY behind the step, not just repeat what's in the content
+
+**Subject-Aware Verbosity:**
+- **Math/Physics:** Keep explanations MINIMAL and focused on the mathematical operation
+  - Example: "We're finding a common denominator so we can add these fractions together."
+  - Example: "Isolating the variable on one side will help us find its value."
+- **Essays/History/Science (non-quantitative):** Use MORE VERBOSE explanations that provide narrative context
+  - Example: "This paragraph establishes your thesis by connecting the historical context to your main argument about social change."
+  - Example: "Understanding the hormone's role helps explain how the plant responds to environmental stimuli."
+- **Multiple Choice:** Brief reasoning about the elimination logic or why the correct answer fits
+  - Example: "We can eliminate options A and B because they don't account for the energy lost to friction."
+
+**What to Include:**
+✓ The strategic reason for this step ("We need to eliminate the fraction to solve for x")
+✓ The mathematical principle being applied ("Common denominators allow us to combine fractions")
+✓ The connection to the problem goal ("This brings us closer to finding the vertex coordinates")
+
+**What NOT to Include:**
+✗ Repeating what's already in the title or content
+✗ Generic statements like "This is an important step"
+✗ Procedural instructions that are already shown in the content
+
+**Examples:**
+
+For Math Step:
+- title: "Find a common denominator"
+- content: "{2/3} + {1/4} = {8/12} + {3/12} = {11/12}"
+- explanation: "Finding a common denominator of 12 allows us to add fractions by making the pieces the same size."
+
+For Physics Step:
+- title: "Apply Newton's Second Law"
+- content: "F = ma, so [blue:15 N] = [blue:3 kg] × a → a = [red:5 m/s²]"
+- explanation: "We're using the relationship between force, mass, and acceleration to find how quickly the object speeds up."
+
+For Essay Step:
+- title: "Develop Your Argument"
+- content: "Build three body paragraphs exploring [blue:character development], [blue:thematic symbolism], and [blue:narrative structure]..."
+- explanation: "Organizing your analysis into these three focused areas creates a clear, logical progression that strengthens your overall argument about the author's intent."
+
 RESPONSE FORMAT (JSON):
 {
   "problem": "Extracted problem text",
@@ -1196,7 +1302,8 @@ RESPONSE FORMAT (JSON):
     {
       "id": "1",
       "title": "Clear action heading",
-      "content": "Solution step with proper formatting"
+      "content": "Solution step with proper formatting",
+      "explanation": "One concise sentence explaining WHY this step matters or WHAT strategy it employs"
     }
   ],
   "finalAnswer": "Final answer with KEY TERMS highlighted using [red:term] syntax for important concepts, formulas, or vocabulary (e.g., [red:phototropism], [red:auxin], [red:quadratic formula])",
