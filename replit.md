@@ -133,6 +133,32 @@ The `parseContent()` function treated `[color:...]` sections as simple highlight
 - Maintains color highlighting (blue for operations, red for results) as required
 - Consistent with non-highlighted fraction behavior
 
+### ✅ Fixed: Decimal Formatting in Generated Diagrams (November 9, 2025)
+**Status:** Completed  
+**Date Fixed:** November 9, 2025  
+**Priority:** Medium (visual consistency)
+
+**Problem:**
+OpenAI's DALL-E image generation was rendering decimal numbers with commas instead of periods (European format: "14,14" instead of "14.14"), causing confusion for students expecting US/English number formatting.
+
+**Root Cause:**
+The diagram generation prompt included decimal formatting instructions at the end, but they were not prominent enough to consistently override the AI's default locale-based number rendering.
+
+**Solution:**
+1. Moved decimal formatting instruction to the beginning of the prompt with "CRITICAL" emphasis
+2. Provided specific examples of correct format (14.14, 10.2, 40.9)
+3. Explicitly stated "NEVER commas" and "US/English number formatting only"
+4. Workflow restart clears diagram cache, forcing regeneration with new format
+
+**Technical Changes:**
+- `server/proxy.ts` (line 206):
+  - Updated prompt: `CRITICAL: All decimal numbers MUST use periods as decimal separators (14.14, 10.2, 40.9), NEVER commas. US/English number formatting only.`
+
+**Impact:**
+- All future generated diagrams will use US decimal notation (periods)
+- Cached diagrams from before the fix will be regenerated on first request
+- Consistent number formatting across all educational content
+
 ## System Architecture
 
 ### UI/UX Decisions
