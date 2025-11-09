@@ -319,6 +319,11 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   // Remove any remaining standalone backslash commands
   formatted = formatted.replace(/\\[a-zA-Z]+\b/g, '');
   
+  // Fix double caret issues (e.g., "m/s^2^" -> "m/s^2")
+  // This happens when LaTeX \text{m/s}^2 is stripped, leaving the ^2 from LaTeX superscript
+  formatted = formatted.replace(/\^\^/g, '^'); // Replace double carets with single
+  formatted = formatted.replace(/(\^\d+)\^/g, '$1'); // Remove trailing caret after superscript numbers
+  
   // 1. Normalize whitespace: replace ALL newlines with spaces for continuous text flow
   // EXCEPT for multi-part answers (a), b), c) which should stay on separate lines
   // First, normalize all line endings to \n
@@ -354,18 +359,20 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   
   // 1. Convert standalone fractions like "1/8" to "{1/8}" (for OCR-detected fractions)
   // NOTE: We no longer force decimal→fraction conversion. Format should match input.
+  // CRITICAL: Don't match fractions that are part of decimal divisions like "19.6/5.0"
   const beforeFractionConversion = formatted;
   
   // First, convert ALL fractions INSIDE color tags: [blue:12/5h - 10/5h] -> [blue:{12/5}h - {10/5}h]
   // This regex handles multiple fractions within a single color tag by processing each tag's content
+  // Use negative lookbehind/lookahead for decimal points to avoid matching "19.6/5.0"
   formatted = formatted.replace(/\[(blue|red):([^\]]+)\]/g, (match, color, content) => {
-    // Convert all fractions inside this color tag's content
-    const convertedContent = content.replace(/(?<![{/])(\d+)\/(\d+)(?![}/])/g, '{$1/$2}');
+    // Convert all fractions inside this color tag's content, but NOT decimal divisions
+    const convertedContent = content.replace(/(?<![{/.\d])(\d+)\/(\d+)(?![}./\d])/g, '{$1/$2}');
     return `[${color}:${convertedContent}]`;
   });
   
   // Then, convert any remaining standalone fractions outside color tags
-  formatted = formatted.replace(/(?<![{/])(\d+)\/(\d+)(?![}/])/g, '{$1/$2}');
+  formatted = formatted.replace(/(?<![{/.\d])(\d+)\/(\d+)(?![}./\d])/g, '{$1/$2}');
   
   if (debugLabel && beforeFractionConversion !== formatted) {
     console.log(`🔢 FRACTION CONVERSION in [${debugLabel}]:`);
