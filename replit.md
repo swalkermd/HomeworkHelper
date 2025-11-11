@@ -9,7 +9,7 @@ None documented yet.
 ## Recent Fixes & Improvements (November 11, 2025)
 
 ### ✅ Enhanced OCR Quality for Image Capture
-**Problem:** Photo capture used default ~50% JPEG quality, causing blurry text. GPT-4o processed images at automatic resolution, leading to poor OCR on dense homework scans. Users reported missing decimals and crucial characters.
+**Problem:** Photo capture used default ~50% JPEG quality, causing blurry text. GPT-4o processed images at automatic resolution, leading to poor OCR on dense homework scans. Users reported missing decimals and crucial characters (e.g., "rt" interpreted as "11").
 **Fix:** 
 - Camera capture now uses `quality: 1` (maximum quality) for full-resolution photos
 - GPT-4o vision API now requests `detail: "high"` for maximum fidelity OCR processing
@@ -17,9 +17,14 @@ None documented yet.
   - ALL CAPS emphasis on decimal point detection as absolute priority
   - Comprehensive character-by-character accuracy checklist (decimals, operators, signs, parentheses, exponents, variables)
   - Specific examples of decimal OCR errors to avoid (3.14 vs 314, 0.5 vs 5, 19.6 vs 196)
+  - **Letter/number confusion prevention** with explicit examples (r vs 1, t vs 1, l vs 1, O vs 0, S vs 5)
+  - Context-based verification rules (variable names vs coefficients)
+  - Common physics variables reference (r=radius, t=time, v=velocity)
+  - Explicit instruction: "rt means r × t, NOT 11"
   - Mandatory verification checklist before solving any problem
   - Final character-by-character mental read-through requirement
-- Result: Significantly improved text recognition accuracy on all characters, especially decimal points and mathematical notation
+- **Known Limitation:** GPT-4o vision achieves ~80% OCR accuracy (industry research). For production-grade accuracy (96-99%), hybrid OCR approach recommended (specialized OCR + GPT-4o reasoning)
+- Result: Improved text recognition, especially for decimals and letter/number disambiguation. Hybrid OCR may be needed for mission-critical accuracy.
 
 ### ✅ Fixed: Variable Fraction Rendering (x/10c)
 **Problem:** Fractions containing variables (like x/10c, a/b, 3x/4) were not being converted to vertical format, displaying as inline text instead.
