@@ -8,6 +8,17 @@ None documented yet.
 
 ## Recent Fixes & Improvements (November 11, 2025)
 
+### ✅ Fixed: Expo Web Build Hanging on Deployment
+**Problem:** Replit deployment stuck with build component spinning for 10+ minutes. Root cause: Known Expo SDK 50+ bug where `expo export --platform web` completes successfully but never terminates (GitHub issues #27938, #26448).
+**Fix:** 
+- Created `scripts/build-web.sh` - Smart build script with timeout handling
+- Monitors for successful build completion (dist/index.html creation)
+- Auto-kills hanging process after detecting completion
+- Maximum 5-minute timeout with progress reporting every 15 seconds
+- Updated deployment config to use: `build = ["bash", "scripts/build-web.sh"]`
+- Tested successfully: Build completes in ~50 seconds, produces 77MB dist/ bundle
+- **Result:** Deployment builds now complete reliably without manual intervention
+
 ### ✅ Enhanced OCR Quality for Image Capture
 **Problem:** Photo capture used default ~50% JPEG quality, causing blurry text. GPT-4o processed images at automatic resolution, leading to poor OCR on dense homework scans. Users reported missing decimals and crucial characters (e.g., "rt" interpreted as "11").
 **Fix:** 
