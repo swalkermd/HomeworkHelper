@@ -1,0 +1,108 @@
+2025-11-11 14:44:04.62
+503419fb
+User
+========== STEP 3 ==========
+
+2025-11-11 14:44:04.62
+503419fb
+User
+Title: undefined
+2025-11-11 14:44:04.62
+503419fb
+User
+Full Content:
+2025-11-11 14:44:04.62
+503419fb
+User
+undefined
+2025-11-11 14:44:04.62
+503419fb
+User
+==================================
+2025-11-11 14:44:04.62
+503419fb
+User
+========================
+2025-11-11 14:44:04.62
+503419fb
+User
+❌ Error analyzing image: TypeError: Cannot read properties of undefined (reading 'match')
+2025-11-11 14:44:04.62
+503419fb
+User
+at (/home/runner/workspace/server/proxy.ts:1869:41)
+2025-11-11 14:44:04.62
+503419fb
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-11-11 14:44:04.63
+503419fb
+User
+Error details: {
+2025-11-11 14:44:04.63
+503419fb
+User
+name: 'TypeError',
+2025-11-11 14:44:04.63
+503419fb
+User
+message: "Cannot read properties of undefined (reading 'match')",
+2025-11-11 14:44:04.63
+503419fb
+User
+code: undefined,
+2025-11-11 14:44:04.63
+503419fb
+User
+status: undefined
+2025-11-11 14:44:04.63
+503419fb
+User
+}
+2025-11-11 15:05:15.10
+503419fb
+System
+system: received signal terminated
+2025-11-11 15:18:02.86
+503419fb
+System
+starting up user application
+2025-11-11 15:18:02.86
+503419fb
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2025-11-11 15:18:02.86
+503419fb
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2025-11-11 15:18:08.79
+503419fb
+User
+📦 Production mode: Serving static files from /home/runner/workspace/dist
+2025-11-11 15:18:08.80
+503419fb
+User
+⏱️ Server timeout set to 300 seconds
+2025-11-11 15:18:08.81
+503419fb
+User
+🚀 Proxy server with API running on port 5000
+2025-11-11 15:18:08.81
+503419fb
+User
+API endpoints available at /api/*
+2025-11-11 15:18:08.81
+503419fb
+User
+Frontend proxied from port 8081
+2025-11-11 15:33:15.10
+503419fb
+System
+system: received signal terminated
+
+Collapse
+
+Wrap
+
+Colors
+

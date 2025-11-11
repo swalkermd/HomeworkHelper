@@ -1184,14 +1184,16 @@ Grade-appropriate language based on difficulty level.`
     
     // Legacy support: Check for old-style [DIAGRAM NEEDED: ...] tags
     for (const step of result.steps) {
-      const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
-      if (diagramMatch) {
-        diagrams.push({
-          stepId: step.id,
-          type: 'legacy',
-          description: diagramMatch[1],
-          status: 'pending'
-        });
+      if (step.content) {
+        const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
+        if (diagramMatch) {
+          diagrams.push({
+            stepId: step.id,
+            type: 'legacy',
+            description: diagramMatch[1],
+            status: 'pending'
+          });
+        }
       }
     }
     
@@ -1866,14 +1868,16 @@ Grade-appropriate language based on difficulty level.`;
     
     // Legacy support: Check for old-style [DIAGRAM NEEDED: ...] tags
     for (const step of result.steps) {
-      const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
-      if (diagramMatch) {
-        diagrams.push({
-          stepId: step.id,
-          type: 'legacy',
-          description: diagramMatch[1],
-          status: 'pending'
-        });
+      if (step.content) {
+        const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
+        if (diagramMatch) {
+          diagrams.push({
+            stepId: step.id,
+            type: 'legacy',
+            description: diagramMatch[1],
+            status: 'pending'
+          });
+        }
       }
     }
     
