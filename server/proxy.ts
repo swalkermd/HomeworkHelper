@@ -21,6 +21,7 @@ import pRetry, { AbortError } from 'p-retry';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { extractTextFromImage, isGoogleVisionAvailable, formatOCRText } from './googleVision';
 
 const app = express();
 const PORT = 5000;
@@ -1211,27 +1212,87 @@ app.post('/api/analyze-image', async (req, res) => {
     const { imageUri, problemNumber } = req.body;
     console.log('Analyzing image, problem number:', problemNumber);
     
+    // 🚀 HYBRID OCR APPROACH: Google Vision + GPT-4o
+    let ocrText = '';
+    let ocrConfidence = 0;
+    let useHybridOCR = false;
+    
+    try {
+      const visionAvailable = await isGoogleVisionAvailable();
+      if (visionAvailable) {
+        console.log('🔍 Step 1: Extracting text with Google Cloud Vision (high-accuracy OCR)...');
+        const ocrResult = await extractTextFromImage(imageUri);
+        ocrText = formatOCRText(ocrResult.text);
+        ocrConfidence = ocrResult.confidence;
+        useHybridOCR = true;
+        console.log(`✅ OCR extraction complete. Confidence: ${(ocrConfidence * 100).toFixed(1)}%, Text length: ${ocrText.length} chars`);
+        console.log(`📝 OCR Preview: ${ocrText.substring(0, 200)}...`);
+      } else {
+        console.log('⚠️ Google Vision API key not configured - falling back to GPT-4o vision only');
+      }
+    } catch (ocrError) {
+      console.error('⚠️ Google Vision OCR failed, falling back to GPT-4o vision only:', ocrError);
+      useHybridOCR = false;
+    }
+    
     let result = await pRetry(
       async () => {
         try {
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            temperature: 0.1,
-            response_format: { type: "json_object" },
-            messages: [
-              {
-                role: "system",
-                content: `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
+          // Build system message based on whether we have OCR text
+          let systemMessage = `You are an expert educational AI tutor. Analyze the homework ${useHybridOCR ? 'problem' : 'image'} and provide a step-by-step solution.
 
 ⚠️ CRITICAL: You MUST respond with valid JSON only.
 
-${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multiple problems exist, solve the most prominent one.'}
+${problemNumber ? `Focus on problem #${problemNumber} in the ${useHybridOCR ? 'text below' : 'image'}.` : useHybridOCR ? 'Solve the problem shown in the text below.' : 'If multiple problems exist, solve the most prominent one.'}`;
+
+          if (useHybridOCR) {
+            systemMessage += `
+
+🎯 **HYBRID OCR MODE - IMPORTANT INSTRUCTIONS:**
+
+**You have been provided with HIGH-ACCURACY OCR text extracted by Google Cloud Vision (${(ocrConfidence * 100).toFixed(1)}% confidence).**
+
+**YOUR PRIMARY TASK:**
+1. Use the OCR text below as your PRIMARY SOURCE for the exact problem statement
+2. The OCR text is HIGHLY ACCURATE (96-99% precision) - trust it for numbers, variables, and mathematical notation
+3. Cross-reference with the image ONLY for:
+   - Visual context (diagrams, graphs already present in the problem)
+   - Layout understanding (how equations or problems are arranged)
+   - Handwriting style or formatting nuances
+
+**CRITICAL OCR USAGE RULES:**
+✅ DO: Trust OCR text for all numbers, decimals, variables, operators, and equation structure
+✅ DO: Use OCR text character-for-character for mathematical expressions
+✅ DO: Preserve exact decimal places and fractions as shown in OCR
+❌ DON'T: Re-read numbers or text from the image when OCR text is available
+❌ DON'T: Second-guess the OCR text unless image clearly contradicts it
+❌ DON'T: Ignore OCR text and only use image analysis
+
+**WHY THIS MATTERS:**
+- Specialized OCR engines excel at pixel-perfect character recognition (especially decimals like 3.14, 19.6, 0.5)
+- GPT-4o vision is better at reasoning and layout understanding than raw OCR
+- Combining both gives you the best of both worlds: accuracy + intelligence
+
+**OCR-EXTRACTED TEXT:**
+\`\`\`
+${ocrText}
+\`\`\`
+
+**Now solve the problem using the OCR text above as your primary reference.**`;
+          }
+          
+          systemMessage += `
 
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
 - If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
-- CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
+- CRITICAL: Match the user's preferred format - don't convert between decimals and fractions`;
+
+          // For hybrid OCR, we already have the character-level accuracy instructions
+          // For GPT-4o vision only, add the OCR accuracy instructions
+          if (!useHybridOCR) {
+            systemMessage += `
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
@@ -1617,7 +1678,16 @@ d = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]"
 - Superscripts: Ca^2+^, x^3^
 - Units: 5 m/s^2^, 3.2 × 10^-5^ mol
 
-Grade-appropriate language based on difficulty level.`
+Grade-appropriate language based on difficulty level.`;
+          }
+          
+          // Make OpenAI API call with constructed system message and image
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: systemMessage
               },
               {
                 role: "user",
@@ -1632,6 +1702,7 @@ Grade-appropriate language based on difficulty level.`
                 ]
               }
             ],
+            response_format: { type: "json_object" },
             max_tokens: 8192,
           });
           
