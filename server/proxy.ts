@@ -1256,7 +1256,30 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
   - finalAnswer (ACTUAL ESSAY): "In Harper Lee's novel To Kill a Mockingbird, the protagonist Scout Finch embarks on a transformative journey from innocence to moral awareness. The story explores how childhood experiences shape our understanding of justice and [red:prejudice] in society. Throughout the narrative, Scout's father Atticus serves as a moral compass, teaching her that true courage means standing up for what is right even when facing overwhelming opposition. The [red:symbolism] of the mockingbird represents innocence and the harm caused by destroying it without reason..."
   - WRONG finalAnswer: "To write this essay, you should discuss the protagonist's journey. Include examples from the text. Make sure to address symbolism..." (This is advice, not an essay!)
 
-**CRITICAL OCR ACCURACY INSTRUCTIONS - READ CAREFULLY:**
+**🚨 CRITICAL OCR ACCURACY INSTRUCTIONS - READ EVERY CHARACTER CAREFULLY 🚨**
+
+⚠️⚠️⚠️ ABSOLUTE PRIORITY: READ EVERY SINGLE CHARACTER WITH EXTREME CARE ⚠️⚠️⚠️
+
+**MOST CRITICAL - DECIMAL POINTS AND NUMBERS:**
+- **DECIMAL POINTS ARE TINY BUT ESSENTIAL** - Look for EVERY decimal point (.) with maximum attention
+- WRONG: Reading "3.14" as "314" - NEVER miss decimal points!
+- WRONG: Reading "0.5" as "5" or "05" - Leading zeros matter!
+- WRONG: Reading "2.75" as "275" or "2.7" - Count digits after decimal carefully!
+- **VERIFY EVERY NUMBER:** Is it 3.14 or 314? Is it 0.5 or 5? Is it 19.6 or 196?
+- Common decimal numbers in homework: 3.14, 0.5, 2.75, 9.8, 19.6, 14.7
+- **Before solving ANY problem, scan for decimal points and verify you captured EVERY digit correctly**
+
+**CHARACTER-BY-CHARACTER ACCURACY CHECKLIST:**
+✓ DECIMAL POINTS (.) - Tiny dots that change entire meaning! Look twice!
+✓ NEGATIVE SIGNS (-) - Don't confuse with subtraction operators
+✓ PLUS/MINUS SIGNS (+, -) - Are they there or missing?
+✓ PARENTHESES ( ) - Opening and closing must match
+✓ EQUALS SIGNS (=) - Where is the equation split?
+✓ VARIABLES (x, d, a, b, c, t, h, etc.) - Correct letter?
+✓ COEFFICIENTS (numbers before variables) - All digits present?
+✓ EXPONENTS (², ³, ^2, ^3) - Is there a power?
+✓ DIVISION SLASHES (/) - Fraction or division?
+✓ COMMAS in large numbers (1,000) - Present or not?
 
 1. **TRANSCRIBE EXACTLY character-by-character** from the image:
    - Look for fraction coefficients BEFORE parentheses: "1/8(3d - 2)" means multiply (3d-2) by the fraction 1/8
@@ -1265,6 +1288,7 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
    - The equation should have TWO sides separated by "=" - do NOT add extra terms!
    
 2. **⚠️ COMMON OCR MISTAKES TO AVOID - CRITICALLY IMPORTANT:**
+   - **MISSING DECIMAL POINTS** - The #1 OCR error! Always check: is it "3.14" or "314"?
    - **FRACTION COEFFICIENTS:** Look VERY carefully at fractions before parentheses
      * If you see "1/8(3d-2)", it's ONE-EIGHTH times (3d-2), NOT "12(3d-2)" or "12/8(3d-2)"
      * The numerator is the digit "1" (one), NOT "12" (twelve)
@@ -1281,11 +1305,17 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
    - "2/5h - 7 = 12/5h - 2h + 3" → This is LINEAR, collect like terms
    - "2(4r + 6) = 2/3(12r + 18)" → This is LINEAR, distribute and solve
    
-4. **OCR DOUBLE-CHECK - Before solving, verify:**
-   ✓ Did you read fraction coefficients correctly? Is "1/8" actually 1/8 or did you misread as 12/8?
-   ✓ Are parentheses in the right place?
-   ✓ Did you capture all variables and signs correctly? Check for +, -, ×, ÷
-   ✓ Is there a d² or x² term? (NO = linear equation, use basic algebra)
+4. **MANDATORY OCR VERIFICATION - Before solving, ALWAYS verify:**
+   ✓ **DECIMAL POINTS:** Did I capture EVERY decimal point? (3.14 not 314, 0.5 not 5, 19.6 not 196)
+   ✓ **ALL DIGITS:** Is it "3.14159" with 5 decimal places, or "3.14" with 2? Count carefully!
+   ✓ **NEGATIVE SIGNS:** Is the number negative? (-5 not 5, -0.5 not 0.5)
+   ✓ **FRACTION COEFFICIENTS:** Is "1/8" actually 1/8 or did you misread as 12/8?
+   ✓ **PARENTHESES:** Are they in the right place and matched correctly?
+   ✓ **OPERATORS:** Did you capture all +, -, ×, ÷ signs correctly?
+   ✓ **EXPONENTS:** Is there a superscript? (x² not x, m/s² not m/s)
+   ✓ **VARIABLES:** Correct letters? (d not b, h not n, x not y)
+   
+   **FINAL CHECK:** Read the entire problem aloud mentally, character by character, to catch any errors.
    
 4. **SOLUTION METHOD SELECTION:**
    - If NO squared terms (d², x², etc.) → LINEAR equation → Use: multiply, distribute, collect terms, divide
