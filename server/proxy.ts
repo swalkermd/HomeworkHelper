@@ -365,14 +365,32 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   // First, convert ALL fractions INSIDE color tags: [blue:12/5h - 10/5h] -> [blue:{12/5}h - {10/5}h]
   // This regex handles multiple fractions within a single color tag by processing each tag's content
   // Use negative lookbehind/lookahead for decimal points to avoid matching "19.6/5.0"
+  // Updated to handle variable fractions like x/10c, not just numeric fractions
+  // CRITICAL: Exclude unit expressions (m/s, km/h) by requiring at least one digit
   formatted = formatted.replace(/\[(blue|red):([^\]]+)\]/g, (match, color, content) => {
-    // Convert all fractions inside this color tag's content, but NOT decimal divisions
-    const convertedContent = content.replace(/(?<![{/.\d])(\d+)\/(\d+)(?![}./\d])/g, '{$1/$2}');
+    // Convert all fractions inside this color tag's content, but NOT decimal divisions or units
+    // Pattern matches: numbers (12/5), mixed (3x/4, x/10c) - but NOT pure letters (m/s, km/h)
+    const convertedContent = content.replace(/(?<![{/.])([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)(?![}./])/g, (m: string, num: string, den: string) => {
+      // Only wrap if numerator or denominator contains at least one digit
+      // This excludes unit expressions like m/s, kg/m which are letter-only
+      if (/\d/.test(num) || /\d/.test(den)) {
+        return `{${num}/${den}}`;
+      }
+      return m; // Leave units unchanged
+    });
     return `[${color}:${convertedContent}]`;
   });
   
   // Then, convert any remaining standalone fractions outside color tags
-  formatted = formatted.replace(/(?<![{/.\d])(\d+)\/(\d+)(?![}./\d])/g, '{$1/$2}');
+  // Handles both numeric fractions (1/8) and variable fractions (x/10c)
+  // Excludes unit expressions (m/s, km/h) by requiring at least one digit
+  formatted = formatted.replace(/(?<![{/.])([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)(?![}./])/g, (match: string, num: string, den: string) => {
+    // Only wrap if numerator or denominator contains at least one digit
+    if (/\d/.test(num) || /\d/.test(den)) {
+      return `{${num}/${den}}`;
+    }
+    return match; // Leave units unchanged
+  });
   
   if (debugLabel && beforeFractionConversion !== formatted) {
     console.log(`🔢 FRACTION CONVERSION in [${debugLabel}]:`);
