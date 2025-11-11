@@ -1269,6 +1269,24 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
 - Common decimal numbers in homework: 3.14, 0.5, 2.75, 9.8, 19.6, 14.7
 - **Before solving ANY problem, scan for decimal points and verify you captured EVERY digit correctly**
 
+**🚨 CRITICAL - LETTERS vs NUMBERS CONFUSION (MOST COMMON OCR ERROR):**
+DO NOT confuse these commonly misread pairs - VERIFY CONTEXT:
+- **"r" is a LETTER, "1" is a NUMBER** - WRONG: Reading "rt" as "11" (should be r and t!)
+- **"t" is a LETTER, "1" is a NUMBER** - WRONG: Reading "rate" as "1a1e"
+- **"l" (lowercase L) is a LETTER, "1" is a NUMBER** - Context matters: "al" not "a1"
+- **"I" (capital i) is a LETTER, "1" is a NUMBER** - In words, it's probably "I"
+- **"O" (letter) vs "0" (zero)** - In variables (vO, aO) it's usually letter O
+- **"S" (letter) vs "5" (number)** - In words like "distance" it's letter S
+- **"Z" (letter) vs "2" (number)** - Check context carefully
+- **"B" (letter) vs "8" (number)** - In formulas, B is usually a coefficient variable
+
+**VERIFICATION RULE FOR LETTERS VS NUMBERS:**
+1. If it appears in a WORD or VARIABLE NAME → It's a LETTER (rate, time, velocity, rt, vt)
+2. If it appears ALONE as a COEFFICIENT or VALUE → Check carefully (is "1t" really "1×t" or is it "lt"?)
+3. **COMMON PHYSICS VARIABLES:** r (radius), t (time), v (velocity), a (acceleration), d (distance), h (height)
+4. **If you see "rt" it means r × t (radius times time), NOT "11"!**
+5. **If you see "vt" it means v × t (velocity times time), NOT two numbers!**
+
 **CHARACTER-BY-CHARACTER ACCURACY CHECKLIST:**
 ✓ DECIMAL POINTS (.) - Tiny dots that change entire meaning! Look twice!
 ✓ NEGATIVE SIGNS (-) - Don't confuse with subtraction operators
