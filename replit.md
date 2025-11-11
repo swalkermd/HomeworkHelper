@@ -9,11 +9,17 @@ None documented yet.
 ## Recent Fixes & Improvements (November 11, 2025)
 
 ### ✅ Enhanced OCR Quality for Image Capture
-**Problem:** Photo capture used default ~50% JPEG quality, causing blurry text. GPT-4o processed images at automatic resolution, leading to poor OCR on dense homework scans.
+**Problem:** Photo capture used default ~50% JPEG quality, causing blurry text. GPT-4o processed images at automatic resolution, leading to poor OCR on dense homework scans. Users reported missing decimals and crucial characters.
 **Fix:** 
 - Camera capture now uses `quality: 1` (maximum quality) for full-resolution photos
 - GPT-4o vision API now requests `detail: "high"` for maximum fidelity OCR processing
-- Result: Significantly improved text recognition accuracy on handwritten and printed homework
+- **Enhanced OCR prompt instructions:**
+  - ALL CAPS emphasis on decimal point detection as absolute priority
+  - Comprehensive character-by-character accuracy checklist (decimals, operators, signs, parentheses, exponents, variables)
+  - Specific examples of decimal OCR errors to avoid (3.14 vs 314, 0.5 vs 5, 19.6 vs 196)
+  - Mandatory verification checklist before solving any problem
+  - Final character-by-character mental read-through requirement
+- Result: Significantly improved text recognition accuracy on all characters, especially decimal points and mathematical notation
 
 ### ✅ Fixed: Variable Fraction Rendering (x/10c)
 **Problem:** Fractions containing variables (like x/10c, a/b, 3x/4) were not being converted to vertical format, displaying as inline text instead.
