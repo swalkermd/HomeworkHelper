@@ -37,6 +37,12 @@ Multi-step problems now include a strategic overview as Step 1, which identifies
 ### System Design Choices
 The application uses a proxy server architecture (port 5000) that centralizes API endpoints and handles CORS. In development, it proxies frontend requests to the Expo dev server; in production, it serves the built Expo web app from the `dist/` directory as static files. The server is configured for Autoscale deployment with environment-aware behavior, including health checks and smart environment detection that prioritizes the existence of a `dist/` directory for production mode. The web build process uses a smart script with timeout handling to reliably complete deployment.
 
+**Production Deployment Requirements:**
+- Environment secrets (GOOGLE_CLOUD_VISION_API_KEY, OpenAI credentials) must be manually configured in Autoscale deployment settings
+- Development secrets are NOT automatically copied to production
+- Enhanced error handling provides specific error messages for missing API keys, rate limits, timeouts, and invalid images
+- Structured logging captures error name, code, message, and status for production debugging
+
 ## External Dependencies
 - **AI Integration:** OpenAI GPT-4o (vision, text analysis, Q&A, image generation) via Replit AI Integrations, Google Cloud Vision API for specialized text extraction.
 - **Image Handling:** `expo-camera`, `expo-image-picker`, `expo-image`, `expo-file-system`.

@@ -1925,9 +1925,45 @@ Grade-appropriate language based on difficulty level.`;
       const hostname = req.get('host');
       void generateDiagramsInBackground(solutionId, diagrams, result.steps, hostname);
     }
-  } catch (error) {
-    console.error('Error analyzing image:', error);
-    res.status(500).json({ error: 'Failed to analyze image' });
+  } catch (error: any) {
+    console.error('❌ Error analyzing image:', error);
+    console.error('Error details:', {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code,
+      status: error?.status
+    });
+    
+    // Provide specific error messages for common issues
+    let userMessage = 'Failed to analyze image';
+    let statusCode = 500;
+    
+    // Check for missing API keys
+    if (error?.message?.includes('API key') || error?.code === 'invalid_api_key') {
+      userMessage = 'API configuration error. Please check deployment settings.';
+      statusCode = 503;
+      console.error('🔑 API key issue detected - check GOOGLE_CLOUD_VISION_API_KEY and OpenAI credentials');
+    }
+    // Check for rate limiting
+    else if (error?.status === 429 || error?.message?.includes('rate limit')) {
+      userMessage = 'Service temporarily unavailable due to rate limits. Please try again in a moment.';
+      statusCode = 429;
+    }
+    // Check for timeout
+    else if (error?.message?.includes('timeout') || error?.code === 'ETIMEDOUT') {
+      userMessage = 'Request timed out. Please try again.';
+      statusCode = 504;
+    }
+    // Check for invalid image
+    else if (error?.message?.includes('image') && error?.message?.includes('invalid')) {
+      userMessage = 'Invalid image format. Please try a different image.';
+      statusCode = 400;
+    }
+    
+    res.status(statusCode).json({ 
+      error: userMessage,
+      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+    });
   }
 });
 
