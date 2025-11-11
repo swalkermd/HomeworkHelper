@@ -69,4 +69,4 @@ externalPort = 3000
 [deployment]
 deploymentTarget = "autoscale"
 run = ["npx", "tsx", "server/proxy.ts"]
-build = ["npx", "expo", "export", "--platform", "web"]
+build = ["bash", "scripts/build-web.sh"]
