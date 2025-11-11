@@ -15,6 +15,13 @@ None documented yet.
 - GPT-4o vision API now requests `detail: "high"` for maximum fidelity OCR processing
 - Result: Significantly improved text recognition accuracy on handwritten and printed homework
 
+### ✅ Fixed: Variable Fraction Rendering (x/10c)
+**Problem:** Fractions containing variables (like x/10c, a/b, 3x/4) were not being converted to vertical format, displaying as inline text instead.
+**Fix:** 
+- Updated server-side fraction formatting to handle both numeric (1/8) and variable fractions (x/10c)
+- Smart detection: only converts expressions with at least one digit (excludes units like m/s, km/h)
+- Prevents false positives while ensuring all algebraic fractions display vertically
+
 ## Recent Fixes & Improvements (November 9, 2025)
 
 ### ✅ Fixed: Vertical Fraction Rendering in Highlighted Text
