@@ -797,6 +797,48 @@ app.post('/api/analyze-text', async (req, res) => {
   - finalAnswer (ACTUAL ESSAY): "In Harper Lee's novel To Kill a Mockingbird, the protagonist Scout Finch embarks on a transformative journey from innocence to moral awareness. The story explores how childhood experiences shape our understanding of justice and [red:prejudice] in society. Throughout the narrative, Scout's father Atticus serves as a moral compass, teaching her that true courage means standing up for what is right even when facing overwhelming opposition. The [red:symbolism] of the mockingbird represents innocence and the harm caused by destroying it without reason..."
   - WRONG finalAnswer: "To write this essay, you should discuss the protagonist's journey. Include examples from the text. Make sure to address symbolism..." (This is advice, not an essay!)
 
+🎯 **MULTI-STEP PROBLEMS - MANDATORY OVERVIEW IN STEP 1:**
+**For any problem requiring multiple steps (math, physics, chemistry, multi-part analysis), Step 1 MUST be a simple overview that helps orient the student.**
+
+**Purpose:** Help students understand the "big picture" before diving into detailed calculations. This centers their approach and shows the general strategy.
+
+**Step 1 Requirements for Multi-Step Problems:**
+- **Title:** Should identify the problem type (e.g., "Identify Problem Type: Linear Equation", "Approach: Projectile Motion Analysis", "Strategy: Finding Area of Composite Shape")
+- **Content:** Write 2-3 SHORT sentences that explain:
+  1. What type of problem this is (e.g., "This is a [red:linear equation] with fractions on both sides")
+  2. The general approach we'll use (e.g., "We'll [blue:eliminate fractions first], then [blue:collect like terms], and finally [blue:isolate the variable]")
+  3. Optional: What our goal is (e.g., "Our goal is to find the value of [red:d]")
+- **Explanation:** Brief note about why this approach makes sense (e.g., "Starting with a clear plan helps us stay organized through multiple steps")
+
+**Examples:**
+
+**Math Problem (Linear Equation):**
+- Step 1 Title: "Identify Problem Type and Approach"
+- Step 1 Content: "This is a [red:linear equation] with fractional coefficients on both sides. We'll [blue:multiply both sides by a common multiple] to eliminate fractions, then [blue:distribute and combine like terms] to solve for [red:d]. This systematic approach keeps the algebra organized."
+- Step 1 Explanation: "Understanding our strategy upfront prevents confusion when working with multiple fractions"
+
+**Physics Problem (Projectile Motion):**
+- Step 1 Title: "Problem Type: Projectile Motion"
+- Step 1 Content: "This is a [red:2D projectile motion] problem where we need to find maximum height and range. We'll [blue:break velocity into components], use [blue:kinematic equations for vertical motion] to find peak height, and [blue:calculate horizontal distance] using time of flight. The parabolic trajectory means vertical and horizontal motions are independent."
+- Step 1 Explanation: "Separating the motion into vertical and horizontal components simplifies what looks like a complex 2D problem"
+
+**Geometry Problem:**
+- Step 1 Title: "Approach: Composite Shape Area"
+- Step 1 Content: "This shape is a [red:composite figure] made of a rectangle and semicircle. We'll [blue:find the area of each shape separately] using their respective formulas, then [blue:add them together]. Breaking complex shapes into simpler parts is the key strategy here."
+- Step 1 Explanation: "Dividing the composite shape into familiar pieces (rectangle + semicircle) makes the calculation straightforward"
+
+**Chemistry Problem:**
+- Step 1 Title: "Strategy: Stoichiometry Calculation"
+- Step 1 Content: "This is a [red:limiting reactant problem] requiring stoichiometry. We'll [blue:convert grams to moles], [blue:use mole ratios] from the balanced equation to identify which reactant runs out first, then [blue:calculate product yield] based on the limiting reactant."
+- Step 1 Explanation: "Following the moles pathway (grams → moles → mole ratio → moles → grams) is the systematic approach for all stoichiometry problems"
+
+**CRITICAL:** This overview step does NOT replace detailed work - it simply provides a roadmap. Steps 2, 3, 4, etc. will contain the actual calculations and detailed solution work.
+
+**When NOT to use overview step:**
+- Simple one-step problems (e.g., "What is 5 + 3?")
+- Essay questions (already have special format)
+- Multiple choice questions that only need elimination logic
+
 💡 **STEP EXPLANATIONS - CONTEXTUAL LEARNING:**
 **MANDATORY: Every step must include a concise "explanation" field that provides immediate learning context.**
 
@@ -1316,6 +1358,48 @@ ${ocrText}
   - Step 1 content (GUIDANCE): "Your essay should address [blue:three main themes]: the protagonist's journey, the [red:symbolism] of the setting, and the [red:moral lesson]. Begin with an engaging introduction that states your thesis. Each body paragraph should focus on one theme with [blue:specific examples] from the text. Conclude by summarizing how these elements work together."
   - finalAnswer (ACTUAL ESSAY): "In Harper Lee's novel To Kill a Mockingbird, the protagonist Scout Finch embarks on a transformative journey from innocence to moral awareness. The story explores how childhood experiences shape our understanding of justice and [red:prejudice] in society. Throughout the narrative, Scout's father Atticus serves as a moral compass, teaching her that true courage means standing up for what is right even when facing overwhelming opposition. The [red:symbolism] of the mockingbird represents innocence and the harm caused by destroying it without reason..."
   - WRONG finalAnswer: "To write this essay, you should discuss the protagonist's journey. Include examples from the text. Make sure to address symbolism..." (This is advice, not an essay!)
+
+🎯 **MULTI-STEP PROBLEMS - MANDATORY OVERVIEW IN STEP 1:**
+**For any problem requiring multiple steps (math, physics, chemistry, multi-part analysis), Step 1 MUST be a simple overview that helps orient the student.**
+
+**Purpose:** Help students understand the "big picture" before diving into detailed calculations. This centers their approach and shows the general strategy.
+
+**Step 1 Requirements for Multi-Step Problems:**
+- **Title:** Should identify the problem type (e.g., "Identify Problem Type and Approach", "Problem Type: Projectile Motion", "Strategy: Composite Shape Area")
+- **Content:** Write 2-3 SHORT sentences that explain:
+  1. What type of problem this is (e.g., "This is a [red:linear equation] with fractions on both sides")
+  2. The general approach we'll use (e.g., "We'll [blue:eliminate fractions first], then [blue:collect like terms], and finally [blue:isolate the variable]")
+  3. Optional: What our goal is (e.g., "Our goal is to find the value of [red:d]")
+- **Explanation:** Brief note about why this approach makes sense (e.g., "Starting with a clear plan helps us stay organized through multiple steps")
+
+**Examples:**
+
+**Math Problem (Linear Equation):**
+- Step 1 Title: "Identify Problem Type and Approach"
+- Step 1 Content: "This is a [red:linear equation] with fractional coefficients on both sides. We'll [blue:multiply both sides by a common multiple] to eliminate fractions, then [blue:distribute and combine like terms] to solve for [red:d]. This systematic approach keeps the algebra organized."
+- Step 1 Explanation: "Understanding our strategy upfront prevents confusion when working with multiple fractions"
+
+**Physics Problem (Projectile Motion):**
+- Step 1 Title: "Problem Type: Projectile Motion"
+- Step 1 Content: "This is a [red:2D projectile motion] problem where we need to find maximum height and range. We'll [blue:break velocity into components], use [blue:kinematic equations for vertical motion] to find peak height, and [blue:calculate horizontal distance] using time of flight. The parabolic trajectory means vertical and horizontal motions are independent."
+- Step 1 Explanation: "Separating the motion into vertical and horizontal components simplifies what looks like a complex 2D problem"
+
+**Geometry Problem:**
+- Step 1 Title: "Approach: Composite Shape Area"
+- Step 1 Content: "This shape is a [red:composite figure] made of a rectangle and semicircle. We'll [blue:find the area of each shape separately] using their respective formulas, then [blue:add them together]. Breaking complex shapes into simpler parts is the key strategy here."
+- Step 1 Explanation: "Dividing the composite shape into familiar pieces (rectangle + semicircle) makes the calculation straightforward"
+
+**Chemistry Problem:**
+- Step 1 Title: "Strategy: Stoichiometry Calculation"
+- Step 1 Content: "This is a [red:limiting reactant problem] requiring stoichiometry. We'll [blue:convert grams to moles], [blue:use mole ratios] from the balanced equation to identify which reactant runs out first, then [blue:calculate product yield] based on the limiting reactant."
+- Step 1 Explanation: "Following the moles pathway (grams → moles → mole ratio → moles → grams) is the systematic approach for all stoichiometry problems"
+
+**CRITICAL:** This overview step does NOT replace detailed work - it simply provides a roadmap. Steps 2, 3, 4, etc. will contain the actual calculations and detailed solution work.
+
+**When NOT to use overview step:**
+- Simple one-step problems (e.g., "What is 5 + 3?")
+- Essay questions (already have special format)
+- Multiple choice questions that only need elimination logic
 
 **🚨 CRITICAL OCR ACCURACY INSTRUCTIONS - READ EVERY CHARACTER CAREFULLY 🚨**
 
