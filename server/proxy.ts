@@ -1559,7 +1559,8 @@ Grade-appropriate language based on difficulty level.`
                   {
                     type: "image_url",
                     image_url: {
-                      url: imageUri
+                      url: imageUri,
+                      detail: "high"
                     }
                   }
                 ]

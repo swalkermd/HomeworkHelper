@@ -6,6 +6,15 @@ Homework Helper is an AI-powered mobile application built with React Native and 
 ## User Preferences
 None documented yet.
 
+## Recent Fixes & Improvements (November 11, 2025)
+
+### ✅ Enhanced OCR Quality for Image Capture
+**Problem:** Photo capture used default ~50% JPEG quality, causing blurry text. GPT-4o processed images at automatic resolution, leading to poor OCR on dense homework scans.
+**Fix:** 
+- Camera capture now uses `quality: 1` (maximum quality) for full-resolution photos
+- GPT-4o vision API now requests `detail: "high"` for maximum fidelity OCR processing
+- Result: Significantly improved text recognition accuracy on handwritten and printed homework
+
 ## Recent Fixes & Improvements (November 9, 2025)
 
 ### ✅ Fixed: Vertical Fraction Rendering in Highlighted Text

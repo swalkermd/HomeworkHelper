@@ -40,6 +40,7 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
+        quality: 1,
       });
       
       if (photo) {
