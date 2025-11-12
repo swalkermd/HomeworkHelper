@@ -2256,7 +2256,7 @@ if (isProduction && hasDistBuild) {
   // Serve the built Expo web app from dist/
   console.log(`📦 Production mode: Serving static files from ${distPath}`);
   
-  // Disable caching for HTML files to ensure fresh app loads
+  // Enhanced cache control for reliable updates and bug fixes
   app.use(express.static(distPath, {
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.html')) {
@@ -2265,8 +2265,13 @@ if (isProduction && hasDistBuild) {
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
       } else if (filePath.match(/\.(js|css|json)$/)) {
-        // Short cache for JS/CSS to allow updates
-        res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes
+        // Don't cache JS/CSS to ensure bug fixes are immediately available
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      } else if (filePath.match(/\.(jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+        // Cache images and fonts for 1 year (these rarely change)
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       }
     }
   }));

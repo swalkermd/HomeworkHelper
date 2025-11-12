@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,82 +14,107 @@ type HomeScreenProps = {
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const reset = useHomeworkStore((state) => state.reset);
   const setCurrentImage = useHomeworkStore((state) => state.setCurrentImage);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   useEffect(() => {
     reset();
   }, [reset]);
 
-  // Handle gallery button - direct file picker on web to maintain user gesture
+  // Handle file selection from persistent input
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      console.log('🖼️ No file selected');
+      setIsProcessingFile(false);
+      return;
+    }
+
+    console.log('🖼️ File selected:', file.name, 'size:', file.size);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      console.log('🖼️ FileReader loaded');
+      const uri = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        console.log('🖼️ Image loaded, dimensions:', img.width, 'x', img.height);
+        setCurrentImage({
+          uri,
+          width: img.width,
+          height: img.height,
+        });
+        setIsProcessingFile(false);
+        navigation.navigate('ProblemSelection');
+      };
+      img.onerror = () => {
+        console.error('🖼️ Failed to load image');
+        setIsProcessingFile(false);
+        alert('Failed to load image. Please try again.');
+      };
+      img.src = uri;
+    };
+    reader.onerror = () => {
+      console.error('🖼️ FileReader error');
+      setIsProcessingFile(false);
+      alert('Failed to read file. Please try again.');
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  };
+
+  // Handle gallery button - uses persistent input on web for reliable mobile browser support
   const handleGalleryPress = () => {
-    console.log('🖼️ handleGalleryPress called, Platform.OS:', Platform.OS);
-    
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      platform: Platform.OS,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+      isMobile: typeof navigator !== 'undefined' ? /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) : false,
+      touchSupport: typeof window !== 'undefined' && 'ontouchstart' in window,
+    };
+
+    console.log('🖼️ Gallery button diagnostics:', JSON.stringify(diagnostics, null, 2));
+
     if (Platform.OS === 'web') {
-      console.log('🖼️ Web platform detected, creating file input...');
+      console.log('🖼️ Web platform - triggering persistent file input');
+      console.log('🖼️ Mobile browser detected:', diagnostics.isMobile);
+
       try {
-        // Open file picker directly on web (must be triggered by user gesture)
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.style.display = 'none';
-        console.log('🖼️ File input created');
-        
-        input.onchange = async (e: any) => {
-          console.log('🖼️ File input onchange triggered');
-          const file = e.target.files?.[0];
-          document.body.removeChild(input);
-          
-          if (!file) {
-            console.log('🖼️ No file selected');
-            return;
-          }
+        setIsProcessingFile(true);
+        fileInputRef.current?.click();
+        console.log('✅ File input click triggered');
 
-          console.log('🖼️ File selected:', file.name, 'size:', file.size);
-
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            console.log('🖼️ FileReader loaded');
-            const uri = event.target?.result as string;
-            const img = new Image();
-            img.onload = () => {
-              console.log('🖼️ Image loaded, dimensions:', img.width, 'x', img.height);
-              setCurrentImage({
-                uri,
-                width: img.width,
-                height: img.height,
-              });
-              navigation.navigate('ProblemSelection');
-            };
-            img.onerror = () => {
-              console.error('🖼️ Failed to load image');
-              alert('Failed to load image. Please try again.');
-            };
-            img.src = uri;
-          };
-          reader.onerror = () => {
-            console.error('🖼️ FileReader error');
-            alert('Failed to read file. Please try again.');
-          };
-          reader.readAsDataURL(file);
-        };
-        
-        console.log('🖼️ Appending input to body...');
-        document.body.appendChild(input);
-        console.log('🖼️ Triggering click...');
-        input.click();
-        console.log('🖼️ Click triggered');
+        // Safety timeout in case picker doesn't open
+        setTimeout(() => {
+          setIsProcessingFile(false);
+        }, 500);
       } catch (error) {
-        console.error('🖼️ Error in handleGalleryPress:', error);
-        alert('Error opening file picker: ' + error);
+        console.error('❌ File input click failed:', error);
+        alert('Failed to open file picker: ' + (error as Error).message);
+        setIsProcessingFile(false);
       }
     } else {
       console.log('🖼️ Native platform, navigating to Gallery screen');
-      // Native platform - navigate to Gallery screen (which handles permissions)
       navigation.navigate('Gallery');
     }
   };
 
   return (
     <View style={styles.container}>
+      {/* Hidden file input - persistent on web for reliable mobile browser support */}
+      {Platform.OS === 'web' && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+      )}
+
       <View style={styles.hero}>
         <View style={styles.iconContainer}>
           <LinearGradient
@@ -99,7 +124,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             <Ionicons name="school" size={48} color="#ffffff" />
           </LinearGradient>
         </View>
-        
+
         <Text style={styles.title}>Homework Helper</Text>
       </View>
 
@@ -141,17 +166,24 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <TouchableOpacity
           onPress={handleGalleryPress}
           activeOpacity={0.8}
+          disabled={isProcessingFile}
         >
           <LinearGradient
             colors={['#10b981', '#06b6d4']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.button}
+            style={[styles.button, isProcessingFile && styles.buttonDisabled]}
           >
             <View style={styles.buttonIconContainer}>
-              <Ionicons name="images" size={24} color="#ffffff" />
+              {isProcessingFile ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Ionicons name="images" size={24} color="#ffffff" />
+              )}
             </View>
-            <Text style={styles.buttonText}>Choose from Gallery</Text>
+            <Text style={styles.buttonText}>
+              {isProcessingFile ? 'Loading...' : 'Choose from Gallery'}
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -229,6 +261,9 @@ const styles = StyleSheet.create({
     lineHeight: typography.titleLarge.lineHeight,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   footer: {
     fontSize: typography.bodyLarge.fontSize,
