@@ -1847,7 +1847,37 @@ Grade-appropriate language based on difficulty level.`;
           });
           
           const content = response.choices[0]?.message?.content || "{}";
+          
+          // 🐛 DEBUG: Log raw GPT-4o response
+          console.log('\n🔍 === GPT-4o RAW RESPONSE DEBUG (IMAGE) ===');
+          console.log('Response exists:', !!response);
+          console.log('Choices exists:', !!response.choices);
+          console.log('Choices length:', response.choices?.length);
+          console.log('Message content length:', content?.length);
+          console.log('Raw content (first 500 chars):', content.substring(0, 500));
+          console.log('Raw content (last 200 chars):', content.substring(Math.max(0, content.length - 200)));
+          console.log('=== END RAW RESPONSE ===\n');
+          
           const parsed = JSON.parse(content);
+          
+          // Validate parsed result has required fields
+          if (!parsed || typeof parsed !== 'object') {
+            console.error('❌ GPT-4o returned invalid JSON: parsed is not an object');
+            throw new Error('GPT-4o returned invalid response structure');
+          }
+          
+          if (!parsed.problem || !parsed.subject || !parsed.difficulty || !parsed.steps || !Array.isArray(parsed.steps)) {
+            console.error('❌ GPT-4o response missing required fields:', {
+              hasProblem: !!parsed.problem,
+              hasSubject: !!parsed.subject,
+              hasDifficulty: !!parsed.difficulty,
+              hasSteps: !!parsed.steps,
+              stepsIsArray: Array.isArray(parsed.steps),
+              actualKeys: Object.keys(parsed)
+            });
+            throw new Error('GPT-4o response missing required fields (problem, subject, difficulty, or steps array)');
+          }
+          
           return parsed;
         } catch (error: any) {
           console.error('OpenAI API error:', error);
