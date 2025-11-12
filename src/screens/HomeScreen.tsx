@@ -21,45 +21,68 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   // Handle gallery button - direct file picker on web to maintain user gesture
   const handleGalleryPress = () => {
+    console.log('🖼️ handleGalleryPress called, Platform.OS:', Platform.OS);
+    
     if (Platform.OS === 'web') {
-      // Open file picker directly on web (must be triggered by user gesture)
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.style.display = 'none';
-      
-      input.onchange = async (e: any) => {
-        const file = e.target.files?.[0];
-        document.body.removeChild(input);
+      console.log('🖼️ Web platform detected, creating file input...');
+      try {
+        // Open file picker directly on web (must be triggered by user gesture)
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.style.display = 'none';
+        console.log('🖼️ File input created');
         
-        if (!file) return;
+        input.onchange = async (e: any) => {
+          console.log('🖼️ File input onchange triggered');
+          const file = e.target.files?.[0];
+          document.body.removeChild(input);
+          
+          if (!file) {
+            console.log('🖼️ No file selected');
+            return;
+          }
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const uri = event.target?.result as string;
-          const img = new Image();
-          img.onload = () => {
-            setCurrentImage({
-              uri,
-              width: img.width,
-              height: img.height,
-            });
-            navigation.navigate('ProblemSelection');
+          console.log('🖼️ File selected:', file.name, 'size:', file.size);
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            console.log('🖼️ FileReader loaded');
+            const uri = event.target?.result as string;
+            const img = new Image();
+            img.onload = () => {
+              console.log('🖼️ Image loaded, dimensions:', img.width, 'x', img.height);
+              setCurrentImage({
+                uri,
+                width: img.width,
+                height: img.height,
+              });
+              navigation.navigate('ProblemSelection');
+            };
+            img.onerror = () => {
+              console.error('🖼️ Failed to load image');
+              alert('Failed to load image. Please try again.');
+            };
+            img.src = uri;
           };
-          img.onerror = () => {
-            alert('Failed to load image. Please try again.');
+          reader.onerror = () => {
+            console.error('🖼️ FileReader error');
+            alert('Failed to read file. Please try again.');
           };
-          img.src = uri;
+          reader.readAsDataURL(file);
         };
-        reader.onerror = () => {
-          alert('Failed to read file. Please try again.');
-        };
-        reader.readAsDataURL(file);
-      };
-      
-      document.body.appendChild(input);
-      input.click();
+        
+        console.log('🖼️ Appending input to body...');
+        document.body.appendChild(input);
+        console.log('🖼️ Triggering click...');
+        input.click();
+        console.log('🖼️ Click triggered');
+      } catch (error) {
+        console.error('🖼️ Error in handleGalleryPress:', error);
+        alert('Error opening file picker: ' + error);
+      }
     } else {
+      console.log('🖼️ Native platform, navigating to Gallery screen');
       // Native platform - navigate to Gallery screen (which handles permissions)
       navigation.navigate('Gallery');
     }

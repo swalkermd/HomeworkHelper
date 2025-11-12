@@ -2255,7 +2255,21 @@ const isProduction = process.env.NODE_ENV === 'production' || hasDistBuild;
 if (isProduction && hasDistBuild) {
   // Serve the built Expo web app from dist/
   console.log(`📦 Production mode: Serving static files from ${distPath}`);
-  app.use(express.static(distPath));
+  
+  // Disable caching for HTML files to ensure fresh app loads
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        // Never cache HTML - always fetch latest
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      } else if (filePath.match(/\.(js|css|json)$/)) {
+        // Short cache for JS/CSS to allow updates
+        res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes
+      }
+    }
+  }));
   
   // Serve index.html for all non-API, non-static routes (SPA routing)
   app.use((req, res) => {
