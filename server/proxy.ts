@@ -1726,7 +1726,6 @@ d = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]"
 - Units: 5 m/s^2^, 3.2 × 10^-5^ mol
 
 Grade-appropriate language based on difficulty level.`;
-          }
           
           // Make OpenAI API call with constructed system message and image
           // NOTE: Do NOT use response_format: json_object with images - OpenAI returns {} silently
