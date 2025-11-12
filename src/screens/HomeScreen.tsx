@@ -14,7 +14,7 @@ type HomeScreenProps = {
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const reset = useHomeworkStore((state) => state.reset);
   const setCurrentImage = useHomeworkStore((state) => state.setCurrentImage);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<any>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   useEffect(() => {
@@ -74,6 +74,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
       isMobile: typeof navigator !== 'undefined' ? /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) : false,
       touchSupport: typeof window !== 'undefined' && 'ontouchstart' in window,
+      refExists: !!fileInputRef.current,
+      refType: fileInputRef.current ? typeof fileInputRef.current : 'null',
     };
 
     console.log('🖼️ Gallery button diagnostics:', JSON.stringify(diagnostics, null, 2));
@@ -81,10 +83,23 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     if (Platform.OS === 'web') {
       console.log('🖼️ Web platform - triggering persistent file input');
       console.log('🖼️ Mobile browser detected:', diagnostics.isMobile);
+      console.log('🖼️ Ref current:', fileInputRef.current);
+
+      if (!fileInputRef.current) {
+        console.error('❌ File input ref is null!');
+        alert('File input not ready. Please try again.');
+        return;
+      }
 
       try {
         setIsProcessingFile(true);
-        fileInputRef.current?.click();
+
+        // Try to focus the input first (some browsers require this)
+        if (fileInputRef.current.focus) {
+          fileInputRef.current.focus();
+        }
+
+        fileInputRef.current.click();
         console.log('✅ File input click triggered');
 
         // Safety timeout in case picker doesn't open
@@ -110,7 +125,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          style={{ display: 'none' }}
+          style={{
+            position: 'absolute',
+            top: '-9999px',
+            left: '-9999px',
+            width: '1px',
+            height: '1px',
+            opacity: 0,
+          }}
           onChange={handleFileChange}
         />
       )}
