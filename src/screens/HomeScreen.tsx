@@ -122,6 +122,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       {/* Hidden file input - persistent on web for reliable mobile browser support */}
       {Platform.OS === 'web' && (
         <input
+          id="gallery-file-input"
           ref={fileInputRef}
           type="file"
           accept="image/*"
@@ -132,6 +133,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             width: '1px',
             height: '1px',
             opacity: 0,
+            pointerEvents: 'none',
           }}
           onChange={handleFileChange}
         />
@@ -185,29 +187,63 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleGalleryPress}
-          activeOpacity={0.8}
-          disabled={isProcessingFile}
-        >
-          <LinearGradient
-            colors={['#10b981', '#06b6d4']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.button, isProcessingFile && styles.buttonDisabled]}
+        {Platform.OS === 'web' ? (
+          <label
+            htmlFor="gallery-file-input"
+            style={{
+              cursor: isProcessingFile ? 'default' : 'pointer',
+              opacity: isProcessingFile ? 0.6 : 1,
+              userSelect: 'none',
+            }}
+            onClick={() => {
+              console.log('🖼️ Label clicked for file input');
+              setIsProcessingFile(true);
+              setTimeout(() => setIsProcessingFile(false), 500);
+            }}
           >
-            <View style={styles.buttonIconContainer}>
-              {isProcessingFile ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Ionicons name="images" size={24} color="#ffffff" />
-              )}
-            </View>
-            <Text style={styles.buttonText}>
-              {isProcessingFile ? 'Loading...' : 'Choose from Gallery'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={['#10b981', '#06b6d4']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.button}
+            >
+              <View style={styles.buttonIconContainer}>
+                {isProcessingFile ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Ionicons name="images" size={24} color="#ffffff" />
+                )}
+              </View>
+              <Text style={styles.buttonText}>
+                {isProcessingFile ? 'Loading...' : 'Choose from Gallery'}
+              </Text>
+            </LinearGradient>
+          </label>
+        ) : (
+          <TouchableOpacity
+            onPress={handleGalleryPress}
+            activeOpacity={0.8}
+            disabled={isProcessingFile}
+          >
+            <LinearGradient
+              colors={['#10b981', '#06b6d4']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.button, isProcessingFile && styles.buttonDisabled]}
+            >
+              <View style={styles.buttonIconContainer}>
+                {isProcessingFile ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Ionicons name="images" size={24} color="#ffffff" />
+                )}
+              </View>
+              <Text style={styles.buttonText}>
+                {isProcessingFile ? 'Loading...' : 'Choose from Gallery'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
 
       <Text style={styles.footer}>Supports Math, Science, English & More</Text>

@@ -21,12 +21,16 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
     if (Platform.OS === 'web') {
       console.error('❌ GalleryScreen accessed on web platform - this is a navigation bug');
       console.error('Stack trace:', new Error().stack);
-      Alert.alert(
-        'Navigation Error',
-        'This screen should not be accessible on web. Returning to home screen.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
-      );
-      navigation.navigate('Home');
+
+      // Use native alert on web (React Native Alert doesn't work well on web)
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert('Navigation error detected. Returning to home screen.');
+      }
+
+      // Navigate back immediately
+      setTimeout(() => {
+        navigation.navigate('Home');
+      }, 100);
       return;
     }
 
