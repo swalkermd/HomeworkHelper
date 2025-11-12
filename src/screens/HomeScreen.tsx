@@ -112,6 +112,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
       try {
         setIsProcessingFile(true);
+        
+        // iOS/Safari requires focus before programmatic click
+        fileInputRef.current.focus();
+        console.log('✅ File input focused');
+        
         fileInputRef.current.click();
         console.log('✅ File input click triggered');
 

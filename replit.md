@@ -3,6 +3,11 @@
 ## Overview
 Homework Helper is an AI-powered mobile application built with React Native and Expo. It assists students with homework across various subjects by providing clear, step-by-step visual solutions. The app leverages AI to offer grade-appropriate explanations, beautiful formatting, and interactive features to foster deeper learning and understanding. The business vision is to revolutionize homework assistance by making learning engaging and accessible, tapping into a significant market of students seeking personalized educational support. The project aims to become a leading tool for enhancing student comprehension and academic performance.
 
+## Recent Changes (Nov 12, 2025)
+- **P1 Fix: iOS/Safari Photo Library Access** - Restored `focus()` call before programmatic `click()` on file input to ensure mobile Safari properly opens the file picker. Without focus, iOS silently ignores programmatic clicks on file inputs.
+- **Service Worker Cache Prevention** - Disabled service worker caching (metro bundler) and added cache-control headers to prevent stale JavaScript from being served after deployments.
+- **Build Process Optimization** - Simplified build script with 2-minute timeout and clean error handling for reliable production deployments.
+
 ## User Preferences
 None documented yet.
 
