@@ -46,6 +46,10 @@ externalPort = 3001
 localPort = 32917
 externalPort = 3000
 
+[[ports]]
+localPort = 36505
+externalPort = 3002
+
 [deployment]
 deploymentTarget = "autoscale"
 run = ["npx", "tsx", "server/proxy.ts"]
