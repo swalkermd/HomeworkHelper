@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,10 +13,57 @@ type HomeScreenProps = {
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const reset = useHomeworkStore((state) => state.reset);
+  const setCurrentImage = useHomeworkStore((state) => state.setCurrentImage);
 
   useEffect(() => {
     reset();
   }, [reset]);
+
+  // Handle gallery button - direct file picker on web to maintain user gesture
+  const handleGalleryPress = () => {
+    if (Platform.OS === 'web') {
+      // Open file picker directly on web (must be triggered by user gesture)
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+      
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        document.body.removeChild(input);
+        
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const uri = event.target?.result as string;
+          const img = new Image();
+          img.onload = () => {
+            setCurrentImage({
+              uri,
+              width: img.width,
+              height: img.height,
+            });
+            navigation.navigate('ProblemSelection');
+          };
+          img.onerror = () => {
+            alert('Failed to load image. Please try again.');
+          };
+          img.src = uri;
+        };
+        reader.onerror = () => {
+          alert('Failed to read file. Please try again.');
+        };
+        reader.readAsDataURL(file);
+      };
+      
+      document.body.appendChild(input);
+      input.click();
+    } else {
+      // Native platform - navigate to Gallery screen (which handles permissions)
+      navigation.navigate('Gallery');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -69,7 +116,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => navigation.navigate('Gallery')}
+          onPress={handleGalleryPress}
           activeOpacity={0.8}
         >
           <LinearGradient
