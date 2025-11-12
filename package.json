@@ -18,7 +18,7 @@
     "babel-preset-expo": "^54.0.6",
     "base-64": "^1.0.0",
     "cors": "^2.8.5",
-    "expo": "~54.0.22",
+    "expo": "^54.0.23",
     "expo-camera": "^17.0.9",
     "expo-constants": "^18.0.10",
     "expo-file-system": "^19.0.17",
