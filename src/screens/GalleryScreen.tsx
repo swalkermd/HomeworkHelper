@@ -137,8 +137,8 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
           uri: asset.uri,
           width: asset.width,
           height: asset.height,
-          base64: asset.base64,
-          mimeType: asset.mimeType,
+          base64: asset.base64 || undefined,
+          mimeType: asset.mimeType || undefined,
         });
         navigation.navigate('ProblemSelection');
       } else {
