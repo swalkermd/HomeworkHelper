@@ -285,6 +285,64 @@ async function extractTextWithMistral(imageUri: string): Promise<{ text: string;
   }
 }
 
+/**
+ * POST-OCR CORRECTION - Cleans and corrects OCR text for math/science accuracy
+ * 
+ * Uses OpenAI to fix common OCR errors in mathematical notation, equations, and symbols.
+ * Significantly improves accuracy of downstream analysis.
+ */
+async function correctOcrText(rawText: string): Promise<string> {
+  if (!rawText || rawText.trim().length === 0) {
+    return rawText;
+  }
+  
+  try {
+    console.log('🧹 Applying post-OCR correction for math/science accuracy...');
+    
+    const correctionPrompt = `You are a post-OCR correction engine for math and science textbooks.
+Input will be raw OCR text. Clean and correct it using logic and heuristics while keeping meaning exact.
+
+Rules:
+- Preserve equations, symbols, and layout.
+- Fix common OCR errors:
+  • Replace ".5" → "0.5", "5 ." → "5.0"
+  • Convert "O"↔"0", "l"↔"1", "S"↔"5" using context
+  • Detect and separate variables from numbers (e.g., "3x" not "3×")
+  • Add missing negative signs or decimals if context implies them
+- Use normal math syntax or LaTeX (e.g., x², √, ½) when clear.
+- Maintain balanced parentheses, operators, and exponents.
+- No commentary or explanations—return only corrected text.
+
+If any token looks uncertain or inconsistent, pick the version that best preserves mathematical sense.`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini", // Use mini for cost efficiency on correction task
+      messages: [
+        {
+          role: "system",
+          content: correctionPrompt
+        },
+        {
+          role: "user",
+          content: `Correct this OCR text:\n\n${rawText}`
+        }
+      ],
+      temperature: 0.1, // Low temperature for deterministic corrections
+      max_tokens: 4096,
+    });
+    
+    const correctedText = response.choices[0]?.message?.content?.trim() || rawText;
+    
+    console.log(`✅ OCR correction complete (${rawText.length} → ${correctedText.length} chars)`);
+    console.log('📝 Corrected text preview:', correctedText.substring(0, 200));
+    
+    return correctedText;
+  } catch (error) {
+    console.warn('⚠️ OCR correction failed, using raw text:', error);
+    return rawText; // Fallback to raw text if correction fails
+  }
+}
+
 // Diagram cache for avoiding regeneration of identical diagrams
 interface DiagramCacheEntry {
   url: string;
@@ -1411,10 +1469,13 @@ app.post('/api/analyze-image', async (req, res) => {
           if (mistral) {
             try {
               // Step 1: Extract text using Mistral's superior OCR
-              const { text: ocrText, confidence: ocrConfidence } = await extractTextWithMistral(imageUri);
+              const { text: rawOcrText, confidence: ocrConfidence } = await extractTextWithMistral(imageUri);
+              
+              // Step 2: Apply post-OCR correction to fix common math/science errors
+              const ocrText = await correctOcrText(rawOcrText);
               
               if (ocrText && ocrText.trim().length > 0) {
-                // Step 2: Analyze the extracted text to determine if it's STEM content
+                // Step 3: Analyze the extracted text to determine if it's STEM content
                 const isStemContent = detectStemFromText(ocrText);
                 
                 if (isStemContent) {
