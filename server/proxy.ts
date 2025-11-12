@@ -1822,6 +1822,7 @@ Grade-appropriate language based on difficulty level.`;
           }
           
           // Make OpenAI API call with constructed system message and image
+          // NOTE: Do NOT use response_format: json_object with images - OpenAI returns {} silently
           const response = await openai.chat.completions.create({
             model: "gpt-4o",
             messages: [
@@ -1842,11 +1843,11 @@ Grade-appropriate language based on difficulty level.`;
                 ]
               }
             ],
-            response_format: { type: "json_object" },
+            // response_format removed - incompatible with image_url content
             max_tokens: 8192,
           });
           
-          const content = response.choices[0]?.message?.content || "{}";
+          let content = response.choices[0]?.message?.content || "{}";
           
           // 🐛 DEBUG: Log raw GPT-4o response
           console.log('\n🔍 === GPT-4o RAW RESPONSE DEBUG (IMAGE) ===');
@@ -1857,6 +1858,13 @@ Grade-appropriate language based on difficulty level.`;
           console.log('Raw content (first 500 chars):', content.substring(0, 500));
           console.log('Raw content (last 200 chars):', content.substring(Math.max(0, content.length - 200)));
           console.log('=== END RAW RESPONSE ===\n');
+          
+          // Extract JSON from markdown code blocks if present (since we can't force json_object with images)
+          const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+          if (jsonMatch) {
+            content = jsonMatch[1];
+            console.log('📝 Extracted JSON from markdown code block');
+          }
           
           const parsed = JSON.parse(content);
           
