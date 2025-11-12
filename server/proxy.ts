@@ -21,7 +21,6 @@ import pRetry, { AbortError } from 'p-retry';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { extractTextFromImage, isGoogleVisionAvailable, formatOCRText } from './googleVision';
 
 const app = express();
 const PORT = 5000;
@@ -41,21 +40,17 @@ app.get('/health', (req, res) => {
 
 // API configuration diagnostic endpoint - shows what's available without exposing keys
 app.get('/api/config-check', (req, res) => {
-  const googleVisionConfigured = !!process.env.GOOGLE_CLOUD_VISION_API_KEY;
   const openaiConfigured = !!openaiApiKey;
 
   res.json({
     environment: process.env.REPLIT_DEPLOYMENT === '1' ? 'production' : 'development',
     apis: {
-      googleCloudVision: googleVisionConfigured ? 'configured ✅' : 'missing ❌',
       openai: openaiConfigured
         ? 'configured ✅'
         : 'missing ❌ (set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY)'
     },
-    ocrMode: googleVisionConfigured ? 'Hybrid (Google Vision + GPT-4o)' : 'Standard (GPT-4o only)',
-    message: googleVisionConfigured
-      ? 'Gold-standard OCR is active (96-99% accuracy)'
-      : 'Add GOOGLE_CLOUD_VISION_API_KEY for enhanced OCR accuracy'
+    ocrMode: 'GPT-4o Vision',
+    message: 'Using OpenAI GPT-4o Vision for image analysis'
   });
 });
 
@@ -1286,121 +1281,23 @@ Grade-appropriate language based on difficulty level.`
 app.post('/api/analyze-image', async (req, res) => {
   try {
     const { imageUri, problemNumber } = req.body;
-    console.log('Analyzing image, problem number:', problemNumber);
-    
-    // 🚀 HYBRID OCR APPROACH: Google Vision + GPT-4o
-    let ocrText = '';
-    let ocrConfidence = 0;
-    let useHybridOCR = false;
-    
-    try {
-      const visionAvailable = await isGoogleVisionAvailable();
-      if (visionAvailable) {
-        console.log('🔍 Step 1: Extracting text with Google Cloud Vision (high-accuracy OCR)...');
-        const ocrResult = await extractTextFromImage(imageUri);
-        ocrText = formatOCRText(ocrResult.text);
-        ocrConfidence = ocrResult.confidence;
-        
-        // Only use OCR if we have reasonable confidence and actual text
-        const MIN_CONFIDENCE = 0.60; // 60% minimum confidence
-        const MIN_TEXT_LENGTH = 3; // At least a few characters
-        
-        if (ocrText.length >= MIN_TEXT_LENGTH && ocrConfidence >= MIN_CONFIDENCE) {
-          useHybridOCR = true;
-          console.log(`✅ OCR extraction complete. Confidence: ${(ocrConfidence * 100).toFixed(1)}%, Text length: ${ocrText.length} chars`);
-          console.log(`📝 OCR Preview: ${ocrText.substring(0, 200)}...`);
-        } else {
-          console.log(`⚠️ OCR confidence too low (${(ocrConfidence * 100).toFixed(1)}%) or insufficient text. Falling back to GPT-4o vision only.`);
-          useHybridOCR = false;
-        }
-      } else {
-        console.log('⚠️ Google Vision API key not configured - falling back to GPT-4o vision only');
-      }
-    } catch (ocrError) {
-      const errorMessage = ocrError instanceof Error ? ocrError.message : String(ocrError);
-      
-      // Log detailed error information
-      console.error('⚠️ Google Vision OCR failed:', {
-        error: errorMessage,
-        errorType: ocrError?.constructor?.name,
-        stack: ocrError instanceof Error ? ocrError.stack : undefined
-      });
-      
-      // Provide specific feedback for common issues
-      if (errorMessage.includes('API key') || errorMessage.includes('authentication')) {
-        console.error('🔑 CRITICAL: Google Vision API key is invalid or missing');
-      } else if (errorMessage.includes('Invalid base64') || errorMessage.includes('image data')) {
-        console.error('📷 Image format error: Unable to process image data');
-      } else if (errorMessage.includes('too large')) {
-        console.error('📦 Image size error:', errorMessage);
-      } else if (errorMessage.includes('timed out')) {
-        console.error('⏱️ Timeout error: Google Vision API request took too long');
-      } else if (errorMessage.includes('rate limit')) {
-        console.error('🚦 Rate limit error: Google Vision API quota exceeded');
-      }
-      
-      // Still fall back, but with better logging
-      useHybridOCR = false;
-    }
+    console.log('Analyzing image with GPT-4o Vision, problem number:', problemNumber);
     
     let result = await pRetry(
       async () => {
         try {
-          // Build system message based on whether we have OCR text
-          let systemMessage = `You are an expert educational AI tutor. Analyze the homework ${useHybridOCR ? 'problem' : 'image'} and provide a step-by-step solution.
+          // Build system message for GPT-4o Vision analysis
+          let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
 
 ⚠️ CRITICAL: You MUST respond with valid JSON only.
 
-${problemNumber ? `Focus on problem #${problemNumber} in the ${useHybridOCR ? 'text below' : 'image'}.` : useHybridOCR ? 'Solve the problem shown in the text below.' : 'If multiple problems exist, solve the most prominent one.'}`;
-
-          if (useHybridOCR) {
-            systemMessage += `
-
-🎯 **HYBRID OCR MODE - IMPORTANT INSTRUCTIONS:**
-
-**You have been provided with HIGH-ACCURACY OCR text extracted by Google Cloud Vision (${(ocrConfidence * 100).toFixed(1)}% confidence).**
-
-**YOUR PRIMARY TASK:**
-1. Use the OCR text below as your PRIMARY SOURCE for the exact problem statement
-2. The OCR text is HIGHLY ACCURATE (96-99% precision) - trust it for numbers, variables, and mathematical notation
-3. Cross-reference with the image ONLY for:
-   - Visual context (diagrams, graphs already present in the problem)
-   - Layout understanding (how equations or problems are arranged)
-   - Handwriting style or formatting nuances
-
-**CRITICAL OCR USAGE RULES:**
-✅ DO: Trust OCR text for all numbers, decimals, variables, operators, and equation structure
-✅ DO: Use OCR text character-for-character for mathematical expressions
-✅ DO: Preserve exact decimal places and fractions as shown in OCR
-❌ DON'T: Re-read numbers or text from the image when OCR text is available
-❌ DON'T: Second-guess the OCR text unless image clearly contradicts it
-❌ DON'T: Ignore OCR text and only use image analysis
-
-**WHY THIS MATTERS:**
-- Specialized OCR engines excel at pixel-perfect character recognition (especially decimals like 3.14, 19.6, 0.5)
-- GPT-4o vision is better at reasoning and layout understanding than raw OCR
-- Combining both gives you the best of both worlds: accuracy + intelligence
-
-**OCR-EXTRACTED TEXT:**
-\`\`\`
-${ocrText}
-\`\`\`
-
-**Now solve the problem using the OCR text above as your primary reference.**`;
-          }
-          
-          systemMessage += `
+${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multiple problems exist, solve the most prominent one.'}
 
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
 - If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
-- CRITICAL: Match the user's preferred format - don't convert between decimals and fractions`;
-
-          // For hybrid OCR, we already have the character-level accuracy instructions
-          // For GPT-4o vision only, add the OCR accuracy instructions
-          if (!useHybridOCR) {
-            systemMessage += `
+- CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
@@ -2052,7 +1949,7 @@ Grade-appropriate language based on difficulty level.`;
     if (error?.message?.includes('API key') || error?.code === 'invalid_api_key') {
       userMessage = 'API configuration error. Please check deployment settings.';
       statusCode = 503;
-      console.error('🔑 API key issue detected - check GOOGLE_CLOUD_VISION_API_KEY and OpenAI credentials');
+      console.error('🔑 API key issue detected - check OpenAI credentials');
     }
     // Check for rate limiting
     else if (error?.status === 429 || error?.message?.includes('rate limit')) {
