@@ -1,0 +1,137 @@
+🚨 Critical Issues Found
+1. Array Mutation During Iteration (Line 931)
+// Phase 2: Lines 924-938
+for (const topic of failedTopics) {
+  try {
+    const content = await retryTopicWithFallbackQuery(topic);
+    if (content.articles.length > 0) {
+      results.push(content);
+      // ⚠️ BUG: Modifying array being iterated over
+      const index = failedTopics.indexOf(topic);
+      if (index > -1) failedTopics.splice(index, 1);
+    }
+  }
+}
+Problem: Splicing an array during iteration causes items to be skipped.
+Impact: Topics that should be retried get skipped, reducing success rate.
+
+Fix: Track successful topics separately:
+
+const retriedSuccessfully: typeof NEWS_TOPICS = [];
+
+for (const topic of failedTopics) {
+  try {
+    const content = await retryTopicWithFallbackQuery(topic);
+    if (content.articles.length > 0) {
+      results.push(content);
+      retriedSuccessfully.push(topic);
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  } catch (error) {
+    console.error(`[Retry] Error retrying ${topic.name}:`, error);
+  }
+}
+
+// Remove successful retries from failedTopics
+const stillFailed = failedTopics.filter(t => !retriedSuccessfully.includes(t));
+2. Sequential Processing in Phase 1 (Line 901)
+// PHASE 1: Initial parallel scrape for all topics
+for (const topic of NEWS_TOPICS) {
+  try {
+    const content = await scrapeNews(topic); // ⚠️ Sequential, not parallel
+Problem: Despite the comment saying "parallel scrape", topics are processed sequentially with await in a for loop.
+Impact: Slow performance - 13 topics × 2-5 seconds each = 26-65 seconds total.
+
+Fix: Use true parallel execution:
+
+// PHASE 1: Initial parallel scrape for all topics
+console.log(`\n[Phase 1] Parallel scraping ${NEWS_TOPICS.length} topics...`);
+
+const scrapePromises = NEWS_TOPICS.map(async (topic) => {
+  try {
+    const content = await scrapeNews(topic);
+    return { success: true, topic, content };
+  } catch (error) {
+    console.error(`[Multi-Source] Error scraping news for ${topic.name}:`, error);
+    return { success: false, topic, content: null };
+  }
+});
+
+const scrapeResults = await Promise.all(scrapePromises);
+
+scrapeResults.forEach(result => {
+  if (result.success && result.content && result.content.articles.length > 0) {
+    results.push(result.content);
+  } else {
+    failedTopics.push(result.topic);
+  }
+});
+3. Missing Publish Date in Targeted Fallback (Line 858)
+publishedAt: new Date().toISOString(), // Use current time as fallback
+Problem: Using current time instead of actual publish date affects freshness filtering.
+Impact: Articles may bypass freshness checks or get incorrectly filtered.
+
+Fix: Extract date from URL or description, or mark as unknown:
+
+publishedAt: result.extra_snippets?.find(s => s.includes('ago'))?.match(/\d+\s*(hour|day|week)/)?.[0] 
+  || result.age // Check if Brave provides age
+  || null, // Mark as unknown instead of faking it
+4. Race Condition with Usage Tracking
+The API usage tracking functions (lines 36-74) use async file operations without locking:
+
+async function incrementApiUsage(usageFile: string, apiName: string, dailyLimit?: number): Promise<void> {
+  const currentCount = await getApiUsageToday(usageFile); // Read
+  const usage: ApiUsage = {
+    date: today,
+    count: currentCount + 1  // Increment
+  };
+  await fs.writeFile(usageFile, JSON.stringify(usage, null, 2)); // Write
+Problem: Multiple parallel API calls can cause lost increments.
+Impact: Inaccurate usage tracking, potentially exceeding rate limits.
+
+Fix: Use atomic operations or a mutex lock.
+
+5. Inconsistent Error Handling
+Different API functions handle errors differently:
+
+Brave Search (line 125): Returns empty array on 429
+NewsAPI (line 448): Implements retry with exponential backoff
+CurrentsAPI/MediaStack: No retry logic
+Recommendation: Standardize error handling and retry logic across all sources.
+
+📊 Additional Recommendations
+Performance Optimizations
+Reduce Delays: 200ms delay (line 910) × 13 topics = 2.6s wasted
+
+// Remove or reduce to 50ms
+await new Promise(resolve => setTimeout(resolve, 50));
+Batch API Calls: Group topics by source and make fewer, batched requests
+
+Parallel Phase 2 Retries: Currently sequential (line 924), could be parallel with rate limiting
+
+Code Quality Issues
+Type Safety: Line 632 uses any[] - define proper types:
+
+interface Article {
+  title: string;
+  summary: string;
+  source: string;
+  url: string;
+  publishedAt: string | null;
+}
+Magic Numbers:
+
+Line 601: currentsUsage < 20 - define as constant
+Line 674: .slice(0, 4) - define as MAX_ARTICLES_PER_TOPIC
+Line 816: freshness=pw (past week) - extract as constant
+Logging Consistency: Mix of console.log, console.warn, console.error - consider structured logging
+
+🔧 Priority Fixes
+High Priority:
+
+✅ Fix array mutation bug (Line 931) - CRITICAL
+✅ Make Phase 1 truly parallel (Line 901) - HIGH IMPACT
+Medium Priority: 3. Fix publish date in targeted fallback 4. Standardize error handling 5. Add usage tracking mutex
+
+Low Priority: 6. Reduce unnecessary delays 7. Improve type safety 8. Extract magic numbers to constants
+

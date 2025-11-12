@@ -1183,16 +1183,18 @@ Grade-appropriate language based on difficulty level.`
     }
     
     // Legacy support: Check for old-style [DIAGRAM NEEDED: ...] tags
-    for (const step of result.steps) {
-      if (step.content) {
-        const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
-        if (diagramMatch) {
-          diagrams.push({
-            stepId: step.id,
-            type: 'legacy',
-            description: diagramMatch[1],
-            status: 'pending'
-          });
+    if (result.steps && Array.isArray(result.steps)) {
+      for (const step of result.steps) {
+        if (step.content) {
+          const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
+          if (diagramMatch) {
+            diagrams.push({
+              stepId: step.id,
+              type: 'legacy',
+              description: diagramMatch[1],
+              status: 'pending'
+            });
+          }
         }
       }
     }
@@ -1208,27 +1210,29 @@ Grade-appropriate language based on difficulty level.`
     }
     
     // CLEANUP: Remove all [DIAGRAM NEEDED] tags - diagrams will load asynchronously
-    for (const step of result.steps) {
-      if (step.content) {
-        let content = step.content;
-        
-        while (true) {
-          const startIndex = content.indexOf('[DIAGRAM NEEDED:');
-          if (startIndex === -1) break;
+    if (result.steps && Array.isArray(result.steps)) {
+      for (const step of result.steps) {
+        if (step.content) {
+          let content = step.content;
           
-          let depth = 1;
-          let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
-          
-          while (depth > 0 && endIndex < content.length) {
-            if (content[endIndex] === '[') depth++;
-            else if (content[endIndex] === ']') depth--;
-            endIndex++;
+          while (true) {
+            const startIndex = content.indexOf('[DIAGRAM NEEDED:');
+            if (startIndex === -1) break;
+            
+            let depth = 1;
+            let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
+            
+            while (depth > 0 && endIndex < content.length) {
+              if (content[endIndex] === '[') depth++;
+              else if (content[endIndex] === ']') depth--;
+              endIndex++;
+            }
+            
+            content = content.substring(0, startIndex) + content.substring(endIndex);
           }
           
-          content = content.substring(0, startIndex) + content.substring(endIndex);
+          step.content = content;
         }
-        
-        step.content = content;
       }
     }
     
@@ -1867,16 +1871,18 @@ Grade-appropriate language based on difficulty level.`;
     }
     
     // Legacy support: Check for old-style [DIAGRAM NEEDED: ...] tags
-    for (const step of result.steps) {
-      if (step.content) {
-        const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
-        if (diagramMatch) {
-          diagrams.push({
-            stepId: step.id,
-            type: 'legacy',
-            description: diagramMatch[1],
-            status: 'pending'
-          });
+    if (result.steps && Array.isArray(result.steps)) {
+      for (const step of result.steps) {
+        if (step.content) {
+          const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
+          if (diagramMatch) {
+            diagrams.push({
+              stepId: step.id,
+              type: 'legacy',
+              description: diagramMatch[1],
+              status: 'pending'
+            });
+          }
         }
       }
     }
@@ -1892,27 +1898,29 @@ Grade-appropriate language based on difficulty level.`;
     }
     
     // CLEANUP: Remove all [DIAGRAM NEEDED] tags - diagrams will load asynchronously
-    for (const step of result.steps) {
-      if (step.content) {
-        let content = step.content;
-        
-        while (true) {
-          const startIndex = content.indexOf('[DIAGRAM NEEDED:');
-          if (startIndex === -1) break;
+    if (result.steps && Array.isArray(result.steps)) {
+      for (const step of result.steps) {
+        if (step.content) {
+          let content = step.content;
           
-          let depth = 1;
-          let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
-          
-          while (depth > 0 && endIndex < content.length) {
-            if (content[endIndex] === '[') depth++;
-            else if (content[endIndex] === ']') depth--;
-            endIndex++;
+          while (true) {
+            const startIndex = content.indexOf('[DIAGRAM NEEDED:');
+            if (startIndex === -1) break;
+            
+            let depth = 1;
+            let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
+            
+            while (depth > 0 && endIndex < content.length) {
+              if (content[endIndex] === '[') depth++;
+              else if (content[endIndex] === ']') depth--;
+              endIndex++;
+            }
+            
+            content = content.substring(0, startIndex) + content.substring(endIndex);
           }
           
-          content = content.substring(0, startIndex) + content.substring(endIndex);
+          step.content = content;
         }
-        
-        step.content = content;
       }
     }
     
