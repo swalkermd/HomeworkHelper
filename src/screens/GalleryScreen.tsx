@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { View, Alert, StyleSheet, ActivityIndicator, Text, Platform } from 'react-native';
+import { View, Alert, StyleSheet, ActivityIndicator, Text, Platform, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -13,10 +13,54 @@ type GalleryScreenProps = {
 
 type MutableBooleanRef = { current: boolean };
 
-const isImagePickerResult = (
-  result: ImagePicker.ImagePickerResult | ImagePicker.ImagePickerErrorResult | null
-): result is ImagePicker.ImagePickerResult => {
-  return !!result && 'canceled' in result;
+type NormalizedImagePickerResult = ImagePicker.ImagePickerResult | null;
+
+const isImagePickerError = (
+  result: unknown
+): result is ImagePicker.ImagePickerErrorResult => {
+  return !!result && typeof result === 'object' && 'error' in result;
+};
+
+const normalizePickerResult = (
+  result:
+    | ImagePicker.ImagePickerResult
+    | ImagePicker.ImagePickerResult[]
+    | ImagePicker.ImagePickerErrorResult
+    | null
+): NormalizedImagePickerResult => {
+  if (!result) {
+    return null;
+  }
+
+  if (Array.isArray(result)) {
+    if (result.length === 0) {
+      return null;
+    }
+    const lastResult = result[result.length - 1];
+    return lastResult ?? null;
+  }
+
+  if (isImagePickerError(result)) {
+    throw new Error(result.error ?? 'Unknown image picker error');
+  }
+
+  if ('canceled' in result) {
+    return result;
+  }
+
+  return null;
+};
+
+const hasMediaLibraryAccess = (permissionResult: ImagePicker.MediaLibraryPermissionResponse) => {
+  if (permissionResult.granted) {
+    return true;
+  }
+
+  if (permissionResult.status === ImagePicker.PermissionStatus.GRANTED) {
+    return true;
+  }
+
+  return permissionResult.accessPrivileges === 'limited';
 };
 
 export default function GalleryScreen({ navigation }: GalleryScreenProps) {
@@ -29,30 +73,43 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
         console.log('🖼️ Gallery: Permission result:', permissionResult);
 
-        const hasLibraryAccess =
-          permissionResult.status === ImagePicker.PermissionStatus.GRANTED ||
-          permissionResult.accessPrivileges === 'limited';
-
-        if (!hasLibraryAccess) {
+        if (!hasMediaLibraryAccess(permissionResult)) {
           console.log('🖼️ Gallery: Permission denied');
+
           if (!isActiveRef.current) {
             return;
           }
-          Alert.alert(
-            'Permission Required',
-            'Please grant permission to access your photo library.',
-            [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
-          );
+
+          const message = permissionResult.canAskAgain
+            ? 'Please grant permission to access your photo library so Homework Helper can analyze your homework photos.'
+            : 'Homework Helper does not have permission to access your photo library. Please enable access in your device settings.';
+
+          const buttons = permissionResult.canAskAgain
+            ? [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
+            : [
+                {
+                  text: 'Open Settings',
+                  onPress: () => {
+                    Linking.openSettings().catch((err) => {
+                      console.warn('🖼️ Gallery: Failed to open settings', err);
+                    });
+                    navigation.navigate('Home');
+                  },
+                },
+                { text: 'Cancel', style: 'cancel', onPress: () => navigation.navigate('Home') },
+              ];
+
+          Alert.alert('Permission Required', message, buttons);
           return;
         }
 
         let pickerResult: ImagePicker.ImagePickerResult | null = null;
-        const pendingResult = await ImagePicker.getPendingResultAsync();
 
-        if (pendingResult && 'error' in pendingResult) {
-          console.warn('🖼️ Gallery: Pending result error:', pendingResult.error);
-        } else if (isImagePickerResult(pendingResult)) {
-          pickerResult = pendingResult;
+        try {
+          const pendingResult = await ImagePicker.getPendingResultAsync();
+          pickerResult = normalizePickerResult(pendingResult);
+        } catch (pendingError) {
+          console.warn('🖼️ Gallery: Pending result error:', pendingError);
         }
 
         if (!pickerResult) {
@@ -62,6 +119,10 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
             allowsEditing: false,
             quality: 1,
             base64: true,
+            presentationStyle:
+              Platform.OS === 'ios'
+                ? ImagePicker.UIImagePickerPresentationStyle.AUTOMATIC
+                : undefined,
           });
         }
 
@@ -81,10 +142,12 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
           return;
         }
 
-        if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets[0]) {
-          const asset = pickerResult.assets[0];
+        const asset = pickerResult.assets?.[0];
+
+        if (!pickerResult.canceled && asset && asset.uri) {
           console.log('🖼️ Gallery: Image selected:', asset.uri);
           console.log('🖼️ Gallery: MIME type:', asset.mimeType);
+
           setCurrentImage({
             uri: asset.uri,
             width: asset.width,
