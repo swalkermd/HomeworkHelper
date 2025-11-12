@@ -237,7 +237,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                   )}
                 </View>
                 <Text style={styles.buttonText}>
-                  {isProcessingFile ? 'Loading...' : 'Choose from Gallery (Web)'}
+                  {isProcessingFile ? 'Loading...' : 'Choose from Gallery'}
                 </Text>
               </LinearGradient>
             </label>
