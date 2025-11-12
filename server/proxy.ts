@@ -1488,8 +1488,12 @@ ${ocrText}
               return parsed;
             }
           }
-          
-          // HYBRID PATH 2: OpenAI GPT-4o Vision (for non-STEM or fallback)
+        } catch (mistralError) {
+          console.warn('⚠️  Mistral OCR pipeline issue - falling back to OpenAI Vision:', mistralError);
+        }
+      }
+
+      // HYBRID PATH 2: OpenAI GPT-4o Vision (for non-STEM or fallback)
           // Build system message for GPT-4o Vision analysis
           let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
 
