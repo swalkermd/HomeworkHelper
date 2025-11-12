@@ -1290,14 +1290,46 @@ app.post('/api/analyze-image', async (req, res) => {
         const ocrResult = await extractTextFromImage(imageUri);
         ocrText = formatOCRText(ocrResult.text);
         ocrConfidence = ocrResult.confidence;
-        useHybridOCR = true;
-        console.log(`✅ OCR extraction complete. Confidence: ${(ocrConfidence * 100).toFixed(1)}%, Text length: ${ocrText.length} chars`);
-        console.log(`📝 OCR Preview: ${ocrText.substring(0, 200)}...`);
+        
+        // Only use OCR if we have reasonable confidence and actual text
+        const MIN_CONFIDENCE = 0.60; // 60% minimum confidence
+        const MIN_TEXT_LENGTH = 3; // At least a few characters
+        
+        if (ocrText.length >= MIN_TEXT_LENGTH && ocrConfidence >= MIN_CONFIDENCE) {
+          useHybridOCR = true;
+          console.log(`✅ OCR extraction complete. Confidence: ${(ocrConfidence * 100).toFixed(1)}%, Text length: ${ocrText.length} chars`);
+          console.log(`📝 OCR Preview: ${ocrText.substring(0, 200)}...`);
+        } else {
+          console.log(`⚠️ OCR confidence too low (${(ocrConfidence * 100).toFixed(1)}%) or insufficient text. Falling back to GPT-4o vision only.`);
+          useHybridOCR = false;
+        }
       } else {
         console.log('⚠️ Google Vision API key not configured - falling back to GPT-4o vision only');
       }
     } catch (ocrError) {
-      console.error('⚠️ Google Vision OCR failed, falling back to GPT-4o vision only:', ocrError);
+      const errorMessage = ocrError instanceof Error ? ocrError.message : String(ocrError);
+      
+      // Log detailed error information
+      console.error('⚠️ Google Vision OCR failed:', {
+        error: errorMessage,
+        errorType: ocrError?.constructor?.name,
+        stack: ocrError instanceof Error ? ocrError.stack : undefined
+      });
+      
+      // Provide specific feedback for common issues
+      if (errorMessage.includes('API key') || errorMessage.includes('authentication')) {
+        console.error('🔑 CRITICAL: Google Vision API key is invalid or missing');
+      } else if (errorMessage.includes('Invalid base64') || errorMessage.includes('image data')) {
+        console.error('📷 Image format error: Unable to process image data');
+      } else if (errorMessage.includes('too large')) {
+        console.error('📦 Image size error:', errorMessage);
+      } else if (errorMessage.includes('timed out')) {
+        console.error('⏱️ Timeout error: Google Vision API request took too long');
+      } else if (errorMessage.includes('rate limit')) {
+        console.error('🚦 Rate limit error: Google Vision API quota exceeded');
+      }
+      
+      // Still fall back, but with better logging
       useHybridOCR = false;
     }
     
