@@ -20,15 +20,25 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
   if [ -f "dist/index.html" ]; then
     echo "✅ Build completed successfully! (${ELAPSED}s)"
     echo "📦 Output: dist/"
-    
+
     # Kill the hanging process
     kill $EXPORT_PID 2>/dev/null || true
-    
+
     # Verify build artifacts
     if [ -d "dist/_expo" ]; then
       echo "✅ Expo assets bundled"
     fi
-    
+
+    # ADD CACHE BUSTING
+    echo "🔄 Adding cache-busting headers..."
+    BUILD_TIME=$(date +%s)
+
+    # Add build timestamp to index.html
+    if [ -f "dist/index.html" ]; then
+      sed -i "s/<head>/<head><meta name=\"build-time\" content=\"${BUILD_TIME}\">/" dist/index.html
+      echo "✅ Cache-busting header added: ${BUILD_TIME}"
+    fi
+
     exit 0
   fi
   
@@ -49,6 +59,15 @@ echo "Checking if build completed anyway..."
 if [ -f "dist/index.html" ]; then
   echo "✅ Build artifacts found despite timeout - proceeding"
   kill $EXPORT_PID 2>/dev/null || true
+
+  # ADD CACHE BUSTING (same as above)
+  echo "🔄 Adding cache-busting headers..."
+  BUILD_TIME=$(date +%s)
+  if [ -f "dist/index.html" ]; then
+    sed -i "s/<head>/<head><meta name=\"build-time\" content=\"${BUILD_TIME}\">/" dist/index.html
+    echo "✅ Cache-busting header added: ${BUILD_TIME}"
+  fi
+
   exit 0
 else
   echo "❌ Build failed or incomplete"

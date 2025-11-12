@@ -16,91 +16,28 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
 
   useEffect(() => {
     console.log('🖼️ Gallery: useEffect triggered, Platform.OS:', Platform.OS);
+
+    // SAFEGUARD: Web should never reach this screen
+    if (Platform.OS === 'web') {
+      console.error('❌ GalleryScreen accessed on web platform - this is a navigation bug');
+      console.error('Stack trace:', new Error().stack);
+      Alert.alert(
+        'Navigation Error',
+        'This screen should not be accessible on web. Returning to home screen.',
+        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
+      );
+      navigation.navigate('Home');
+      return;
+    }
+
     if (!hasPickedRef.current) {
       hasPickedRef.current = true;
-      console.log('🖼️ Gallery: First run, hasPickedRef set to true');
-      
-      if (Platform.OS === 'web') {
-        console.log('🖼️ Gallery: Detected web platform, calling pickImageWeb()');
-        try {
-          pickImageWeb();
-        } catch (error) {
-          console.error('🖼️ Gallery: Error in pickImageWeb:', error);
-          navigation.navigate('Home');
-        }
-      } else {
-        console.log('🖼️ Gallery: Detected native platform, calling pickImage()');
-        pickImage();
-      }
+      console.log('🖼️ Gallery: First run, calling pickImage()');
+      pickImage();
     } else {
       console.log('🖼️ Gallery: hasPickedRef already true, skipping');
     }
   }, []);
-
-  const pickImageWeb = () => {
-    console.log('🖼️ Gallery: pickImageWeb() started');
-    
-    try {
-      console.log('🖼️ Gallery: Creating file input element...');
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.style.display = 'none';
-      console.log('🖼️ Gallery: File input created');
-      
-      input.onchange = async (e: any) => {
-        console.log('🖼️ Gallery: onChange triggered');
-        const file = e.target.files?.[0];
-        
-        // Clean up input from DOM
-        document.body.removeChild(input);
-        
-        if (!file) {
-          console.log('🖼️ Gallery: No file selected');
-          navigation.navigate('Home');
-          return;
-        }
-
-        console.log('🖼️ Gallery: File selected:', file.name);
-        
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const uri = event.target?.result as string;
-          const img = new Image();
-          img.onload = () => {
-            console.log('🖼️ Gallery: Image loaded, dimensions:', img.width, 'x', img.height);
-            setCurrentImage({
-              uri,
-              width: img.width,
-              height: img.height,
-            });
-            navigation.navigate('ProblemSelection');
-          };
-          img.onerror = () => {
-            console.error('🖼️ Gallery: Failed to load image');
-            navigation.navigate('Home');
-          };
-          img.src = uri;
-        };
-        reader.onerror = () => {
-          console.error('🖼️ Gallery: Failed to read file');
-          navigation.navigate('Home');
-        };
-        reader.readAsDataURL(file);
-      };
-      
-      // Append to DOM before clicking (required for some browsers)
-      console.log('🖼️ Gallery: Appending input to DOM...');
-      document.body.appendChild(input);
-      
-      console.log('🖼️ Gallery: Triggering file picker...');
-      input.click();
-      console.log('🖼️ Gallery: File picker triggered');
-    } catch (error) {
-      console.error('🖼️ Gallery: Error in pickImageWeb:', error);
-      navigation.navigate('Home');
-    }
-  };
 
   const pickImage = async () => {
     try {
