@@ -88,7 +88,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     console.log('🖼️ Gallery button diagnostics:', JSON.stringify(diagnostics, null, 2));
 
     // FAILSAFE: Never navigate to Gallery on web platform
-    if (Platform.OS === 'web' || typeof window !== 'undefined') {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
       console.log('🖼️ Web platform detected - using file input');
       console.log('🖼️ Mobile browser detected:', diagnostics.isMobile);
       console.log('🖼️ Ref current:', fileInputRef.current);
@@ -97,16 +97,21 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       if (!fileInputRef.current) {
         console.warn('⚠️ File input ref is null, creating dynamic input as fallback');
 
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = (e: any) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            handleFileChange({ target: { files: [file], value: '' } } as any);
-          }
-        };
-        input.click();
+        try {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.onchange = (e: any) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              handleFileChange({ target: { files: [file], value: '' } } as any);
+            }
+          };
+          input.click();
+        } catch (error) {
+          console.error('❌ Failed to create dynamic file input:', error);
+          alert('Your device does not support selecting photos in the browser.');
+        }
         return;
       }
 
@@ -129,10 +134,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         alert('Failed to open file picker: ' + (error as Error).message);
         setIsProcessingFile(false);
       }
-    } else {
-      console.log('🖼️ Native platform, navigating to Gallery screen');
-      navigation.navigate('Gallery');
+
+      return;
     }
+
+    console.log('🖼️ Native platform, navigating to Gallery screen');
+    navigation.navigate('Gallery');
   };
 
   return (

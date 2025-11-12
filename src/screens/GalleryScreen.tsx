@@ -1,5 +1,14 @@
 import React, { useCallback } from 'react';
-import { View, Alert, StyleSheet, ActivityIndicator, Text, Platform, Linking } from 'react-native';
+import {
+  View,
+  Alert,
+  StyleSheet,
+  ActivityIndicator,
+  Text,
+  Platform,
+  Linking,
+  AlertButton,
+} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -41,7 +50,8 @@ const normalizePickerResult = (
   }
 
   if (isImagePickerError(result)) {
-    throw new Error(result.error ?? 'Unknown image picker error');
+    const errorMessage = (result as { error?: string }).error ?? 'Unknown image picker error';
+    throw new Error(errorMessage);
   }
 
   if ('canceled' in result) {
@@ -84,7 +94,7 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
             ? 'Please grant permission to access your photo library so Homework Helper can analyze your homework photos.'
             : 'Homework Helper does not have permission to access your photo library. Please enable access in your device settings.';
 
-          const buttons = permissionResult.canAskAgain
+          const buttons: AlertButton[] = permissionResult.canAskAgain
             ? [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
             : [
                 {
@@ -115,7 +125,7 @@ export default function GalleryScreen({ navigation }: GalleryScreenProps) {
         if (!pickerResult) {
           console.log('🖼️ Gallery: Launching image library...');
           pickerResult = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: false,
             quality: 1,
             base64: true,
