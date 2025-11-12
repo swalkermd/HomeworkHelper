@@ -190,24 +190,52 @@ const openai = new OpenAI({
 const mistral = mistralApiKey ? new Mistral({ apiKey: mistralApiKey }) : null;
 
 /**
- * STEM CONTENT DETECTION - Routes to Mistral OCR for superior math recognition
+ * STEM CONTENT DETECTION - Analyzes extracted text to determine if it's STEM content
  * 
- * Detects if content is likely STEM-related based on keywords and patterns.
+ * Returns true if the text contains strong STEM indicators (math, science, equations).
  * Mistral OCR achieves 94.29% accuracy on complex mathematical equations.
  */
-function isStemContent(problemNumber?: number): boolean {
-  // If we don't have Mistral configured, always return false (fall back to OpenAI)
-  if (!mistral) {
+function detectStemFromText(text: string): boolean {
+  if (!text || text.trim().length === 0) {
     return false;
   }
   
-  // IMPORTANT: We can't detect content from image alone without analyzing it first
-  // So we'll use a probabilistic approach: if problemNumber is provided, assume
-  // it's likely from a math worksheet/textbook (STEM content)
-  // For now, we'll default to TRUE for all images to maximize Mistral's superior OCR
-  // Once we extract text, we can make a smarter decision
+  const lowerText = text.toLowerCase();
   
-  return true; // Default to Mistral for all images (superior OCR accuracy)
+  // STEM indicators: mathematical symbols, equations, scientific terms
+  const stemIndicators = [
+    // Math symbols and patterns
+    /[+\-×÷=<>≤≥≠±∞∑∏√∫]/,  // Mathematical operators and symbols
+    /\d+[\s]*[+\-×÷]\s*\d+/,  // Arithmetic operations (e.g., "3 + 5", "10 × 2")
+    /\d+\.?\d*\s*[=]/,  // Equations (e.g., "x = 5", "2.5 =")
+    /[a-z]\s*[=]\s*\d/,  // Variable assignments (e.g., "x = 10")
+    /\^\d+/,  // Exponents (e.g., "x^2", "2^3")
+    /\d+\/\d+/,  // Fractions (e.g., "1/2", "3/4")
+    /\(\s*\d+/,  // Parenthetical expressions (e.g., "(3 + 5)")
+    
+    // Science & math keywords
+    /\b(solve|equation|formula|calculate|evaluate|simplify|factor|derivative|integral)\b/i,
+    /\b(theorem|proof|lemma|corollary|axiom|hypothesis)\b/i,
+    /\b(angle|triangle|circle|square|rectangle|polygon|perimeter|area|volume)\b/i,
+    /\b(force|mass|velocity|acceleration|energy|momentum|friction)\b/i,
+    /\b(atom|molecule|electron|proton|neutron|ion|chemical|reaction)\b/i,
+    /\b(cell|dna|protein|enzyme|mitosis|meiosis|chromosome)\b/i,
+    /\b(sin|cos|tan|log|ln|exp|sqrt)\b/i,  // Math functions
+  ];
+  
+  // Count how many STEM indicators are present
+  let stemScore = 0;
+  for (const pattern of stemIndicators) {
+    if (pattern.test(text)) {
+      stemScore++;
+    }
+  }
+  
+  // If we find 2+ strong STEM indicators, classify as STEM
+  const isStem = stemScore >= 2;
+  
+  console.log(`🎯 STEM detection: ${isStem} (score: ${stemScore}/20 indicators)`);
+  return isStem;
 }
 
 /**
@@ -223,14 +251,14 @@ async function extractTextWithMistral(imageUri: string): Promise<{ text: string;
   try {
     console.log('🔍 Using Mistral OCR for superior STEM text extraction...');
     
-    // Mistral OCR expects either image_url or document_base64
+    // Mistral OCR expects either imageUrl or documentBase64
     const response = await mistral.ocr.process({
       model: 'mistral-ocr-latest',
       document: {
         type: 'image_url',
-        image_url: imageUri
+        imageUrl: imageUri
       },
-      include_image_base64: false
+      includeImageBase64: false
     });
     
     if (!response.pages || response.pages.length === 0) {
@@ -1372,28 +1400,26 @@ Grade-appropriate language based on difficulty level.`
 app.post('/api/analyze-image', async (req, res) => {
   try {
     const { imageUri, problemNumber } = req.body;
-    
-    // 🎯 HYBRID OCR ROUTING - Use Mistral for STEM, OpenAI for general
-    const useMistralOCR = isStemContent(problemNumber);
-    
-    if (useMistralOCR) {
-      console.log('🔬 STEM content detected → Using Mistral OCR + OpenAI analysis');
-    } else {
-      console.log('📚 General content → Using OpenAI GPT-4o Vision directly');
-    }
+    console.log('🎯 Starting hybrid OCR analysis...');
     
     let result = await pRetry(
       async () => {
         try {
-          // HYBRID PATH 1: Mistral OCR + OpenAI Analysis (for STEM content)
-          if (useMistralOCR) {
-            // Step 1: Extract text using Mistral's superior math OCR
-            const { text: ocrText, confidence: ocrConfidence } = await extractTextWithMistral(imageUri);
-            
-            if (!ocrText || ocrText.trim().length === 0) {
-              console.warn('⚠️ Mistral OCR returned empty text, falling back to OpenAI Vision');
-              // Fall through to OpenAI Vision path below
-            } else {
+          // STRATEGY: Always try Mistral OCR first (superior accuracy)
+          // Then decide based on content whether to use text analysis or vision
+          
+          if (mistral) {
+            try {
+              // Step 1: Extract text using Mistral's superior OCR
+              const { text: ocrText, confidence: ocrConfidence } = await extractTextWithMistral(imageUri);
+              
+              if (ocrText && ocrText.trim().length > 0) {
+                // Step 2: Analyze the extracted text to determine if it's STEM content
+                const isStemContent = detectStemFromText(ocrText);
+                
+                if (isStemContent) {
+                  console.log('🔬 STEM content detected → Using Mistral OCR + OpenAI text analysis');
+                  // HYBRID PATH 1: Mistral OCR + OpenAI Text Analysis (for STEM)
               // Step 2: Use OpenAI GPT-4o (text mode) to analyze the extracted text
               console.log(`📝 Using Mistral OCR text (${(ocrConfidence * 100).toFixed(1)}% confidence) with OpenAI analysis`);
               
