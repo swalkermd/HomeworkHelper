@@ -26,6 +26,14 @@ import { extractTextFromImage, isGoogleVisionAvailable, formatOCRText } from './
 const app = express();
 const PORT = 5000;
 
+// Resolve OpenAI configuration with backwards compatibility for legacy env vars
+const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+const openaiBaseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL;
+
+if (!openaiApiKey) {
+  console.warn('⚠️ OpenAI API key not configured. Set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY.');
+}
+
 // CRITICAL: Health check endpoint FIRST - must respond immediately for deployment health checks
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
@@ -34,17 +42,19 @@ app.get('/health', (req, res) => {
 // API configuration diagnostic endpoint - shows what's available without exposing keys
 app.get('/api/config-check', (req, res) => {
   const googleVisionConfigured = !!process.env.GOOGLE_CLOUD_VISION_API_KEY;
-  const openaiConfigured = !!process.env.OPENAI_API_KEY;
-  
+  const openaiConfigured = !!openaiApiKey;
+
   res.json({
     environment: process.env.REPLIT_DEPLOYMENT === '1' ? 'production' : 'development',
     apis: {
       googleCloudVision: googleVisionConfigured ? 'configured ✅' : 'missing ❌',
-      openai: openaiConfigured ? 'configured ✅' : 'missing ❌'
+      openai: openaiConfigured
+        ? 'configured ✅'
+        : 'missing ❌ (set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY)'
     },
     ocrMode: googleVisionConfigured ? 'Hybrid (Google Vision + GPT-4o)' : 'Standard (GPT-4o only)',
-    message: googleVisionConfigured 
-      ? 'Gold-standard OCR is active (96-99% accuracy)' 
+    message: googleVisionConfigured
+      ? 'Gold-standard OCR is active (96-99% accuracy)'
       : 'Add GOOGLE_CLOUD_VISION_API_KEY for enhanced OCR accuracy'
   });
 });
@@ -157,8 +167,8 @@ async function generateDiagramsInBackground(
 app.use('/diagrams', express.static(path.join(process.cwd(), 'public', 'diagrams')));
 
 const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
+  apiKey: openaiApiKey,
+  baseURL: openaiBaseURL || undefined,
 });
 
 // Diagram cache for avoiding regeneration of identical diagrams
