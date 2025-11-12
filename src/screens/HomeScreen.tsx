@@ -19,6 +19,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   useEffect(() => {
     reset();
+
+    // CRITICAL DIAGNOSTIC: Log platform info on mount
+    console.log('🏠 HomeScreen mounted');
+    console.log('🏠 Platform.OS:', Platform.OS);
+    console.log('🏠 navigator.userAgent:', typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A');
+    console.log('🏠 Window exists:', typeof window !== 'undefined');
+    console.log('🏠 Document exists:', typeof document !== 'undefined');
   }, [reset]);
 
   // Handle file selection from persistent input
@@ -80,29 +87,35 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
     console.log('🖼️ Gallery button diagnostics:', JSON.stringify(diagnostics, null, 2));
 
-    if (Platform.OS === 'web') {
-      console.log('🖼️ Web platform - triggering persistent file input');
+    // FAILSAFE: Never navigate to Gallery on web platform
+    if (Platform.OS === 'web' || typeof window !== 'undefined') {
+      console.log('🖼️ Web platform detected - using file input');
       console.log('🖼️ Mobile browser detected:', diagnostics.isMobile);
       console.log('🖼️ Ref current:', fileInputRef.current);
 
+      // Create and click file input dynamically as fallback
       if (!fileInputRef.current) {
-        console.error('❌ File input ref is null!');
-        alert('File input not ready. Please try again.');
+        console.warn('⚠️ File input ref is null, creating dynamic input as fallback');
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e: any) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            handleFileChange({ target: { files: [file], value: '' } } as any);
+          }
+        };
+        input.click();
         return;
       }
 
       try {
         setIsProcessingFile(true);
-
-        // Try to focus the input first (some browsers require this)
-        if (fileInputRef.current.focus) {
-          fileInputRef.current.focus();
-        }
-
         fileInputRef.current.click();
         console.log('✅ File input click triggered');
 
-        // Safety timeout in case picker doesn't open
+        // Safety timeout
         setTimeout(() => {
           setIsProcessingFile(false);
         }, 500);
@@ -188,37 +201,42 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         </TouchableOpacity>
 
         {Platform.OS === 'web' ? (
-          <label
-            htmlFor="gallery-file-input"
-            style={{
-              cursor: isProcessingFile ? 'default' : 'pointer',
-              opacity: isProcessingFile ? 0.6 : 1,
-              userSelect: 'none',
-            }}
-            onClick={() => {
-              console.log('🖼️ Label clicked for file input');
-              setIsProcessingFile(true);
-              setTimeout(() => setIsProcessingFile(false), 500);
-            }}
-          >
-            <LinearGradient
-              colors={['#10b981', '#06b6d4']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.button}
+          <>
+            {/* WEB PATH: Using label element */}
+            <label
+              htmlFor="gallery-file-input"
+              style={{
+                cursor: isProcessingFile ? 'default' : 'pointer',
+                opacity: isProcessingFile ? 0.6 : 1,
+                userSelect: 'none',
+              }}
+              onClick={() => {
+                console.log('🖼️ [WEB] Label clicked for file input');
+                console.log('🖼️ [WEB] Platform.OS:', Platform.OS);
+                console.log('🖼️ [WEB] This should open file picker via htmlFor');
+                setIsProcessingFile(true);
+                setTimeout(() => setIsProcessingFile(false), 500);
+              }}
             >
-              <View style={styles.buttonIconContainer}>
-                {isProcessingFile ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Ionicons name="images" size={24} color="#ffffff" />
-                )}
-              </View>
-              <Text style={styles.buttonText}>
-                {isProcessingFile ? 'Loading...' : 'Choose from Gallery'}
-              </Text>
-            </LinearGradient>
-          </label>
+              <LinearGradient
+                colors={['#10b981', '#06b6d4']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.button}
+              >
+                <View style={styles.buttonIconContainer}>
+                  {isProcessingFile ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Ionicons name="images" size={24} color="#ffffff" />
+                  )}
+                </View>
+                <Text style={styles.buttonText}>
+                  {isProcessingFile ? 'Loading...' : 'Choose from Gallery (Web)'}
+                </Text>
+              </LinearGradient>
+            </label>
+          </>
         ) : (
           <TouchableOpacity
             onPress={handleGalleryPress}
