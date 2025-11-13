@@ -3,18 +3,25 @@ import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
 
+// Request timeout configuration (longer for production to handle cold starts)
+// Production: 120s (Autoscale cold start + 4-stage pipeline: OCR → correction → detection → analysis)
+// Development: 45s (warm server, faster response)
+const IS_PRODUCTION = API_URL.includes('replit.app') || API_URL.includes('repl.co');
+const API_REQUEST_TIMEOUT_MS = IS_PRODUCTION ? 120000 : 45000;
+console.log('⏱️ API timeout configured:', API_REQUEST_TIMEOUT_MS / 1000, 'seconds', IS_PRODUCTION ? '(production)' : '(development)');
+
 export async function analyzeTextQuestion(question: string): Promise<any> {
   try {
     console.log('📡 Calling API:', `${API_URL}/analyze-text`);
     console.log('📡 Fetch starting...');
     console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // 30 second timeout for initial response (diagrams load async)
+    // Timeout for initial response (diagrams load async)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('⏱️ Timeout triggered after 30 seconds');
+      console.log('⏱️ Timeout triggered after', API_REQUEST_TIMEOUT_MS / 1000, 'seconds');
       controller.abort();
-    }, 30000);
+    }, API_REQUEST_TIMEOUT_MS);
     
     const response = await fetch(`${API_URL}/analyze-text`, {
       method: 'POST',
@@ -66,12 +73,12 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     console.log('Calling API:', `${API_URL}/analyze-image`);
     console.log('⏱️ Starting analysis at:', new Date().toISOString());
     
-    // 30 second timeout for initial response (diagrams load async)
+    // Timeout for initial response (diagrams load async)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('⏱️ Timeout triggered after 30 seconds');
+      console.log('⏱️ Timeout triggered after', API_REQUEST_TIMEOUT_MS / 1000, 'seconds');
       controller.abort();
-    }, 30000);
+    }, API_REQUEST_TIMEOUT_MS);
     
     console.log('📡 Sending request...');
     const response = await fetch(`${API_URL}/analyze-image`, {
@@ -108,7 +115,7 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     console.error('❌ Error type:', error instanceof Error ? error.name : typeof error);
     console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Analysis timed out after 30 seconds. Please try again.');
+      throw new Error(`Analysis timed out after ${API_REQUEST_TIMEOUT_MS / 1000} seconds. Please try again.`);
     }
     throw error;
   }
@@ -153,7 +160,7 @@ export async function askFollowUpQuestion(
     
     // Handle timeout error
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Question timed out after 30 seconds. Please try again.');
+      throw new Error(`Question timed out after ${API_REQUEST_TIMEOUT_MS / 1000} seconds. Please try again.`);
     }
     
     throw error;
@@ -201,7 +208,7 @@ export async function getSimplifiedExplanations(solution: HomeworkSolution): Pro
     
     // Handle timeout error
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Simplification timed out after 30 seconds. Please try again.');
+      throw new Error(`Simplification timed out after ${API_REQUEST_TIMEOUT_MS / 1000} seconds. Please try again.`);
     }
     
     throw error;
