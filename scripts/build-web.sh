@@ -2,15 +2,21 @@
 set -e  # Exit on error
 
 echo "🔨 Starting Expo web build..."
+echo "📅 Build started at: $(date)"
 
 # Clean previous build
+echo "🗑️  Cleaning previous build..."
 rm -rf dist/
 
-# Run expo export with timeout (2 minutes should be enough)
-timeout 120 npx expo export --platform web || {
+# Show node and npm versions for debugging
+echo "📋 Node: $(node --version), NPM: $(npm --version)"
+
+# Run expo export with timeout (5 minutes for deployment builds)
+echo "⚙️  Running expo export (timeout: 5 minutes)..."
+timeout 300 npx expo export --platform web --output-dir dist || {
   EXIT_CODE=$?
   if [ $EXIT_CODE -eq 124 ]; then
-    echo "⏰ Build process timed out after 120s"
+    echo "⏰ Build process timed out after 300s"
     # Check if build actually completed despite timeout
     if [ -f "dist/index.html" ]; then
       echo "✅ Build artifacts found - build succeeded"
