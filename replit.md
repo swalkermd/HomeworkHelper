@@ -32,7 +32,7 @@ The application features a responsive design with distinct typography and a colo
 ### Technical Implementations
 The app is built with React Native 0.81.5, Expo SDK 54, and TypeScript, utilizing React Navigation v7 for navigation, Zustand for state management, and NativeWind v4 for styling. Animations are handled by React Native Reanimated and Gesture Handler.
 
-A custom `MathText` component renders complex mathematical notation, including vertical fractions, subscripts, superscripts, and inline images, with critical rendering optimizations to prevent unwanted line breaks. Server-side whitespace normalization ensures clean text delivery.
+A custom `MathText` component renders complex mathematical notation, including vertical fractions, subscripts, superscripts, and inline images, with critical rendering optimizations to prevent unwanted line breaks. The component uses a unified parser (`parseContentInternal`) with bracket-depth tracking to correctly handle nested formatting tags like `[handwritten:[red:text]]`. All formatting types (colors, fractions, subscripts, arrows, italics, images) are preserved when wrapped in `[handwritten:]` tags, which apply the Caveat handwriting font for format-matching. Server-side whitespace normalization ensures clean text delivery.
 
 Intelligent Visual Aid Generation uses AI to determine the optimal type and placement of visual aids (geometric diagrams, graphs, charts, physics diagrams, process illustrations), ensuring they are grade-level aware and enhance understanding. Mandatory diagram generation is enforced for key biology/chemistry topics like metabolic cycles.
 
