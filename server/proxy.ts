@@ -497,7 +497,12 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
     return `__IMAGE_PLACEHOLDER_${imageTags.length - 1}__`;
   });
   
-  // 0. Remove LaTeX commands that shouldn't be displayed as text
+  // 0A. CRITICAL: Convert LaTeX fractions BEFORE stripping other macros
+  // This must happen first to preserve numerator and denominator
+  // Handle \frac{num}{den}, \dfrac{num}{den}, and \tfrac{num}{den}
+  formatted = formatted.replace(/\\[dt]?frac\{([^{}]+)\}\{([^{}]+)\}/g, '{$1/$2}');
+  
+  // 0B. Remove LaTeX commands that shouldn't be displayed as text
   // Iteratively strip \command{text} patterns to handle nested commands
   let prevFormatted;
   do {
@@ -1513,10 +1518,40 @@ ${ocrText}
   - WRONG: "[blue:8] × {1/8}" (operator outside the tag causes line breaks)
 - Example: "Multiply both sides by [blue:8 ×] to eliminate fractions: [blue:8 ×] {1/8}(3d - 2) = [blue:8 ×] {1/4}(d + 5) simplifies to [red:(3d - 2) = 2(d + 5)]"
 - NEVER skip color highlighting - it's essential for student understanding!
-- **CRITICAL:** Keep all text (including punctuation) on the SAME LINE as color tags. NEVER write: "[red:phototropism]\\n." Instead write: "[red:phototropism]."`;
+- **CRITICAL:** Keep all text (including punctuation) on the SAME LINE as color tags. NEVER write: "[red:phototropism]\\n." Instead write: "[red:phototropism]."
+
+🎯 **MULTI-STEP PROBLEMS - MANDATORY OVERVIEW IN STEP 1:**
+**For any problem requiring multiple steps (math, physics, chemistry, multi-part analysis), Step 1 MUST be a simple overview that helps orient the student.**
+
+**Purpose:** Help students understand the "big picture" before diving into detailed calculations. This centers their approach and shows the general strategy.
+
+**Step 1 Requirements for Multi-Step Problems:**
+- **Title:** Should identify the problem type (e.g., "Identify Problem Type and Approach", "Problem Type: Projectile Motion", "Strategy: Composite Shape Area")
+- **Content:** Write 2-3 SHORT sentences that explain:
+  1. What type of problem this is (e.g., "This is a [red:linear equation] with fractions on both sides")
+  2. The general approach we'll use (e.g., "We'll [blue:eliminate fractions first], then [blue:collect like terms], and finally [blue:isolate the variable]")
+  3. Optional: What our goal is (e.g., "Our goal is to find the value of [red:d]")
+- **Explanation:** Brief note about why this approach makes sense (e.g., "Starting with a clear plan helps us stay organized through multiple steps")
+
+**When NOT to use overview step:**
+- Simple one-step problems (e.g., "What is 5 + 3?")
+- Essay questions (already have special format)
+- Multiple choice questions that only need elimination logic
+
+📊 **RATIO FILL-IN-THE-BLANK PROBLEMS:**
+**If the problem contains empty boxes/blanks to be filled with ratio numbers:**
+- **Recognize ratio patterns:** Look for "ratio of A to B", "_ : _ : _", "Fill in: ___ to ___"
+- **Format the answer clearly:**
+  - PREFERRED: Recreate the original format with filled boxes, e.g., "Box 1: [red:3], Box 2: [red:5], Box 3: [red:7]" or "Ratio: [red:3]:[red:5]:[red:7]"
+  - MINIMUM: List each ratio component with clear labels, e.g., "First number = [red:3], Second number = [red:5], Third number = [red:7]"
+- **Avoid confusing prose:** Do NOT say "the ratio can be expressed as..." Instead, directly state "The answer is [red:3]:[red:5]:[red:7]"
+- **Highlight ratio numbers:** Always use [red:number] for the actual ratio values to make them stand out
+
+**Example:**
+- Question: "Complete the ratio: ___ : ___ : ___ (The angles of a triangle are in ratio 2:3:4)"
+- GOOD Answer: "The completed ratio is [red:2]:[red:3]:[red:4]" or "Box 1 = [red:2], Box 2 = [red:3], Box 3 = [red:4]"
+- BAD Answer: "The ratio can be expressed as two to three to four based on the proportion given..."`;
               
-              // Continue building the rest of the prompt...
-              // (The rest of the formatting instructions will be added in a follow-up edit)
               const response = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [
@@ -1632,6 +1667,20 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
 - Simple one-step problems (e.g., "What is 5 + 3?")
 - Essay questions (already have special format)
 - Multiple choice questions that only need elimination logic
+
+📊 **RATIO FILL-IN-THE-BLANK PROBLEMS:**
+**If the problem contains empty boxes/blanks to be filled with ratio numbers:**
+- **Recognize ratio patterns:** Look for "ratio of A to B", "_ : _ : _", "Fill in: ___ to ___"
+- **Format the answer clearly:**
+  - PREFERRED: Recreate the original format with filled boxes, e.g., "Box 1: [red:3], Box 2: [red:5], Box 3: [red:7]" or "Ratio: [red:3]:[red:5]:[red:7]"
+  - MINIMUM: List each ratio component with clear labels, e.g., "First number = [red:3], Second number = [red:5], Third number = [red:7]"
+- **Avoid confusing prose:** Do NOT say "the ratio can be expressed as..." Instead, directly state "The answer is [red:3]:[red:5]:[red:7]"
+- **Highlight ratio numbers:** Always use [red:number] for the actual ratio values to make them stand out
+
+**Example:**
+- Question: "Complete the ratio: ___ : ___ : ___ (The angles of a triangle are in ratio 2:3:4)"
+- GOOD Answer: "The completed ratio is [red:2]:[red:3]:[red:4]" or "Box 1 = [red:2], Box 2 = [red:3], Box 3 = [red:4]"
+- BAD Answer: "The ratio can be expressed as two to three to four based on the proportion given..."
 
 **🚨 CRITICAL OCR ACCURACY INSTRUCTIONS - READ EVERY CHARACTER CAREFULLY 🚨**
 

@@ -3,7 +3,11 @@
 ## Overview
 Homework Helper is an AI-powered mobile application built with React Native and Expo. It assists students with homework across various subjects by providing clear, step-by-step visual solutions. The app leverages AI to offer grade-appropriate explanations, beautiful formatting, and interactive features to foster deeper learning and understanding. The business vision is to revolutionize homework assistance by making learning engaging and accessible, tapping into a significant market of students seeking personalized educational support. The project aims to become a leading tool for enhancing student comprehension and academic performance.
 
-## Recent Changes (Nov 12, 2025)
+## Recent Changes (Nov 13, 2025)
+- **FIXED: Three Critical Deployment Issues**:
+  1. **Fraction Rendering** - Fixed `{` and `}` displaying above/below fraction lines. Added LaTeX `\frac{num}{den}` conversion BEFORE macro stripping in `enforceProperFormatting()`.
+  2. **Ratio Fill-in-the-Blank Formatting** - Added AI instructions to recognize ratio problems and format answers clearly (e.g., "Box 1: 3, Box 2: 5" instead of confusing prose). Recreates original format when possible.
+  3. **Missing Step 1 Overview** - Restored mandatory multi-step problem overview to STEM OCR path's system prompt. Step 1 now identifies problem type, approach, and goal for all multi-step problems.
 - **NEW: Mobile Keyboard Zoom Prevention** - Fixed unwanted zoom on mobile when keyboard appears. Set input fontSize to 16px (preventing iOS auto-zoom) and added viewport maximum-scale constraint via custom `public/index.html`. Eliminates need for manual pinch-to-zoom after entering problem numbers.
 - **NEW: Post-OCR Correction Layer** - Added intelligent OCR cleanup using GPT-4o-mini to fix common math/science errors (0/O confusion, missing decimals, variable separation). Runs after Mistral OCR extraction before STEM detection, significantly improving downstream analysis accuracy with deterministic, low-temperature corrections.
 - **REVERTED: Hybrid OCR to OpenAI-Only** - Removed Google Cloud Vision integration due to persistent failures. Now using OpenAI GPT-4o Vision exclusively for image OCR analysis. Deleted `server/googleVision.ts` and simplified `/api/analyze-image` endpoint.
