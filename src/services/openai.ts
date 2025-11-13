@@ -6,9 +6,11 @@ const API_URL = API_BASE_URL;
 // Request timeout configuration (longer for production to handle cold starts)
 // Production: 120s (Autoscale cold start + 4-stage pipeline: OCR → correction → detection → analysis)
 // Development: 45s (warm server, faster response)
-const IS_PRODUCTION = API_URL.includes('replit.app') || API_URL.includes('repl.co');
+// Check hostname instead of API_URL since API_URL is just "/api" for web
+const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+const IS_PRODUCTION = hostname.includes('replit.app') || hostname.includes('repl.co') || hostname.includes('replit.dev');
 const API_REQUEST_TIMEOUT_MS = IS_PRODUCTION ? 120000 : 45000;
-console.log('⏱️ API timeout configured:', API_REQUEST_TIMEOUT_MS / 1000, 'seconds', IS_PRODUCTION ? '(production)' : '(development)');
+console.log('⏱️ API timeout configured:', API_REQUEST_TIMEOUT_MS / 1000, 'seconds', IS_PRODUCTION ? '(production)' : '(development)', '| hostname:', hostname);
 
 export async function analyzeTextQuestion(question: string): Promise<any> {
   try {

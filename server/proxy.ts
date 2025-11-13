@@ -959,9 +959,11 @@ function ensureBiologyVisualAids(question: string, result: any): any {
 }
 
 app.post('/api/analyze-text', async (req, res) => {
+  const requestStartTime = Date.now();
   try {
     const { question } = req.body;
     console.log('Analyzing text question:', question);
+    console.log('⏱️ [TIMING] Request received at:', new Date().toISOString());
     
     let result = await pRetry(
       async () => {
@@ -1461,7 +1463,9 @@ Grade-appropriate language based on difficulty level.`
     };
     
     // ⚡ RETURN IMMEDIATELY - No waiting for diagrams!
-    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately (<8s target)`);
+    const totalTime = Date.now() - requestStartTime;
+    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately`);
+    console.log(`⏱️ [TIMING] === TOTAL REQUEST TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
     res.json(responseWithId);
     
     // ⚡ BACKGROUND TASKS: Validation and diagram generation (non-blocking)
@@ -1489,9 +1493,11 @@ Grade-appropriate language based on difficulty level.`
 });
 
 app.post('/api/analyze-image', async (req, res) => {
+  const requestStartTime = Date.now();
   try {
     const { imageUri, problemNumber } = req.body;
     console.log('🎯 Starting hybrid OCR analysis...');
+    console.log('⏱️ [TIMING] Request received at:', new Date().toISOString());
     
     let result = await pRetry(
       async () => {
@@ -1501,15 +1507,29 @@ app.post('/api/analyze-image', async (req, res) => {
           
           if (mistral) {
             try {
+              const startTime = Date.now();
+              
               // Step 1: Extract text using Mistral's superior OCR
+              console.log('⏱️ [TIMING] Starting Mistral OCR...');
               const { text: rawOcrText, confidence: ocrConfidence } = await extractTextWithMistral(imageUri);
+              console.log(`⏱️ [TIMING] Mistral OCR completed in ${Date.now() - startTime}ms`);
               
-              // Step 2: Apply post-OCR correction to fix common math/science errors
-              const ocrText = await correctOcrText(rawOcrText);
-              
-              if (ocrText && ocrText.trim().length > 0) {
-                // Step 3: Analyze the extracted text to determine if it's STEM content
-                const isStemContent = detectStemFromText(ocrText);
+              if (rawOcrText && rawOcrText.trim().length > 0) {
+                // Step 2: Analyze the extracted text to determine if it's STEM content (BEFORE correction)
+                const stemCheckStart = Date.now();
+                const isStemContent = detectStemFromText(rawOcrText);
+                console.log(`⏱️ [TIMING] STEM detection completed in ${Date.now() - stemCheckStart}ms`);
+                
+                // Step 3: Apply post-OCR correction ONLY for STEM content (optimization: saves 6-8s on non-STEM)
+                let ocrText = rawOcrText;
+                if (isStemContent) {
+                  console.log('⏱️ [TIMING] Starting OCR correction (STEM content)...');
+                  const correctionStart = Date.now();
+                  ocrText = await correctOcrText(rawOcrText);
+                  console.log(`⏱️ [TIMING] OCR correction completed in ${Date.now() - correctionStart}ms`);
+                } else {
+                  console.log('⏱️ [OPTIMIZATION] Skipping OCR correction for non-STEM content');
+                }
                 
                 if (isStemContent) {
                   console.log('🔬 STEM content detected → Using Mistral OCR + OpenAI text analysis');
@@ -1580,6 +1600,8 @@ ${ocrText}
 - GOOD Answer: "The completed ratio is [red:2]:[red:3]:[red:4]" or "Box 1 = [red:2], Box 2 = [red:3], Box 3 = [red:4]"
 - BAD Answer: "The ratio can be expressed as two to three to four based on the proportion given..."`;
               
+              console.log('⏱️ [TIMING] Starting GPT-4o analysis (text mode)...');
+              const gptStart = Date.now();
               const response = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [
@@ -1595,6 +1617,7 @@ ${ocrText}
                 response_format: { type: "json_object" },
                 max_tokens: 8192,
               });
+              console.log(`⏱️ [TIMING] GPT-4o analysis completed in ${Date.now() - gptStart}ms`);
               
               let content = response.choices[0]?.message?.content || "{}";
               const parsed = JSON.parse(content);
@@ -2103,6 +2126,8 @@ Grade-appropriate language based on difficulty level.`;
           
           // Make OpenAI API call with constructed system message and image
           // NOTE: Do NOT use response_format: json_object with images - OpenAI returns {} silently
+          console.log('⏱️ [TIMING] Starting GPT-4o Vision analysis...');
+          const visionStart = Date.now();
           const response = await openai.chat.completions.create({
             model: "gpt-4o",
             messages: [
@@ -2126,6 +2151,7 @@ Grade-appropriate language based on difficulty level.`;
             // response_format removed - incompatible with image_url content
             max_tokens: 8192,
           });
+          console.log(`⏱️ [TIMING] GPT-4o Vision completed in ${Date.now() - visionStart}ms`);
           
           let content = response.choices[0]?.message?.content || "{}";
           
@@ -2284,7 +2310,9 @@ Grade-appropriate language based on difficulty level.`;
     };
     
     // ⚡ RETURN IMMEDIATELY - No waiting for diagrams!
-    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately (<8s target)`);
+    const totalTime = Date.now() - requestStartTime;
+    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately`);
+    console.log(`⏱️ [TIMING] === TOTAL REQUEST TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
     res.json(responseWithId);
     
     // ⚡ BACKGROUND TASKS: Validation and diagram generation (non-blocking)
