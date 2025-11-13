@@ -1114,16 +1114,44 @@ RESPONSE FORMAT (JSON):
   ]
 }
 
-**FINAL ANSWER HIGHLIGHTING - CRITICAL:**
+🎨 **MATCH QUESTION FORMAT IN FINAL ANSWER - CRITICAL DIFFERENTIATION:**
+
+**This is what makes us stand out from other homework apps - final answers should MIRROR the question's format and appearance!**
+
+**1. MULTIPLE CHOICE QUESTIONS - Show ALL Options:**
+- **ALWAYS include ALL answer choices (A, B, C, D, etc.) in the finalAnswer, not just the correct one**
+- Format them EXACTLY as they appear in the question
+- Highlight ONLY the correct answer with [red:]
+- **Example:**
+  - Question has: "A) Mitochondrion, B) Nucleus, C) Ribosome, D) Chloroplast"
+  - finalAnswer MUST BE: "A) Mitochondrion \n B) Nucleus \n C) [red:Ribosome] \n D) Chloroplast"
+  - WRONG: "[red:C) Ribosome]" (missing the other options!)
+- This helps students see WHY other options are wrong by showing the full context
+
+**2. HANDWRITTEN PROBLEMS - Use Handwriting Font:**
+- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper)
+- If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags
+- **Example:**
+  - Handwritten math problem: finalAnswer = "[handwritten:x = 7]"
+  - Typed textbook problem: finalAnswer = "[red:x = 7]" (no handwritten tag)
+- The handwriting font makes the answer feel personal and relatable to the student's own work
+
+**3. MATCH NUMBER FORMAT:**
+- If question uses decimals (0.5, 3.14), use decimals in answer: [red:0.5]
+- If question uses fractions ({1/2}, {3/4}), use fractions in answer: [red:{1/2}]
+- If question uses mixed numbers ({1{1/2}}), use mixed numbers in answer
+
+**4. PRESERVE QUESTION STRUCTURE:**
+- If question has parts labeled (a, b, c) or (1, 2, 3), use the SAME labels in finalAnswer
+- If question is a fill-in-the-blank, format answer to match the blank style
+- If question is a table, consider using a simple text table format
+
+**FINAL ANSWER HIGHLIGHTING - GENERAL RULES:**
 - ALWAYS highlight key technical terms, concepts, or vocabulary in the final answer using [red:term]
 - Examples: [red:phototropism], [red:auxin], [red:mitochondria], [red:Pythagorean theorem], [red:oxidation]
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
-- **MULTIPLE CHOICE QUESTIONS:** If the question provides answer choices (A, B, C, D), ALWAYS include the correct letter in the final answer:
-  - CORRECT: "[red:C) Mitochondrion]" or "[red:C)] [red:Mitochondrion]"
-  - WRONG: "[red:Mitochondrion]" (missing the letter C)
-  - The letter must be clearly visible so students know which option is correct
 - **MULTI-PART ANSWERS:** If the question has multiple parts OR your answer has multiple numbered/lettered items, put each part on its own line:
   - CORRECT (letters): "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
   - CORRECT (numbers): "1. [blue:Patient Preparation]: ... \n 2. [blue:Ultrasound Guidance]: ... \n 3. [blue:Sterile Field]: ..."
@@ -1838,16 +1866,44 @@ RESPONSE FORMAT (JSON):
   ]
 }
 
-**FINAL ANSWER HIGHLIGHTING - CRITICAL:**
+🎨 **MATCH QUESTION FORMAT IN FINAL ANSWER - CRITICAL DIFFERENTIATION:**
+
+**This is what makes us stand out from other homework apps - final answers should MIRROR the question's format and appearance!**
+
+**1. MULTIPLE CHOICE QUESTIONS - Show ALL Options:**
+- **ALWAYS include ALL answer choices (A, B, C, D, etc.) in the finalAnswer, not just the correct one**
+- Format them EXACTLY as they appear in the question
+- Highlight ONLY the correct answer with [red:]
+- **Example:**
+  - Question has: "A) Mitochondrion, B) Nucleus, C) Ribosome, D) Chloroplast"
+  - finalAnswer MUST BE: "A) Mitochondrion \n B) Nucleus \n C) [red:Ribosome] \n D) Chloroplast"
+  - WRONG: "[red:C) Ribosome]" (missing the other options!)
+- This helps students see WHY other options are wrong by showing the full context
+
+**2. HANDWRITTEN PROBLEMS - Use Handwriting Font:**
+- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper)
+- If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags
+- **Example:**
+  - Handwritten math problem: finalAnswer = "[handwritten:x = 7]"
+  - Typed textbook problem: finalAnswer = "[red:x = 7]" (no handwritten tag)
+- The handwriting font makes the answer feel personal and relatable to the student's own work
+
+**3. MATCH NUMBER FORMAT:**
+- If question uses decimals (0.5, 3.14), use decimals in answer: [red:0.5]
+- If question uses fractions ({1/2}, {3/4}), use fractions in answer: [red:{1/2}]
+- If question uses mixed numbers ({1{1/2}}), use mixed numbers in answer
+
+**4. PRESERVE QUESTION STRUCTURE:**
+- If question has parts labeled (a, b, c) or (1, 2, 3), use the SAME labels in finalAnswer
+- If question is a fill-in-the-blank, format answer to match the blank style
+- If question is a table, consider using a simple text table format
+
+**FINAL ANSWER HIGHLIGHTING - GENERAL RULES:**
 - ALWAYS highlight key technical terms, concepts, or vocabulary in the final answer using [red:term]
 - Examples: [red:phototropism], [red:auxin], [red:mitochondria], [red:Pythagorean theorem], [red:oxidation]
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
-- **MULTIPLE CHOICE QUESTIONS:** If the question provides answer choices (A, B, C, D), ALWAYS include the correct letter in the final answer:
-  - CORRECT: "[red:C) Mitochondrion]" or "[red:C)] [red:Mitochondrion]"
-  - WRONG: "[red:Mitochondrion]" (missing the letter C)
-  - The letter must be clearly visible so students know which option is correct
 - **MULTI-PART ANSWERS:** If the question has multiple parts OR your answer has multiple numbered/lettered items, put each part on its own line:
   - CORRECT (letters): "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
   - CORRECT (numbers): "1. [blue:Patient Preparation]: ... \n 2. [blue:Ultrasound Guidance]: ... \n 3. [blue:Sterile Field]: ..."

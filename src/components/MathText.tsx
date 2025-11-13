@@ -11,7 +11,7 @@ interface MathTextProps {
 }
 
 interface ParsedPart {
-  type: 'text' | 'fraction' | 'highlighted' | 'arrow' | 'italic' | 'image' | 'subscript' | 'superscript';
+  type: 'text' | 'fraction' | 'highlighted' | 'arrow' | 'italic' | 'image' | 'subscript' | 'superscript' | 'handwritten';
   content: string;
   color?: string;
   url?: string;
@@ -164,12 +164,17 @@ function parseContent(content: string): ParsedPart[] {
       }
       const endIndex = content.indexOf(']', i);
       const highlightContent = content.substring(i + 1, endIndex);
-      const [colorName, ...textParts] = highlightContent.split(':');
-      const highlightedText = textParts.join(':').trim();
+      const [tagName, ...textParts] = highlightContent.split(':');
+      const taggedText = textParts.join(':').trim();
       
-      // Recursively parse highlighted content for fractions and other formatting
-      const highlightedParts = parseHighlightedContent(highlightedText, colorName.trim());
-      parts.push(...highlightedParts);
+      // Check if this is a handwritten tag
+      if (tagName.trim().toLowerCase() === 'handwritten') {
+        parts.push({ type: 'handwritten', content: taggedText });
+      } else {
+        // Recursively parse highlighted content for fractions and other formatting
+        const highlightedParts = parseHighlightedContent(taggedText, tagName.trim());
+        parts.push(...highlightedParts);
+      }
       
       i = endIndex + 1;
     } else if ((content.substring(i, i + 2) === '->' || content.substring(i, i + 2) === '=>')) {
@@ -289,6 +294,13 @@ function renderTextPart(part: ParsedPart, index: number, baseFontSize: number, b
         </Text>
       );
     
+    case 'handwritten':
+      return (
+        <Text key={index} style={{ fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600' }}>
+          {part.content}
+        </Text>
+      );
+    
     default: // 'text'
       return part.content;
   }
@@ -349,6 +361,13 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
       return (
         <Text key={index} style={{ fontSize: baseFontSize * 0.7, color: baseColor }}>
           {superscriptText}
+        </Text>
+      );
+    
+    case 'handwritten':
+      return (
+        <Text key={index} style={{ fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600', color: baseColor }}>
+          {part.content}
         </Text>
       );
     
