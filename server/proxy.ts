@@ -1131,11 +1131,12 @@ RESPONSE FORMAT (JSON):
 - This helps students see WHY other options are wrong by showing the full context
 
 **2. HANDWRITTEN PROBLEMS - Use Handwriting Font:**
-- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper)
-- If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags
+- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper, handwritten numbers/symbols)
+- If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags with colored highlights inside
 - **Example:**
-  - Handwritten math problem: finalAnswer = "[handwritten:x = 7]"
-  - Typed textbook problem: finalAnswer = "[red:x = 7]" (no handwritten tag)
+  - Handwritten math problem: finalAnswer = "[handwritten:[red:x = 7]]" (handwriting font with red highlight)
+  - Typed textbook problem: finalAnswer = "[red:x = 7]" (normal font, just red highlight)
+- **CRITICAL**: You can nest color tags inside handwritten tags: [handwritten:[red:answer]] works perfectly
 - The handwriting font makes the answer feel personal and relatable to the student's own work
 
 **3. MATCH NUMBER FORMAT:**
@@ -1598,9 +1599,19 @@ ${ocrText}
 **Example:**
 - Question: "Complete the ratio: ___ : ___ : ___ (The angles of a triangle are in ratio 2:3:4)"
 - GOOD Answer: "The completed ratio is [red:2]:[red:3]:[red:4]" or "Box 1 = [red:2], Box 2 = [red:3], Box 3 = [red:4]"
-- BAD Answer: "The ratio can be expressed as two to three to four based on the proportion given..."`;
+- BAD Answer: "The ratio can be expressed as two to three to four based on the proportion given..."
+
+🖊️ **HANDWRITTEN PROBLEMS - Use Handwriting Font in Final Answer:**
+- **You have access to BOTH the OCR text AND the original image** - examine the image to detect handwriting
+- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper, handwritten numbers/symbols)
+- If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags with colored highlights inside
+- **Example:**
+  - Handwritten math problem: finalAnswer = "[handwritten:[red:x = 7]]" (handwriting font with red highlight)
+  - Typed textbook problem: finalAnswer = "[red:x = 7]" (normal font, just red highlight)
+- **CRITICAL**: You can nest color tags inside handwritten tags: [handwritten:[red:answer]] works perfectly
+- The handwriting font makes the answer feel personal and relatable to the student's own work`;
               
-              console.log('⏱️ [TIMING] Starting GPT-4o analysis (text mode)...');
+              console.log('⏱️ [TIMING] Starting GPT-4o analysis (with image for handwriting detection)...');
               const gptStart = Date.now();
               const response = await openai.chat.completions.create({
                 model: "gpt-4o",
@@ -1611,7 +1622,18 @@ ${ocrText}
                   },
                   {
                     role: "user",
-                    content: `Please analyze the OCR-extracted problem text above and provide a complete step-by-step solution in JSON format.`
+                    content: [
+                      {
+                        type: "text",
+                        text: `Please analyze the OCR-extracted problem text above and provide a complete step-by-step solution in JSON format. I'm also providing the original image so you can detect if it's handwritten and format the final answer accordingly.`
+                      },
+                      {
+                        type: "image_url",
+                        image_url: {
+                          url: imageUri
+                        }
+                      }
+                    ]
                   }
                 ],
                 response_format: { type: "json_object" },
@@ -1904,11 +1926,12 @@ RESPONSE FORMAT (JSON):
 - This helps students see WHY other options are wrong by showing the full context
 
 **2. HANDWRITTEN PROBLEMS - Use Handwriting Font:**
-- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper)
-- If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags
+- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper, handwritten numbers/symbols)
+- If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags with colored highlights inside
 - **Example:**
-  - Handwritten math problem: finalAnswer = "[handwritten:x = 7]"
-  - Typed textbook problem: finalAnswer = "[red:x = 7]" (no handwritten tag)
+  - Handwritten math problem: finalAnswer = "[handwritten:[red:x = 7]]" (handwriting font with red highlight)
+  - Typed textbook problem: finalAnswer = "[red:x = 7]" (normal font, just red highlight)
+- **CRITICAL**: You can nest color tags inside handwritten tags: [handwritten:[red:answer]] works perfectly
 - The handwriting font makes the answer feel personal and relatable to the student's own work
 
 **3. MATCH NUMBER FORMAT:**
