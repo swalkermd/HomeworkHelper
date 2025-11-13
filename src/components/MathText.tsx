@@ -17,6 +17,7 @@ interface ParsedPart {
   url?: string;
   numerator?: string;
   denominator?: string;
+  isHandwritten?: boolean; // Flag for applying handwriting font style
 }
 
 const SUPERSCRIPT_MAP: { [key: string]: string } = {
@@ -130,7 +131,35 @@ function parseHighlightedContent(content: string, color: string): ParsedPart[] {
   return parts;
 }
 
-function parseContent(content: string): ParsedPart[] {
+// Helper function to parse handwritten content - uses full parseContent logic and marks all parts as handwritten
+function parseHandwrittenContent(content: string): ParsedPart[] {
+  // Parse using the full content parser to get all formatting types
+  const parts = parseContentInternal(content, true);
+  return parts;
+}
+
+// Helper function to find matching closing bracket with depth tracking
+function findMatchingBracket(content: string, startIndex: number, openChar: string, closeChar: string): number {
+  let depth = 1;
+  let i = startIndex + 1;
+  
+  while (i < content.length && depth > 0) {
+    if (content[i] === openChar) {
+      depth++;
+    } else if (content[i] === closeChar) {
+      depth--;
+      if (depth === 0) {
+        return i;
+      }
+    }
+    i++;
+  }
+  
+  return -1; // No matching bracket found
+}
+
+// Internal content parser with optional handwritten flag
+function parseContentInternal(content: string, isHandwritten: boolean = false): ParsedPart[] {
   const parts: ParsedPart[] = [];
   let i = 0;
   let currentText = '';
@@ -138,61 +167,77 @@ function parseContent(content: string): ParsedPart[] {
   while (i < content.length) {
     if (content[i] === '{' && content.indexOf('}', i) > i) {
       if (currentText) {
-        parts.push({ type: 'text', content: currentText });
+        parts.push({ type: 'text', content: currentText, isHandwritten });
         currentText = '';
       }
       const endIndex = content.indexOf('}', i);
       const fractionContent = content.substring(i + 1, endIndex);
       const [num, den] = fractionContent.split('/');
       if (num && den) {
-        // This is a fraction like {1/8}
         parts.push({
           type: 'fraction',
           content: fractionContent,
           numerator: num.trim(),
           denominator: den.trim(),
+          isHandwritten,
         });
       } else {
-        // This is just text in braces like {8}, display without braces
-        parts.push({ type: 'text', content: fractionContent });
+        parts.push({ type: 'text', content: fractionContent, isHandwritten });
       }
       i = endIndex + 1;
-    } else if (content[i] === '[' && content.indexOf(':', i) > i && content.indexOf(']', i) > i) {
-      if (currentText) {
-        parts.push({ type: 'text', content: currentText });
-        currentText = '';
-      }
-      const endIndex = content.indexOf(']', i);
-      const highlightContent = content.substring(i + 1, endIndex);
-      const [tagName, ...textParts] = highlightContent.split(':');
-      const taggedText = textParts.join(':').trim();
+    } else if (content[i] === '[' && content.indexOf(':', i) > i) {
+      // Use bracket depth tracking to find the matching closing bracket
+      const endIndex = findMatchingBracket(content, i, '[', ']');
+      if (endIndex > i) {
+        if (currentText) {
+          parts.push({ type: 'text', content: currentText, isHandwritten });
+          currentText = '';
+        }
+        const highlightContent = content.substring(i + 1, endIndex);
+        const colonIndex = highlightContent.indexOf(':');
+        if (colonIndex > -1) {
+          const tagName = highlightContent.substring(0, colonIndex);
+          const taggedText = highlightContent.substring(colonIndex + 1).trim();
       
-      // Check if this is a handwritten tag
-      if (tagName.trim().toLowerCase() === 'handwritten') {
-        parts.push({ type: 'handwritten', content: taggedText });
+          if (tagName.trim().toLowerCase() === 'handwritten') {
+            // Don't nest handwritten tags - just parse the content as handwritten
+            const handwrittenParts = parseContentInternal(taggedText, true);
+            parts.push(...handwrittenParts);
+          } else {
+            // Color highlight - parse and preserve isHandwritten flag
+            const highlightedParts = parseHighlightedContent(taggedText, tagName.trim());
+            highlightedParts.forEach(part => {
+              if (isHandwritten) part.isHandwritten = true;
+            });
+            parts.push(...highlightedParts);
+          }
+        } else {
+          // No colon found, treat as regular text
+          currentText += content[i];
+          i++;
+          continue;
+        }
+        
+        i = endIndex + 1;
       } else {
-        // Recursively parse highlighted content for fractions and other formatting
-        const highlightedParts = parseHighlightedContent(taggedText, tagName.trim());
-        parts.push(...highlightedParts);
+        // No matching bracket found, treat as regular text
+        currentText += content[i];
+        i++;
       }
-      
-      i = endIndex + 1;
     } else if ((content.substring(i, i + 2) === '->' || content.substring(i, i + 2) === '=>')) {
       if (currentText) {
-        parts.push({ type: 'text', content: currentText });
+        parts.push({ type: 'text', content: currentText, isHandwritten });
         currentText = '';
       }
-      parts.push({ type: 'arrow', content: content.substring(i, i + 2) });
+      parts.push({ type: 'arrow', content: content.substring(i, i + 2), isHandwritten });
       i += 2;
     } else if (content[i] === '(' && content.substring(i, i + 7) === '(IMAGE:') {
-      // Find the closing parenthesis to get the full image tag: (IMAGE: desc](url)
       const closingParenIndex = content.indexOf(')', i + 7);
       if (closingParenIndex > i) {
         if (currentText) {
-          parts.push({ type: 'text', content: currentText });
+          parts.push({ type: 'text', content: currentText, isHandwritten });
           currentText = '';
         }
-        // Extract everything between (IMAGE: and )
         const imageContent = content.substring(i + 7, closingParenIndex);
         const separatorIndex = imageContent.indexOf('](');
         if (separatorIndex > -1) {
@@ -202,42 +247,43 @@ function parseContent(content: string): ParsedPart[] {
             type: 'image',
             content: desc,
             url: url,
+            isHandwritten,
           });
-          i = closingParenIndex + 1;  // Skip past the closing )
+          i = closingParenIndex + 1;
         } else {
-          // Malformed tag, treat as text
           currentText += content[i];
+          i++;
         }
       } else {
         currentText += content[i];
+        i++;
       }
     } else if (content[i] === '_' && content.indexOf('_', i + 1) > i) {
       if (currentText) {
-        parts.push({ type: 'text', content: currentText });
+        parts.push({ type: 'text', content: currentText, isHandwritten });
         currentText = '';
       }
       const endIndex = content.indexOf('_', i + 1);
       const subscriptContent = content.substring(i + 1, endIndex);
-      parts.push({ type: 'subscript', content: subscriptContent });
+      parts.push({ type: 'subscript', content: subscriptContent, isHandwritten });
       i = endIndex + 1;
     } else if (content[i] === '^' && content.indexOf('^', i + 1) > i) {
       if (currentText) {
-        parts.push({ type: 'text', content: currentText });
+        parts.push({ type: 'text', content: currentText, isHandwritten });
         currentText = '';
       }
       const endIndex = content.indexOf('^', i + 1);
       const superscriptContent = content.substring(i + 1, endIndex);
-      parts.push({ type: 'superscript', content: superscriptContent });
+      parts.push({ type: 'superscript', content: superscriptContent, isHandwritten });
       i = endIndex + 1;
     } else if (content[i] === '+' && content[i + 1] === '+' && content.indexOf('++', i + 2) > i) {
-      // Only treat ++ as italic markers (not single + which is math operator)
       if (currentText) {
-        parts.push({ type: 'text', content: currentText });
+        parts.push({ type: 'text', content: currentText, isHandwritten });
         currentText = '';
       }
       const endIndex = content.indexOf('++', i + 2);
       const italicContent = content.substring(i + 2, endIndex);
-      parts.push({ type: 'italic', content: italicContent });
+      parts.push({ type: 'italic', content: italicContent, isHandwritten });
       i = endIndex + 2;
     } else {
       currentText += content[i];
@@ -246,80 +292,94 @@ function parseContent(content: string): ParsedPart[] {
   }
 
   if (currentText) {
-    parts.push({ type: 'text', content: currentText });
+    parts.push({ type: 'text', content: currentText, isHandwritten });
   }
 
   return parts;
 }
 
+function parseContent(content: string): ParsedPart[] {
+  // Use the internal parser with isHandwritten=false for regular content
+  return parseContentInternal(content, false);
+}
+
 // Render text-only parts as nested Text (for inline flow without breaks)
 function renderTextPart(part: ParsedPart, index: number, baseFontSize: number, baseColor: string, isOnGreenBg: boolean): React.ReactNode {
+  // Helper to apply handwriting style wrapper if needed
+  const wrapWithHandwriting = (element: React.ReactNode) => {
+    if (part.isHandwritten) {
+      return <Text key={index} style={{ fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600' }}>{element}</Text>;
+    }
+    return element;
+  };
+  
   switch (part.type) {
     case 'highlighted':
       const highlightColor = getHighlightColor(part.color || '');
-      return (
-        <Text key={index} style={{ color: highlightColor, fontWeight: '600' }}>
+      const highlightElement = (
+        <Text style={{ color: highlightColor, fontWeight: '600' }}>
           {part.content}
         </Text>
       );
+      return wrapWithHandwriting(highlightElement);
     
     case 'arrow':
       const arrowColor = isOnGreenBg ? '#ffffff' : colors.secondary;
-      return (
-        <Text key={index} style={{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor }}>
+      return wrapWithHandwriting(
+        <Text style={{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor }}>
           {' → '}
         </Text>
       );
     
     case 'italic':
-      return (
-        <Text key={index} style={{ fontStyle: 'italic' }}>
+      return wrapWithHandwriting(
+        <Text style={{ fontStyle: 'italic' }}>
           {part.content}
         </Text>
       );
     
     case 'subscript':
       const subscriptText = part.content.split('').map(char => SUBSCRIPT_MAP[char] || char).join('');
-      return (
-        <Text key={index} style={{ fontSize: baseFontSize * 0.7 }}>
+      return wrapWithHandwriting(
+        <Text style={{ fontSize: baseFontSize * 0.7 }}>
           {subscriptText}
         </Text>
       );
     
     case 'superscript':
       const superscriptText = part.content.split('').map(char => SUPERSCRIPT_MAP[char] || char).join('');
-      return (
-        <Text key={index} style={{ fontSize: baseFontSize * 0.7 }}>
+      return wrapWithHandwriting(
+        <Text style={{ fontSize: baseFontSize * 0.7 }}>
           {superscriptText}
         </Text>
       );
     
-    case 'handwritten':
-      return (
-        <Text key={index} style={{ fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600' }}>
-          {part.content}
-        </Text>
-      );
-    
     default: // 'text'
+      if (part.isHandwritten) {
+        return <Text key={index} style={{ fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600' }}>{part.content}</Text>;
+      }
       return part.content;
   }
 }
 
 // Render all parts (including fractions/images) as View children
 function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseColor: string, isOnGreenBg: boolean): React.ReactNode {
+  // Helper to get font style for handwritten content
+  const getHandwritingStyle = () => part.isHandwritten ? { fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600' as const } : {};
+  
   switch (part.type) {
     case 'fraction':
       // Use the fraction's color if specified (for highlighted fractions), otherwise use base color
       const fractionColor = part.color ? getHighlightColor(part.color) : baseColor;
       const fractionWeight = part.color ? '600' : 'normal'; // Bold if highlighted
+      const fractionFont = part.isHandwritten ? { fontFamily: 'Caveat', fontWeight: '600' as const } : {};
       return (
         <View key={index} style={styles.fractionContainer}>
-          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: fractionColor, fontWeight: fractionWeight }]}>
+          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: fractionColor, fontWeight: fractionWeight }, fractionFont]}>
             {part.numerator}
           </Text>
           <View style={[styles.fractionLine, { backgroundColor: fractionColor }]} />
-          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: fractionColor, fontWeight: fractionWeight }]}>
+          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: fractionColor, fontWeight: fractionWeight }, fractionFont]}>
             {part.denominator}
           </Text>
         </View>
@@ -328,7 +388,7 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     case 'highlighted':
       const highlightColor = getHighlightColor(part.color || '');
       return (
-        <Text key={index} style={{ fontSize: baseFontSize, color: highlightColor, fontWeight: '600' }}>
+        <Text key={index} style={[{ fontSize: baseFontSize, color: highlightColor, fontWeight: '600' }, getHandwritingStyle()]}>
           {part.content}
         </Text>
       );
@@ -336,14 +396,14 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     case 'arrow':
       const arrowColor = isOnGreenBg ? '#ffffff' : colors.secondary;
       return (
-        <Text key={index} style={{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor }}>
+        <Text key={index} style={[{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor }, getHandwritingStyle()]}>
           {' → '}
         </Text>
       );
     
     case 'italic':
       return (
-        <Text key={index} style={{ fontSize: baseFontSize, color: baseColor, fontStyle: 'italic' }}>
+        <Text key={index} style={[{ fontSize: baseFontSize, color: baseColor, fontStyle: 'italic' }, getHandwritingStyle()]}>
           {part.content}
         </Text>
       );
@@ -351,7 +411,7 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     case 'subscript':
       const subscriptText = part.content.split('').map(char => SUBSCRIPT_MAP[char] || char).join('');
       return (
-        <Text key={index} style={{ fontSize: baseFontSize * 0.7, color: baseColor }}>
+        <Text key={index} style={[{ fontSize: baseFontSize * 0.7, color: baseColor }, getHandwritingStyle()]}>
           {subscriptText}
         </Text>
       );
@@ -359,15 +419,8 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     case 'superscript':
       const superscriptText = part.content.split('').map(char => SUPERSCRIPT_MAP[char] || char).join('');
       return (
-        <Text key={index} style={{ fontSize: baseFontSize * 0.7, color: baseColor }}>
+        <Text key={index} style={[{ fontSize: baseFontSize * 0.7, color: baseColor }, getHandwritingStyle()]}>
           {superscriptText}
-        </Text>
-      );
-    
-    case 'handwritten':
-      return (
-        <Text key={index} style={{ fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600', color: baseColor }}>
-          {part.content}
         </Text>
       );
     
@@ -391,7 +444,7 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     case 'text':
     default:
       return (
-        <Text key={index} style={{ fontSize: baseFontSize, color: baseColor }}>
+        <Text key={index} style={[{ fontSize: baseFontSize, color: baseColor }, getHandwritingStyle()]}>
           {part.content}
         </Text>
       );
