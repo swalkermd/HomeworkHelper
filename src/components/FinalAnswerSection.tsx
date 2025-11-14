@@ -88,21 +88,24 @@ export default function FinalAnswerSection({ content, structuredContent, isOnGre
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'column', // Explicit vertical stacking
-    gap: 16, // Vertical spacing between parts (increased for clarity)
+    gap: 18, // Generous spacing between parts for readability
+    paddingVertical: 4, // Subtle padding for breathing room
   },
   partRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 14, // Comfortable spacing between label and content
+    paddingVertical: 2, // Subtle vertical padding for each part
   },
   labelContainer: {
-    minWidth: 40,
-    paddingTop: 2, // Align with first line of text
+    minWidth: 42, // Slightly wider for better alignment
+    paddingTop: 3, // Fine-tuned alignment with first line of text
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
+    fontSize: 17, // Slightly larger for better hierarchy
+    fontWeight: '700', // Bolder for stronger visual distinction
+    color: colors.primary, // Use brand color for labels
+    letterSpacing: 0.2, // Subtle letter spacing for refinement
   },
   labelOnGreen: {
     color: colors.textPrimary,
@@ -110,5 +113,6 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     flexShrink: 1,
+    paddingTop: 1, // Micro-adjustment for perfect vertical alignment
   },
 });

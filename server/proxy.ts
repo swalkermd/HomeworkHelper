@@ -2900,11 +2900,38 @@ RESPONSE FORMAT (JSON):
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
-- **MULTI-PART ANSWERS:** If the question has multiple parts OR your answer has multiple numbered/lettered items, put each part on its own line:
-  - CORRECT (letters): "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
-  - CORRECT (numbers): "1. [blue:Patient Preparation]: ... \n 2. [blue:Ultrasound Guidance]: ... \n 3. [blue:Sterile Field]: ..."
-  - WRONG: "a) v = 15 m/s, b) h = 11.5 m, c) t = 3.1 s" (all on one line)
-  - WRONG: "1. Step one 2. Step two 3. Step three" (all on one line)
+- **MULTI-PART ANSWERS - PROFESSIONAL FORMATTING:**
+  If the question has multiple parts OR your answer has multiple numbered/lettered items:
+  
+  **CRITICAL RULES for Multi-Part Final Answers:**
+  1. **Each part on its own line** - Use \n to separate parts
+  2. **Descriptive labels** - Include what each part represents, not just the letter
+  3. **NO periods after equations** - Equations are not sentences
+  4. **Parallel structure** - All parts should follow the same grammatical pattern
+  5. **Complete descriptions** - Each part should be clear and self-contained
+  
+  **PROFESSIONAL FORMAT EXAMPLES:**
+  
+  ✅ EXCELLENT (Physics - descriptive, parallel, no periods):
+  "a) Initial velocity: [red:v₀ = 15 m/s] \n b) Maximum height: [red:h = 11.5 m] \n c) Time of flight: [red:t = 3.1 s]"
+  
+  ✅ EXCELLENT (Math - equation type labeled, consistent structure):
+  "a) Vertex form: [red:y = −2(x − 1)² + 25] \n b) Standard form: [red:y = −2x² + 4x + 23] \n c) Vertex coordinates: [red:(1, 25)] \n d) Direction: The parabola opens [red:downward]"
+  
+  ✅ GOOD (Chemistry - complete descriptions):
+  "a) Balanced equation: [red:2H₂ + O₂ → 2H₂O] \n b) Reaction type: [red:Synthesis reaction] \n c) Moles of product: [red:0.5 mol]"
+  
+  ❌ WRONG (inconsistent - some have context, some don't):
+  "a) [red:y = −2(x − 1)² + 25] \n b) Standard form: [red:y = −2x² + 4x + 23] \n c) Vertex: [red:(1, 25)] \n d) Opens [red:downward]"
+  
+  ❌ WRONG (periods after equations look awkward):
+  "a) Vertex form: [red:y = −2(x − 1)² + 25]. \n b) Standard: [red:y = −2x² + 4x + 23]."
+  
+  ❌ WRONG (all on one line):
+  "a) v = 15 m/s, b) h = 11.5 m, c) t = 3.1 s"
+  
+  ❌ WRONG (too terse, lacks context):
+  "a) [red:−2(x − 1)² + 25] \n b) [red:−2x² + 4x + 23] \n c) [red:(1, 25)] \n d) [red:Downward]"
 
 **CRITICAL: visualAids array is REQUIRED for:**
 - Physics: projectile motion, force diagrams, circuits, kinematics
@@ -3891,11 +3918,38 @@ RESPONSE FORMAT (JSON):
 - For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
 - For science: highlight phenomena, hormones, processes, chemical names
 - For any subject: highlight the most important 2-3 terms that answer the core question
-- **MULTI-PART ANSWERS:** If the question has multiple parts OR your answer has multiple numbered/lettered items, put each part on its own line:
-  - CORRECT (letters): "a) [red:v = 15 m/s] \n b) [red:h = 11.5 m] \n c) [red:t = 3.1 s]"
-  - CORRECT (numbers): "1. [blue:Patient Preparation]: ... \n 2. [blue:Ultrasound Guidance]: ... \n 3. [blue:Sterile Field]: ..."
-  - WRONG: "a) v = 15 m/s, b) h = 11.5 m, c) t = 3.1 s" (all on one line)
-  - WRONG: "1. Step one 2. Step two 3. Step three" (all on one line)
+- **MULTI-PART ANSWERS - PROFESSIONAL FORMATTING:**
+  If the question has multiple parts OR your answer has multiple numbered/lettered items:
+  
+  **CRITICAL RULES for Multi-Part Final Answers:**
+  1. **Each part on its own line** - Use \n to separate parts
+  2. **Descriptive labels** - Include what each part represents, not just the letter
+  3. **NO periods after equations** - Equations are not sentences
+  4. **Parallel structure** - All parts should follow the same grammatical pattern
+  5. **Complete descriptions** - Each part should be clear and self-contained
+  
+  **PROFESSIONAL FORMAT EXAMPLES:**
+  
+  ✅ EXCELLENT (Physics - descriptive, parallel, no periods):
+  "a) Initial velocity: [red:v₀ = 15 m/s] \n b) Maximum height: [red:h = 11.5 m] \n c) Time of flight: [red:t = 3.1 s]"
+  
+  ✅ EXCELLENT (Math - equation type labeled, consistent structure):
+  "a) Vertex form: [red:y = −2(x − 1)² + 25] \n b) Standard form: [red:y = −2x² + 4x + 23] \n c) Vertex coordinates: [red:(1, 25)] \n d) Direction: The parabola opens [red:downward]"
+  
+  ✅ GOOD (Chemistry - complete descriptions):
+  "a) Balanced equation: [red:2H₂ + O₂ → 2H₂O] \n b) Reaction type: [red:Synthesis reaction] \n c) Moles of product: [red:0.5 mol]"
+  
+  ❌ WRONG (inconsistent - some have context, some don't):
+  "a) [red:y = −2(x − 1)² + 25] \n b) Standard form: [red:y = −2x² + 4x + 23] \n c) Vertex: [red:(1, 25)] \n d) Opens [red:downward]"
+  
+  ❌ WRONG (periods after equations look awkward):
+  "a) Vertex form: [red:y = −2(x − 1)² + 25]. \n b) Standard: [red:y = −2x² + 4x + 23]."
+  
+  ❌ WRONG (all on one line):
+  "a) v = 15 m/s, b) h = 11.5 m, c) t = 3.1 s"
+  
+  ❌ WRONG (too terse, lacks context):
+  "a) [red:−2(x − 1)² + 25] \n b) [red:−2x² + 4x + 23] \n c) [red:(1, 25)] \n d) [red:Downward]"
 
 **CRITICAL: visualAids array is REQUIRED for:**
 - Physics: projectile motion, force diagrams, circuits, kinematics
