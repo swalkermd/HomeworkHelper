@@ -2903,8 +2903,13 @@ RESPONSE FORMAT (JSON):
 - **MULTI-PART ANSWERS - PROFESSIONAL FORMATTING:**
   If the question has multiple parts OR your answer has multiple numbered/lettered items:
   
+  **🚨 CRITICAL: finalAnswer MUST BE A STRING, NOT AN OBJECT!**
+  - DO NOT create a JSON object like {"a": "...", "b": "...", "c": "..."}
+  - DO use a single string with \n newline separators between parts
+  - Correct format: "a) Part one \n b) Part two \n c) Part three"
+  
   **CRITICAL RULES for Multi-Part Final Answers:**
-  1. **Each part on its own line** - Use \n to separate parts
+  1. **Each part on its own line** - Use literal \n characters to separate parts
   2. **Descriptive labels** - Include what each part represents, not just the letter
   3. **NO periods after equations** - Equations are not sentences
   4. **Parallel structure** - All parts should follow the same grammatical pattern
@@ -3921,8 +3926,13 @@ RESPONSE FORMAT (JSON):
 - **MULTI-PART ANSWERS - PROFESSIONAL FORMATTING:**
   If the question has multiple parts OR your answer has multiple numbered/lettered items:
   
+  **🚨 CRITICAL: finalAnswer MUST BE A STRING, NOT AN OBJECT!**
+  - DO NOT create a JSON object like {"a": "...", "b": "...", "c": "..."}
+  - DO use a single string with \n newline separators between parts
+  - Correct format: "a) Part one \n b) Part two \n c) Part three"
+  
   **CRITICAL RULES for Multi-Part Final Answers:**
-  1. **Each part on its own line** - Use \n to separate parts
+  1. **Each part on its own line** - Use literal \n characters to separate parts
   2. **Descriptive labels** - Include what each part represents, not just the letter
   3. **NO periods after equations** - Equations are not sentences
   4. **Parallel structure** - All parts should follow the same grammatical pattern
