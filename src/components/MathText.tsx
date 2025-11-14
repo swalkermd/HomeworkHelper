@@ -500,7 +500,7 @@ function getHighlightColor(colorName: string): string {
 const styles = StyleSheet.create({
   lineContainer: {
     flexDirection: 'row',
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
     alignItems: 'baseline',
   },
   fractionContainer: {
