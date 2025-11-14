@@ -382,14 +382,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'baseline',
-    maxWidth: '100%',
+    width: '100%',
+    flexShrink: 1,
   },
   cluster: {
     flexDirection: 'row',
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
     alignItems: 'baseline',
     flexShrink: 1,
-    maxWidth: '100%',
+    width: '100%',
   },
   inlineText: {
     flexShrink: 1,
