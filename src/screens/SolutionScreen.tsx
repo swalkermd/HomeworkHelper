@@ -64,11 +64,12 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const [loadingSimplified, setLoadingSimplified] = useState(false);
   const [diagrams, setDiagrams] = useState<DiagramStatus[]>([]);
   const [diagramsComplete, setDiagramsComplete] = useState(false);
-  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'unverified'>('pending');
+  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'unverified' | null>(null);
   const validation = useMemo(() => validateSolutionIntegrity(currentSolution), [currentSolution]);
 
   useEffect(() => {
     if (currentSolution?.solutionId) {
+      console.log('🔄 Syncing verification status from solution:', currentSolution.verificationStatus);
       setVerificationStatus(currentSolution.verificationStatus || 'pending');
     }
   }, [currentSolution?.solutionId, currentSolution?.verificationStatus]);
@@ -716,7 +717,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                 colors={['#10b981', '#059669']}
                 style={styles.finalAnswerCard}
               >
-                {verificationStatus === 'pending' && (
+                {(verificationStatus === 'pending' || verificationStatus === null) && (
                   <ActivityIndicator size="small" color="#ffffff" />
                 )}
                 {verificationStatus === 'verified' && (
