@@ -1528,8 +1528,45 @@ Grade-appropriate language based on difficulty level.`
           });
           
           const content = response.choices[0]?.message?.content || "{}";
-          const parsed = JSON.parse(content);
-          return parsed;
+          
+          try {
+            const parsed = JSON.parse(content);
+            return parsed;
+          } catch (jsonError: any) {
+            console.error('❌ JSON Parse Error:', jsonError.message);
+            console.error('📄 Response length:', content.length, 'chars');
+            console.error('📄 Response preview (first 500 chars):', content.substring(0, 500));
+            console.error('📄 Response end (last 500 chars):', content.substring(Math.max(0, content.length - 500)));
+            
+            // Attempt to repair common JSON issues
+            let repairedContent = content;
+            
+            // Fix: Unclosed arrays - add missing closing bracket
+            const openBrackets = (repairedContent.match(/\[/g) || []).length;
+            const closeBrackets = (repairedContent.match(/\]/g) || []).length;
+            if (openBrackets > closeBrackets) {
+              console.log(`🔧 Attempting JSON repair: Adding ${openBrackets - closeBrackets} missing ']'`);
+              repairedContent += ']'.repeat(openBrackets - closeBrackets);
+            }
+            
+            // Fix: Unclosed objects - add missing closing brace
+            const openBraces = (repairedContent.match(/\{/g) || []).length;
+            const closeBraces = (repairedContent.match(/\}/g) || []).length;
+            if (openBraces > closeBraces) {
+              console.log(`🔧 Attempting JSON repair: Adding ${openBraces - closeBraces} missing '}'`);
+              repairedContent += '}'.repeat(openBraces - closeBraces);
+            }
+            
+            // Try parsing repaired JSON
+            try {
+              const parsed = JSON.parse(repairedContent);
+              console.log('✅ JSON successfully repaired and parsed!');
+              return parsed;
+            } catch (repairError: any) {
+              console.error('❌ JSON repair failed:', repairError.message);
+              throw new Error(`Failed to parse AI response as JSON: ${jsonError.message}`);
+            }
+          }
         } catch (error: any) {
           console.error('OpenAI API error:', error);
           if (isRateLimitError(error)) {
