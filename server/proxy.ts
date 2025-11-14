@@ -371,7 +371,12 @@ function isMathEligible(question: string, subject: string): boolean {
     'factor', 'expand', 'differentiate', 'integrate'
   ];
   
-  const nonMathKeywords = ['explain', 'describe', 'essay', 'write', 'discuss', 'analyze'];
+  // Essay-specific phrases (not just "write" which can be math-related)
+  const nonMathPhrases = [
+    'write an essay', 'write a paragraph', 'write about', 
+    'explain in', 'describe how', 'describe why', 'describe the',
+    'discuss the', 'analyze the'
+  ];
   
   // Check if subject is math-related
   const isMathSubject = mathSubjects.some(s => subject.toLowerCase().includes(s));
@@ -381,12 +386,12 @@ function isMathEligible(question: string, subject: string): boolean {
     question.toLowerCase().includes(kw)
   );
   
-  // Check for non-math keywords (essay questions, etc.)
-  const hasNonMathKeywords = nonMathKeywords.some(kw => 
-    question.toLowerCase().includes(kw)
+  // Check for non-math phrases (essay questions, etc.)
+  const hasNonMathPhrases = nonMathPhrases.some(phrase => 
+    question.toLowerCase().includes(phrase)
   );
   
-  return (isMathSubject || hasMathKeywords) && !hasNonMathKeywords;
+  return (isMathSubject || hasMathKeywords) && !hasNonMathPhrases;
 }
 
 // Extract answer parts from multi-part solution
