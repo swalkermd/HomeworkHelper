@@ -3,6 +3,14 @@
 ## Overview
 Homework Helper is an AI-powered mobile application built with React Native and Expo. It assists students with homework across various subjects by providing clear, step-by-step visual solutions. The app leverages AI to offer grade-appropriate explanations, beautiful formatting, and interactive features to foster deeper learning and understanding. The business vision is to revolutionize homework assistance by making learning engaging and accessible, tapping into a significant market of students seeking personalized educational support, and aiming to become a leading tool for enhancing student comprehension and academic performance.
 
+## Recent Changes (Nov 14, 2025)
+- **FIXED: Vertical Fraction Formatting** - Implemented hybrid solution to prevent AI from outputting fractions in multi-line vertical format. Added pre-processor to detect and convert vertical fractions (e.g., "1\n2") to slash notation ("1/2") before whitespace normalization. Updated AI prompts across all endpoints to mandate LaTeX `\frac{num}{den}` or slash `{num/den}` notation and explicitly prohibit vertical fraction layouts.
+- **UX: Simplified Final Answer Section** - Removed instructional text ("Double-check the concluding statement..." and "Reviewed for completeness and clarity") from final answer display. Changed "Verified Result" label to just "Answer" for clarity.
+- **UX: Hidden Difficulty Level** - Removed difficulty level from solution screen display to reduce visual clutter. Difficulty is still tracked internally and can be revealed if user asks about it.
+- **FIXED: Critical Fraction Formatting Bug** - Rewrote fraction conversion logic using brace-aware tokenizer to prevent double-wrapping. Fixed bug where `{240/41}` was corrupted to `{2{40/4}1}`. New tokenizer skips already-wrapped fractions in curly braces while still processing fractions in parentheses. Includes unit allowlist (h, m, s, c, cm, ft, in, kg, etc.) to preserve measurement units outside braces (`12/5h` → `{12/5}h`) while keeping algebraic variables inside (`3x/4y` → `{3x/4y}`).
+- **NEW: Automatic Diagram Generation for Geometry Problems** - Added deterministic measurement diagram enforcement using keyword classifier. Geometry/measurement problems (cutting, dividing, measuring) with units and fractions now automatically trigger diagram generation even if AI omits them. Uses ≥2 signal threshold (geometry actions, measurement nouns, units, fractions) to avoid false positives.
+- **FIXED: Line Break in Mixed Number Measurements** - Enhanced MathText component to prevent line breaks between fractions and following hyphens/units. Fixed issue where "20{1/2}-inch" would break across lines. Fractions followed by hyphens are now wrapped together in a single non-wrapping View container.
+
 ## User Preferences
 None documented yet.
 

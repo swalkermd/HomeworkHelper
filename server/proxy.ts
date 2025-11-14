@@ -530,6 +530,23 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   formatted = formatted.replace(/\^\^/g, '^'); // Replace double carets with single
   formatted = formatted.replace(/(\^\d+)\^/g, '$1'); // Remove trailing caret after superscript numbers
   
+  // 0C. CRITICAL: Detect and convert vertical fractions BEFORE whitespace normalization
+  // AI sometimes outputs fractions in vertical format:
+  //   y = 
+  //   1
+  //   2
+  // This must be converted to "1/2" before newlines are collapsed to spaces
+  // Pattern: math context (=, +, -, ×, etc.) followed by newlines and a fraction-like stack
+  formatted = formatted.replace(
+    /([=+\-×÷*\(]\s*)\n+\s*(\d+)\s*\n+\s*(\d+)(?=\s|$)/g,
+    '$1$2/$3'
+  );
+  // Also catch fractions at start of text (no preceding operator)
+  formatted = formatted.replace(
+    /^\s*(\d+)\s*\n+\s*(\d+)(?=\s+[a-zA-Z])/gm,
+    '$1/$2'
+  );
+  
   // 1. Normalize whitespace: replace ALL newlines with spaces for continuous text flow
   // EXCEPT for multi-part answers (a), b), c) which should stay on separate lines
   // First, normalize all line endings to \n
@@ -1127,6 +1144,8 @@ app.post('/api/analyze-text', async (req, res) => {
 - If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
 - CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
+- **ALWAYS use LaTeX \\frac{num}{den} or slash notation {num/den} for fractions**
+- **NEVER output fractions in vertical multi-line format** (e.g., "1\n2" is WRONG, use "\\frac{1}{2}" or "{1/2}")
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
@@ -1708,6 +1727,8 @@ ${ocrText}
 - If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
 - CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
+- **ALWAYS use LaTeX \\frac{num}{den} or slash notation {num/den} for fractions**
+- **NEVER output fractions in vertical multi-line format** (e.g., "1\n2" is WRONG, use "\\frac{1}{2}" or "{1/2}")
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
@@ -1825,6 +1846,8 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
 - If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
 - CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
+- **ALWAYS use LaTeX \\frac{num}{den} or slash notation {num/den} for fractions**
+- **NEVER output fractions in vertical multi-line format** (e.g., "1\n2" is WRONG, use "\\frac{1}{2}" or "{1/2}")
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
