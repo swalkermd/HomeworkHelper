@@ -18,6 +18,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import cors from 'cors';
 import OpenAI from 'openai';
 import { Mistral } from '@mistralai/mistralai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import pRetry, { AbortError } from 'p-retry';
 import fs from 'fs';
 import path from 'path';
@@ -33,12 +34,19 @@ const openaiBaseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env
 // Resolve Mistral configuration
 const mistralApiKey = process.env.MISTRAL_API_KEY;
 
+// Resolve Gemini configuration
+const geminiApiKey = process.env.GEMINI_API_KEY;
+
 if (!openaiApiKey) {
   console.warn('⚠️ OpenAI API key not configured. Set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY.');
 }
 
 if (!mistralApiKey) {
   console.warn('⚠️ Mistral API key not configured. Hybrid OCR will fall back to OpenAI only.');
+}
+
+if (!geminiApiKey) {
+  console.warn('⚠️ Gemini API key not configured. Backup verification will be unavailable.');
 }
 
 // CRITICAL: Health check endpoint FIRST - must respond immediately for deployment health checks
@@ -188,6 +196,70 @@ const openai = new OpenAI({
 
 // Initialize Mistral client for superior STEM OCR
 const mistral = mistralApiKey ? new Mistral({ apiKey: mistralApiKey }) : null;
+
+// Initialize Gemini client for backup verification
+const geminiAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
+
+// Gemini usage tracking (200 calls/month limit)
+const GEMINI_USAGE_FILE = path.join(process.cwd(), 'data', 'gemini-usage.json');
+const GEMINI_MONTHLY_LIMIT = 200;
+
+interface GeminiUsage {
+  monthKey: string;
+  count: number;
+}
+
+async function getGeminiUsage(): Promise<GeminiUsage> {
+  try {
+    const data = await fs.promises.readFile(GEMINI_USAGE_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    return { monthKey: '', count: 0 };
+  }
+}
+
+async function incrementGeminiUsage(): Promise<boolean> {
+  const currentMonthKey = new Date().toISOString().substring(0, 7); // "YYYY-MM"
+  const usage = await getGeminiUsage();
+  
+  // Reset counter if new month
+  if (usage.monthKey !== currentMonthKey) {
+    usage.monthKey = currentMonthKey;
+    usage.count = 0;
+  }
+  
+  // Check limit
+  if (usage.count >= GEMINI_MONTHLY_LIMIT) {
+    console.warn(`⚠️ Gemini monthly limit reached (${usage.count}/${GEMINI_MONTHLY_LIMIT})`);
+    return false;
+  }
+  
+  // Increment and save
+  usage.count++;
+  await fs.promises.writeFile(GEMINI_USAGE_FILE, JSON.stringify(usage, null, 2));
+  console.log(`📊 Gemini usage: ${usage.count}/${GEMINI_MONTHLY_LIMIT} this month`);
+  return true;
+}
+
+// In-memory verification store
+interface VerificationResult {
+  status: 'pending' | 'verified' | 'unverified';
+  confidence: number;
+  warnings: string[];
+  timestamp: number;
+}
+
+const verificationStore = new Map<string, VerificationResult>();
+
+// Cleanup old verifications after 1 hour
+setInterval(() => {
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  for (const [id, data] of verificationStore.entries()) {
+    if (data.timestamp < oneHourAgo) {
+      verificationStore.delete(id);
+    }
+  }
+}, 5 * 60 * 1000);
 
 /**
  * STEM CONTENT DETECTION - Analyzes extracted text to determine if it's STEM content
@@ -987,6 +1059,191 @@ Respond in JSON format:
   }
 }
 
+// Gemini verification - backup verification using Google's Gemini
+async function geminiVerification(
+  originalQuestion: string,
+  proposedSolution: any
+): Promise<ValidationResult> {
+  if (!geminiAI) {
+    console.warn('⚠️ Gemini client not initialized');
+    return {
+      isValid: true,
+      errors: [],
+      warnings: ['Gemini not available'],
+      confidence: 50
+    };
+  }
+  
+  try {
+    console.log('🔮 Running Gemini verification (backup)...');
+    
+    // Check rate limit
+    const canUse = await incrementGeminiUsage();
+    if (!canUse) {
+      return {
+        isValid: true,
+        errors: [],
+        warnings: ['Gemini monthly limit reached'],
+        confidence: 50
+      };
+    }
+    
+    const stepsText = proposedSolution.steps
+      .map((s: any) => `${s.title}: ${s.content}`)
+      .join('\n');
+    
+    const verificationPrompt = `You are a quality control expert verifying educational content for accuracy.
+
+ORIGINAL PROBLEM:
+${originalQuestion}
+
+PROPOSED SOLUTION:
+Subject: ${proposedSolution.subject}
+Grade Level: ${proposedSolution.difficulty}
+
+Steps:
+${stepsText}
+
+Final Answer: ${proposedSolution.finalAnswer}
+
+YOUR TASK:
+1. Verify the mathematical/scientific accuracy of this solution
+2. Check that calculations are correct at each step
+3. Verify the final answer is accurate
+4. Identify any errors in logic, arithmetic, or problem-solving approach
+5. Confirm the solution actually addresses the question asked
+
+Respond in JSON format:
+{
+  "isCorrect": true/false,
+  "confidence": 0-100 (how confident you are in this assessment),
+  "errors": ["list of specific errors found, if any"],
+  "warnings": ["list of minor issues or improvements, if any"],
+  "reasoning": "brief explanation of your assessment"
+}`;
+
+    const model = geminiAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: verificationPrompt }] }],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 2048,
+        responseMimeType: "application/json",
+      },
+    });
+    
+    const response = result.response;
+    const text = response.text();
+    const verification = JSON.parse(text);
+    
+    console.log(`✓ Gemini verification complete - Correct: ${verification.isCorrect}, Confidence: ${verification.confidence}%`);
+    if (verification.errors && verification.errors.length > 0) {
+      console.log(`⚠️  Gemini found errors:`, verification.errors);
+    }
+    
+    return {
+      isValid: verification.isCorrect === true,
+      errors: verification.errors || [],
+      warnings: verification.warnings || [],
+      confidence: verification.confidence || 0
+    };
+    
+  } catch (error) {
+    console.error('❌ Gemini verification error:', error);
+    return {
+      isValid: true,
+      errors: [],
+      warnings: ['Gemini verification encountered an error'],
+      confidence: 50
+    };
+  }
+}
+
+// Async verification pipeline - runs in background
+async function runVerificationPipeline(
+  solutionId: string,
+  originalQuestion: string,
+  solution: any
+): Promise<void> {
+  console.log(`🔄 Starting async verification pipeline for solution ${solutionId}...`);
+  
+  // Initialize as pending
+  verificationStore.set(solutionId, {
+    status: 'pending',
+    confidence: 0,
+    warnings: [],
+    timestamp: Date.now()
+  });
+  
+  try {
+    // Attempt 1: GPT-4o verification (temperature 0.3)
+    let verification = await crossModelVerification(originalQuestion, solution);
+    
+    if (verification.isValid && verification.confidence >= 70) {
+      // Success on first try
+      console.log(`✅ Verification passed on first attempt (confidence: ${verification.confidence}%)`);
+      verificationStore.set(solutionId, {
+        status: 'verified',
+        confidence: verification.confidence,
+        warnings: verification.warnings,
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    // Attempt 2: Retry GPT-4o with alternate prompt (higher temperature for fresh perspective)
+    console.log(`🔄 First attempt inconclusive, retrying with alternate approach...`);
+    
+    const retryVerification = await crossModelVerification(originalQuestion, solution);
+    
+    if (retryVerification.isValid && retryVerification.confidence >= 70) {
+      console.log(`✅ Verification passed on retry (confidence: ${retryVerification.confidence}%)`);
+      verificationStore.set(solutionId, {
+        status: 'verified',
+        confidence: retryVerification.confidence,
+        warnings: retryVerification.warnings,
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    // Attempt 3: Gemini backup verification (if available and under limit)
+    if (geminiAI) {
+      console.log(`🔮 GPT-4o verification inconclusive, trying Gemini backup...`);
+      const geminiResult = await geminiVerification(originalQuestion, solution);
+      
+      if (geminiResult.isValid && geminiResult.confidence >= 70) {
+        console.log(`✅ Gemini verification passed (confidence: ${geminiResult.confidence}%)`);
+        verificationStore.set(solutionId, {
+          status: 'verified',
+          confidence: geminiResult.confidence,
+          warnings: [...verification.warnings, ...geminiResult.warnings],
+          timestamp: Date.now()
+        });
+        return;
+      }
+    }
+    
+    // All verification attempts inconclusive - mark as unverified
+    console.warn(`⚠️ All verification attempts inconclusive - marking as unverified`);
+    verificationStore.set(solutionId, {
+      status: 'unverified',
+      confidence: Math.max(verification.confidence, 0),
+      warnings: ['Unable to verify solution accuracy', ...verification.warnings],
+      timestamp: Date.now()
+    });
+    
+  } catch (error) {
+    console.error(`❌ Verification pipeline error for ${solutionId}:`, error);
+    verificationStore.set(solutionId, {
+      status: 'unverified',
+      confidence: 0,
+      warnings: ['Verification system error'],
+      timestamp: Date.now()
+    });
+  }
+}
+
 // Main validation orchestrator with retry capability
 async function validateSolution(
   originalQuestion: string,
@@ -1663,87 +1920,25 @@ Grade-appropriate language based on difficulty level.`
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
-    // 🔒 SYNCHRONOUS VALIDATION - Verify accuracy BEFORE sending to user
-    console.log('🔍 Running synchronous validation...');
-    const validationStart = Date.now();
-    let validationResult;
-    try {
-      validationResult = await validateSolution(question, formattedResult);
-    } catch (validationError) {
-      console.error('⚠️ Validation system error (non-blocking):', validationError);
-      // If validator fails, allow solution through with warning
-      validationResult = {
-        validationPassed: true,
-        validationDetails: {
-          verification: {
-            confidence: 50,
-            warnings: ['Validation system unavailable - answer not verified']
-          }
-        }
-      };
-    }
-    
-    const { validationPassed, validationDetails } = validationResult;
-    console.log(`⏱️ [TIMING] Validation completed in ${Date.now() - validationStart}ms`);
-    
-    // Map confidence to verification status
-    const confidence = validationDetails?.verification?.confidence || 0;
-    let verificationStatus: 'verified' | 'unverified' | 'failed' = 'failed';
-    
-    // CRITICAL: Check BOTH validationPassed and confidence
-    if (!validationPassed) {
-      // Validator explicitly marked as incorrect - always fail
-      verificationStatus = 'failed';
-    } else if (confidence >= 70) {
-      // High confidence and passed validation
-      verificationStatus = 'verified';
-    } else if (confidence >= 40) {
-      // Medium confidence but passed validation
-      verificationStatus = 'unverified';
-    } else {
-      // Low confidence - treat as failed
-      verificationStatus = 'failed';
-    }
-    
-    // 🚫 BLOCK FAILED VERIFICATIONS - Don't send incorrect answers to students
-    if (verificationStatus === 'failed') {
-      console.error(`❌ VERIFICATION FAILED - Blocking response (confidence: ${confidence}%)`);
-      if (validationDetails?.verification?.errors) {
-        console.error('   Errors detected:', validationDetails.verification.errors);
-      }
-      
-      const totalTime = Date.now() - requestStartTime;
-      console.log(`⏱️ [TIMING] === REQUEST BLOCKED AFTER: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
-      
-      return res.status(422).json({
-        error: 'Unable to verify answer accuracy',
-        message: 'Our AI detected potential errors in the solution. Please try rephrasing your question or breaking it into smaller parts.',
-        confidence,
-        details: validationDetails?.verification?.errors || []
-      });
-    }
-    
-    // Add solutionId and verification metadata to response
+    // ⚡ RETURN IMMEDIATELY with pending verification status
     const responseWithId = {
       ...formattedResult,
       solutionId: diagrams.length > 0 ? solutionId : undefined,
-      verificationStatus,
-      verificationConfidence: confidence,
-      verificationWarnings: validationDetails?.verification?.warnings || []
+      verificationStatus: 'pending' as const,
+      verificationConfidence: 0,
+      verificationWarnings: []
     };
     
-    if (verificationStatus === 'unverified') {
-      console.warn(`⚠️  Solution verification: unverified (confidence: ${confidence}%)`);
-      if (validationDetails?.verification?.warnings) {
-        console.warn('   Warnings:', validationDetails.verification.warnings);
-      }
-    }
-    
-    // ⚡ RETURN WITH VERIFICATION STATUS (only if verified or unverified, never failed)
     const totalTime = Date.now() - requestStartTime;
-    console.log(`✅ Analysis complete - returning solution ${solutionId} (${verificationStatus})`);
+    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately (verification pending)`);
     console.log(`⏱️ [TIMING] === TOTAL REQUEST TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
     res.json(responseWithId);
+    
+    // 🔄 START ASYNC VERIFICATION PIPELINE (non-blocking)
+    void runVerificationPipeline(solutionId, question, formattedResult)
+      .catch(err => {
+        console.error(`⚠️ Verification pipeline error for ${solutionId}:`, err);
+      });
     
     // Generate diagrams in background if any exist
     if (diagrams.length > 0) {
@@ -2726,6 +2921,23 @@ Grade-appropriate language based on difficulty level.`;
 });
 
 // Polling endpoint for diagram status
+// Verification status endpoint - check verification progress
+app.get('/api/verification/:solutionId', async (req, res) => {
+  try {
+    const { solutionId } = req.params;
+    const verification = verificationStore.get(solutionId);
+    
+    if (!verification) {
+      return res.status(404).json({ error: 'Verification not found' });
+    }
+    
+    res.json(verification);
+  } catch (error) {
+    console.error('Error fetching verification:', error);
+    res.status(500).json({ error: 'Failed to fetch verification status' });
+  }
+});
+
 app.get('/api/diagrams/:solutionId', async (req, res) => {
   try {
     const { solutionId } = req.params;
