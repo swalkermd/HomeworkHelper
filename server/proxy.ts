@@ -2712,6 +2712,12 @@ app.post('/api/analyze-text', async (req, res) => {
                 role: "system",
                 content: `You are an expert educational AI tutor. Analyze the homework question and provide a step-by-step solution with proper formatting.
 
+⚡ **RESPONSE SIZE LIMIT - CRITICAL:**
+- Keep your ENTIRE JSON response under 2,000 characters total
+- Each step content should be 2-3 sentences maximum (50-100 chars each)
+- Be concise and focused - students need clarity, not verbosity
+- For multi-part problems (a, b, c, d), keep each part's explanation brief
+
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
 - If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
@@ -3101,6 +3107,48 @@ Grade-appropriate language based on difficulty level.`
           });
           
           const content = response.choices[0]?.message?.content || "{}";
+          
+          // 🚨 POST-CALL GUARD: Reject oversized responses immediately
+          const MAX_RESPONSE_SIZE = 5000; // chars (≈1250 tokens)
+          if (content.length > MAX_RESPONSE_SIZE) {
+            console.error(`🚨 Response too large: ${content.length} chars (limit: ${MAX_RESPONSE_SIZE})`);
+            console.log('🔄 Re-requesting with emergency compression instruction...');
+            
+            // Re-issue with emergency compression request
+            const compressResponse = await openai.chat.completions.create({
+              model: "gpt-4o",
+              messages: [
+                {
+                  role: "system",
+                  content: `You are an expert educational AI tutor. Provide ULTRA-CONCISE step-by-step solutions.
+                  
+CRITICAL SIZE LIMIT: Your ENTIRE JSON response must be under 2,000 characters. This is non-negotiable.
+
+- Each step: 1-2 SHORT sentences only (40-60 chars max)
+- Total steps: Keep to 4-6 steps maximum
+- finalAnswer: Just the answer, no explanation
+- Use color tags [blue:] [red:] but keep text minimal`
+                },
+                {
+                  role: "user",
+                  content: `${question}\n\n⚠️ EMERGENCY: Previous response was too long. Give me the SHORTEST possible solution that still has proper steps and formatting. Maximum 2000 characters total.`
+                }
+              ],
+              response_format: { type: "json_object" },
+              max_tokens: 1500, // Hard limit to prevent oversized responses
+            });
+            
+            const compressedContent = compressResponse.choices[0]?.message?.content || "{}";
+            console.log(`✅ Compressed response: ${compressedContent.length} chars (was ${content.length})`);
+            
+            try {
+              const parsed = JSON.parse(compressedContent);
+              return parsed;
+            } catch (compressError: any) {
+              console.error('❌ Compressed response also failed to parse');
+              throw new Error(`Compression failed: ${compressError.message}`);
+            }
+          }
           
           try {
             const parsed = JSON.parse(content);
