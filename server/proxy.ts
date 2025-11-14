@@ -957,6 +957,11 @@ function isInvalidSolution(solution: any): { isInvalid: boolean; reason: string 
   }
   
   // Check 5: Final answer is empty or just punctuation
+  // Handle case where finalAnswer exists but is not a string
+  if (typeof solution.finalAnswer !== 'string') {
+    return { isInvalid: true, reason: 'Final answer is not a string (got ' + typeof solution.finalAnswer + ')' };
+  }
+  
   const cleanAnswer = solution.finalAnswer.replace(/[^\w\d]/g, '');
   if (cleanAnswer.length < 2) {
     return { isInvalid: true, reason: 'Final answer is empty or invalid' };
