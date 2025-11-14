@@ -1779,16 +1779,21 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   // FIXED: Use brace-aware tokenizer to prevent double-wrapping fractions like {240/41}
   const beforeFractionConversion = formatted;
   
-  // Brace-aware fraction wrapper - only wraps raw a/b tokens, not {a/b}
-  // CRITICAL: Only skips CURLY braces {...}, not parentheses () or brackets []
+  // Two-pass fraction wrapper:
+  // Pass 1: Wrap numeric fractions followed by variables (fixes {2/9x}² bug)
+  // Pass 2: Wrap algebraic fractions (preserves {3x/4y})
   function wrapFractions(text: string): string {
+    // PASS 1: Numeric fractions before variables (e.g., 2/9x² → {2/9}x²)
+    // Match: digits/digits followed by letter or parenthesis
+    text = text.replace(/(\d+)\/(\d+)(?=[a-zA-Z(])/g, '{$1/$2}');
+    
+    // PASS 2: General algebraic fractions (brace-aware)
     let result = '';
     let i = 0;
     
     while (i < text.length) {
       // Check if we're at the start of a CURLY brace-wrapped section
-      // This ensures we skip already-wrapped fractions like {240/41}
-      // But we still process fractions in parentheses like (3/4) or √(9/16)
+      // This ensures we skip already-wrapped fractions like {240/41} or {2/9} from Pass 1
       if (text[i] === '{') {
         // Find the matching closing curly brace (handle unmatched braces gracefully)
         let depth = 1;
@@ -1799,20 +1804,14 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
           j++;
         }
         // Copy the entire brace section unchanged (already wrapped)
-        // If unmatched, copy what we found and continue
         result += text.substring(i, j);
         i = j;
         continue;
       }
       
-      // Check if we're at a fraction pattern
-      // Strategy: Numerator can be alphanumeric, but denominator is DIGITS ONLY
-      // This automatically stops before trailing variables:
-      //   2/9x² → match "2/9" (denominator stops at digits) → {2/9}x²
-      //   3x/4 → match "3x/4" → {3x/4}
-      //   x/4 → match "x/4" → {x/4}
-      //   2/9x → match "2/9" (stops before x) → {2/9}x ✓ FIXED!
-      const fractionMatch = text.substring(i).match(/^([a-zA-Z0-9]+)\/([0-9]+)/);
+      // Check if we're at an algebraic fraction pattern
+      // Match: alphanumeric/alphanumeric (e.g., 3x/4y, x/4, 12/5)
+      const fractionMatch = text.substring(i).match(/^([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/);
       if (fractionMatch) {
         const num = fractionMatch[1];
         const den = fractionMatch[2];
@@ -4342,7 +4341,7 @@ Grade-appropriate language based on difficulty level.`;
     console.log(`⏱️ [TIMING] Validation completed in ${Date.now() - validationStart}ms`);
     
     // Map confidence to verification status
-    const confidence = validationDetails?.verification?.confidence || 0;
+    const confidence = validationDetails?.confidence ?? 0;
     let verificationStatus: 'verified' | 'unverified' | 'failed' = 'failed';
     
     // CRITICAL: Check BOTH validationPassed and confidence
