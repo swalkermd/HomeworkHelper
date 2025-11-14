@@ -21,12 +21,48 @@ export default function FinalAnswerSection({ content, structuredContent, isOnGre
   // Check if we have multi-part answer (more than one block with labels)
   const isMultiPart = blocks.length > 1 && blocks.some(block => block.label);
 
+  // Preserve structured content if provided, otherwise parse from strings
   const derivedStructuredBlocks = React.useMemo(() => {
     if (!isMultiPart) {
       return [] as MathNode[][];
     }
+    
+    // If we already have structured content, partition it by labels instead of reparsing
+    if (structuredContent && structuredContent.length > 0) {
+      // Find label positions in the structured content
+      const partitionedBlocks: MathNode[][] = [];
+      let currentBlock: MathNode[] = [];
+      
+      for (const node of structuredContent) {
+        // Check if this text node contains a label marker (a), b), etc.)
+        if (node.type === 'text' && /^([a-z]\)|\([a-z]\)|\d+\)|\(\d+\))\s*/i.test(node.content)) {
+          // Start new block if we have accumulated nodes
+          if (currentBlock.length > 0) {
+            partitionedBlocks.push(currentBlock);
+            currentBlock = [];
+          }
+          
+          // Remove the label from this node and add remaining content
+          const cleanedContent = node.content.replace(/^([a-z]\)|\([a-z]\)|\d+\)|\(\d+\))\s*/i, '').trim();
+          if (cleanedContent) {
+            currentBlock.push({ ...node, content: cleanedContent });
+          }
+        } else {
+          currentBlock.push(node);
+        }
+      }
+      
+      // Add final block
+      if (currentBlock.length > 0) {
+        partitionedBlocks.push(currentBlock);
+      }
+      
+      return partitionedBlocks;
+    }
+    
+    // Fallback: parse from strings
     return blocks.map(block => parseMathContent(block.content));
-  }, [blocks, isMultiPart]);
+  }, [blocks, isMultiPart, structuredContent]);
 
   if (isMultiPart) {
     // Render as structured multi-part layout

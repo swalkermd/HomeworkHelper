@@ -372,13 +372,13 @@ const styles = StyleSheet.create({
   lineContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     maxWidth: '100%',
   },
   cluster: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     flexShrink: 1,
     maxWidth: '100%',
     rowGap: 0,
