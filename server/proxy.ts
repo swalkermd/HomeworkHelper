@@ -999,58 +999,104 @@ async function crossModelVerification(
       .map((s: any) => `${s.title}: ${s.content}`)
       .join('\n');
     
-    const verificationPrompt = `You are a rigorous quality control expert verifying educational content for accuracy. Your job is to catch errors that would mislead students.
+    const verificationPrompt = `You are a RIGOROUS quality control expert. Your ONLY job is to catch ERRORS that would mislead students. Be EXTREMELY strict.
 
-ORIGINAL PROBLEM:
-${originalQuestion}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MANDATORY PROTOCOL - FOLLOW EVERY STEP EXACTLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-PROPOSED SOLUTION:
-Subject: ${proposedSolution.subject}
-Grade Level: ${proposedSolution.difficulty}
+STEP 1: SOLVE THE PROBLEM INDEPENDENTLY FIRST
+Problem: ${originalQuestion}
 
-Steps:
+- Solve this problem completely from scratch
+- Write YOUR answer for each part (a), (b), (c), (d), (e), etc.
+- Show all work and calculations
+- DO NOT look below at the proposed solution yet!
+
+STEP 2: LIST YOUR ANSWERS
+Write explicitly:
+My answer (a): [YOUR_VALUE]
+My answer (b): [YOUR_VALUE]
+My answer (c): [YOUR_VALUE]
+My answer (d): [YOUR_VALUE]
+My answer (e): [YOUR_VALUE]
+... etc for all parts
+
+STEP 3: NOW EXAMINE THEIR SOLUTION
+Here is what they provided:
+
+THEIR STEP-BY-STEP WORK:
 ${stepsText}
 
-Final Answer: ${proposedSolution.finalAnswer}
+THEIR FINAL ANSWER:
+${proposedSolution.finalAnswer}
 
-VERIFICATION PROTOCOL (CRITICAL - FOLLOW EXACTLY):
+STEP 4: EXTRACT THEIR ANSWERS  
+Write explicitly what THEY said for each part:
+Their answer (a): [THEIR_VALUE from their work above]
+Their answer (b): [THEIR_VALUE from their work above]
+Their answer (c): [THEIR_VALUE from their work above]
+Their answer (d): [THEIR_VALUE from their work above]
+Their answer (e): [THEIR_VALUE from their work above]
+... etc
 
-STEP 1: SOLVE INDEPENDENTLY
-- First, solve the problem yourself from scratch WITHOUT looking at the proposed solution
-- Show your own work for each calculation
-- For multi-part problems (a, b, c, etc.), solve each part independently
+STEP 5: COMPARE ONE-BY-ONE
+For EACH part:
+- Part (a): Match? Yes/No - If no, what exactly is wrong?
+- Part (b): Match? Yes/No - If no, what exactly is wrong?
+- Part (c): Match? Yes/No - If no, what exactly is wrong?
+- Part (d): Match? Yes/No - If no, what exactly is wrong?
+- Part (e): Match? Yes/No - If no, what exactly is wrong?
+... etc
 
-STEP 2: COMPARE SOLUTIONS
-- Compare your independent solution to the proposed solution
-- Check EACH sub-answer separately for multi-part problems
-- Verify numerical values match exactly
-- For calculus: verify signs, intervals, critical points, and endpoints
-- For algebra: verify arithmetic, factoring, and final simplification
-- Check that interval notation is correct (open vs closed, positive vs negative)
+Check EVERYTHING meticulously:
+✓ Numerical values (must match EXACTLY)
+✓ Signs (+ vs -)  
+✓ Intervals (correct direction, endpoints, open/closed)
+✓ Critical points identified correctly
+✓ Arithmetic calculations
 
-STEP 3: IDENTIFY DISCREPANCIES
-- List EVERY difference you find, no matter how small
-- Pay special attention to:
-  * Sign errors (positive vs negative)
-  * Interval direction errors (increasing vs decreasing)
-  * Wrong critical points or endpoints
-  * Arithmetic mistakes in calculations
-  * Incorrect final numerical values
-  * Missing or extra parts in multi-part answers
+STEP 6: FINAL VERDICT
+- ALL parts 100% correct → isCorrect: true
+- ANY part wrong (even ONE) → isCorrect: false
+- Unsure about any part → isCorrect: false
 
-CRITICAL RULES:
-- If ANY sub-part of a multi-part problem is wrong, mark isCorrect: false
-- Be extremely strict with numerical answers - they must match exactly
-- Do NOT give the benefit of the doubt - students need accurate information
-- Confidence should reflect how thoroughly you checked each step
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXAMPLE - HOW TO CATCH ERRORS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Respond in JSON format:
+MY INDEPENDENT SOLUTION:
+(a) v(t) = 3t² - 12t + 9
+(b) a(t) = 6t - 12  
+(c) At rest: t = 1, 3
+(d) Speeding up: (1,2), (3,5); Slowing down: (0,1), (2,3)
+(e) Min s = 4 at t = 0, 3
+
+THEIR WORK SHOWS:
+(a) v(t) = 3t² - 12t + 9
+(b) a(t) = 6t - 12
+(c) At rest: t = 1, 3  
+(d) Speeding up: (0,1), (1,3), (3,5); Slowing down: none
+(e) Min s = -26 at t = 5
+
+COMPARISON:
+✓ (a) MATCH - Both have v(t) = 3t² - 12t + 9
+✓ (b) MATCH - Both have a(t) = 6t - 12
+✓ (c) MATCH - Both have t = 1, 3
+✗ (d) NO MATCH - I got (1,2) & (3,5), they got (0,1) & (1,3). Intervals are backwards!
+✗ (e) NO MATCH - I got min=4 at t=0,3; they got min=-26 at t=5. Wrong value AND wrong location!
+
+VERDICT: isCorrect = FALSE (2 errors found)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Respond in JSON:
 {
   "isCorrect": true/false,
-  "confidence": 0-100 (100 = perfect match, 0 = definitely wrong),
-  "errors": ["specific error in part X: expected Y but got Z"],
-  "warnings": ["minor issues that don't affect correctness"],
-  "reasoning": "summary of your independent solution and comparison"
+  "confidence": 0-100,
+  "errors": ["Part (d): My intervals (1,2),(3,5) vs their intervals (0,1),(1,3) - backwards!", ...],
+  "warnings": [],
+  "reasoning": "I solved independently and got: ... | They provided: ... | Mismatches in parts: ..."
 }`;
 
     const response = await openai.chat.completions.create({
@@ -1132,58 +1178,104 @@ async function geminiVerification(
       .map((s: any) => `${s.title}: ${s.content}`)
       .join('\n');
     
-    const verificationPrompt = `You are a rigorous quality control expert verifying educational content for accuracy. Your job is to catch errors that would mislead students.
+    const verificationPrompt = `You are a RIGOROUS quality control expert. Your ONLY job is to catch ERRORS that would mislead students. Be EXTREMELY strict.
 
-ORIGINAL PROBLEM:
-${originalQuestion}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MANDATORY PROTOCOL - FOLLOW EVERY STEP EXACTLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-PROPOSED SOLUTION:
-Subject: ${proposedSolution.subject}
-Grade Level: ${proposedSolution.difficulty}
+STEP 1: SOLVE THE PROBLEM INDEPENDENTLY FIRST
+Problem: ${originalQuestion}
 
-Steps:
+- Solve this problem completely from scratch
+- Write YOUR answer for each part (a), (b), (c), (d), (e), etc.
+- Show all work and calculations
+- DO NOT look below at the proposed solution yet!
+
+STEP 2: LIST YOUR ANSWERS
+Write explicitly:
+My answer (a): [YOUR_VALUE]
+My answer (b): [YOUR_VALUE]
+My answer (c): [YOUR_VALUE]
+My answer (d): [YOUR_VALUE]
+My answer (e): [YOUR_VALUE]
+... etc for all parts
+
+STEP 3: NOW EXAMINE THEIR SOLUTION
+Here is what they provided:
+
+THEIR STEP-BY-STEP WORK:
 ${stepsText}
 
-Final Answer: ${proposedSolution.finalAnswer}
+THEIR FINAL ANSWER:
+${proposedSolution.finalAnswer}
 
-VERIFICATION PROTOCOL (CRITICAL - FOLLOW EXACTLY):
+STEP 4: EXTRACT THEIR ANSWERS  
+Write explicitly what THEY said for each part:
+Their answer (a): [THEIR_VALUE from their work above]
+Their answer (b): [THEIR_VALUE from their work above]
+Their answer (c): [THEIR_VALUE from their work above]
+Their answer (d): [THEIR_VALUE from their work above]
+Their answer (e): [THEIR_VALUE from their work above]
+... etc
 
-STEP 1: SOLVE INDEPENDENTLY
-- First, solve the problem yourself from scratch WITHOUT looking at the proposed solution
-- Show your own work for each calculation
-- For multi-part problems (a, b, c, etc.), solve each part independently
+STEP 5: COMPARE ONE-BY-ONE
+For EACH part:
+- Part (a): Match? Yes/No - If no, what exactly is wrong?
+- Part (b): Match? Yes/No - If no, what exactly is wrong?
+- Part (c): Match? Yes/No - If no, what exactly is wrong?
+- Part (d): Match? Yes/No - If no, what exactly is wrong?
+- Part (e): Match? Yes/No - If no, what exactly is wrong?
+... etc
 
-STEP 2: COMPARE SOLUTIONS
-- Compare your independent solution to the proposed solution
-- Check EACH sub-answer separately for multi-part problems
-- Verify numerical values match exactly
-- For calculus: verify signs, intervals, critical points, and endpoints
-- For algebra: verify arithmetic, factoring, and final simplification
-- Check that interval notation is correct (open vs closed, positive vs negative)
+Check EVERYTHING meticulously:
+✓ Numerical values (must match EXACTLY)
+✓ Signs (+ vs -)  
+✓ Intervals (correct direction, endpoints, open/closed)
+✓ Critical points identified correctly
+✓ Arithmetic calculations
 
-STEP 3: IDENTIFY DISCREPANCIES
-- List EVERY difference you find, no matter how small
-- Pay special attention to:
-  * Sign errors (positive vs negative)
-  * Interval direction errors (increasing vs decreasing)
-  * Wrong critical points or endpoints
-  * Arithmetic mistakes in calculations
-  * Incorrect final numerical values
-  * Missing or extra parts in multi-part answers
+STEP 6: FINAL VERDICT
+- ALL parts 100% correct → isCorrect: true
+- ANY part wrong (even ONE) → isCorrect: false
+- Unsure about any part → isCorrect: false
 
-CRITICAL RULES:
-- If ANY sub-part of a multi-part problem is wrong, mark isCorrect: false
-- Be extremely strict with numerical answers - they must match exactly
-- Do NOT give the benefit of the doubt - students need accurate information
-- Confidence should reflect how thoroughly you checked each step
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXAMPLE - HOW TO CATCH ERRORS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Respond in JSON format:
+MY INDEPENDENT SOLUTION:
+(a) v(t) = 3t² - 12t + 9
+(b) a(t) = 6t - 12  
+(c) At rest: t = 1, 3
+(d) Speeding up: (1,2), (3,5); Slowing down: (0,1), (2,3)
+(e) Min s = 4 at t = 0, 3
+
+THEIR WORK SHOWS:
+(a) v(t) = 3t² - 12t + 9
+(b) a(t) = 6t - 12
+(c) At rest: t = 1, 3  
+(d) Speeding up: (0,1), (1,3), (3,5); Slowing down: none
+(e) Min s = -26 at t = 5
+
+COMPARISON:
+✓ (a) MATCH - Both have v(t) = 3t² - 12t + 9
+✓ (b) MATCH - Both have a(t) = 6t - 12
+✓ (c) MATCH - Both have t = 1, 3
+✗ (d) NO MATCH - I got (1,2) & (3,5), they got (0,1) & (1,3). Intervals are backwards!
+✗ (e) NO MATCH - I got min=4 at t=0,3; they got min=-26 at t=5. Wrong value AND wrong location!
+
+VERDICT: isCorrect = FALSE (2 errors found)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Respond in JSON:
 {
   "isCorrect": true/false,
-  "confidence": 0-100 (100 = perfect match, 0 = definitely wrong),
-  "errors": ["specific error in part X: expected Y but got Z"],
-  "warnings": ["minor issues that don't affect correctness"],
-  "reasoning": "summary of your independent solution and comparison"
+  "confidence": 0-100,
+  "errors": ["Part (d): My intervals (1,2),(3,5) vs their intervals (0,1),(1,3) - backwards!", ...],
+  "warnings": [],
+  "reasoning": "I solved independently and got: ... | They provided: ... | Mismatches in parts: ..."
 }`;
 
     const model = geminiAI.getGenerativeModel({ model: "gemini-2.0-flash" });
