@@ -1663,30 +1663,87 @@ Grade-appropriate language based on difficulty level.`
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
-    // Add solutionId to response for diagram polling
+    // 🔒 SYNCHRONOUS VALIDATION - Verify accuracy BEFORE sending to user
+    console.log('🔍 Running synchronous validation...');
+    const validationStart = Date.now();
+    let validationResult;
+    try {
+      validationResult = await validateSolution(question, formattedResult);
+    } catch (validationError) {
+      console.error('⚠️ Validation system error (non-blocking):', validationError);
+      // If validator fails, allow solution through with warning
+      validationResult = {
+        validationPassed: true,
+        validationDetails: {
+          verification: {
+            confidence: 50,
+            warnings: ['Validation system unavailable - answer not verified']
+          }
+        }
+      };
+    }
+    
+    const { validationPassed, validationDetails } = validationResult;
+    console.log(`⏱️ [TIMING] Validation completed in ${Date.now() - validationStart}ms`);
+    
+    // Map confidence to verification status
+    const confidence = validationDetails?.verification?.confidence || 0;
+    let verificationStatus: 'verified' | 'unverified' | 'failed' = 'failed';
+    
+    // CRITICAL: Check BOTH validationPassed and confidence
+    if (!validationPassed) {
+      // Validator explicitly marked as incorrect - always fail
+      verificationStatus = 'failed';
+    } else if (confidence >= 70) {
+      // High confidence and passed validation
+      verificationStatus = 'verified';
+    } else if (confidence >= 40) {
+      // Medium confidence but passed validation
+      verificationStatus = 'unverified';
+    } else {
+      // Low confidence - treat as failed
+      verificationStatus = 'failed';
+    }
+    
+    // 🚫 BLOCK FAILED VERIFICATIONS - Don't send incorrect answers to students
+    if (verificationStatus === 'failed') {
+      console.error(`❌ VERIFICATION FAILED - Blocking response (confidence: ${confidence}%)`);
+      if (validationDetails?.verification?.errors) {
+        console.error('   Errors detected:', validationDetails.verification.errors);
+      }
+      
+      const totalTime = Date.now() - requestStartTime;
+      console.log(`⏱️ [TIMING] === REQUEST BLOCKED AFTER: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
+      
+      return res.status(422).json({
+        error: 'Unable to verify answer accuracy',
+        message: 'Our AI detected potential errors in the solution. Please try rephrasing your question or breaking it into smaller parts.',
+        confidence,
+        details: validationDetails?.verification?.errors || []
+      });
+    }
+    
+    // Add solutionId and verification metadata to response
     const responseWithId = {
       ...formattedResult,
-      solutionId: diagrams.length > 0 ? solutionId : undefined
+      solutionId: diagrams.length > 0 ? solutionId : undefined,
+      verificationStatus,
+      verificationConfidence: confidence,
+      verificationWarnings: validationDetails?.verification?.warnings || []
     };
     
-    // ⚡ RETURN IMMEDIATELY - No waiting for diagrams!
+    if (verificationStatus === 'unverified') {
+      console.warn(`⚠️  Solution verification: unverified (confidence: ${confidence}%)`);
+      if (validationDetails?.verification?.warnings) {
+        console.warn('   Warnings:', validationDetails.verification.warnings);
+      }
+    }
+    
+    // ⚡ RETURN WITH VERIFICATION STATUS (only if verified or unverified, never failed)
     const totalTime = Date.now() - requestStartTime;
-    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately`);
+    console.log(`✅ Analysis complete - returning solution ${solutionId} (${verificationStatus})`);
     console.log(`⏱️ [TIMING] === TOTAL REQUEST TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
     res.json(responseWithId);
-    
-    // ⚡ BACKGROUND TASKS: Validation and diagram generation (non-blocking)
-    void validateSolution(question, formattedResult)
-      .then(({ validationPassed, validationDetails }) => {
-        if (!validationPassed) {
-          console.warn('⚠️ Background validation failed:', validationDetails);
-        } else {
-          console.log('✅ Background validation passed');
-        }
-      })
-      .catch(err => {
-        console.error('⚠️ Background validation error (non-blocking):', err);
-      });
     
     // Generate diagrams in background if any exist
     if (diagrams.length > 0) {
@@ -2539,30 +2596,87 @@ Grade-appropriate language based on difficulty level.`;
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     
-    // Add solutionId to response for diagram polling
+    // 🔒 SYNCHRONOUS VALIDATION - Verify accuracy BEFORE sending to user
+    console.log('🔍 Running synchronous validation...');
+    const validationStart = Date.now();
+    let validationResult;
+    try {
+      validationResult = await validateSolution(result.problem || 'Image-based question', formattedResult);
+    } catch (validationError) {
+      console.error('⚠️ Validation system error (non-blocking):', validationError);
+      // If validator fails, allow solution through with warning
+      validationResult = {
+        validationPassed: true,
+        validationDetails: {
+          verification: {
+            confidence: 50,
+            warnings: ['Validation system unavailable - answer not verified']
+          }
+        }
+      };
+    }
+    
+    const { validationPassed, validationDetails } = validationResult;
+    console.log(`⏱️ [TIMING] Validation completed in ${Date.now() - validationStart}ms`);
+    
+    // Map confidence to verification status
+    const confidence = validationDetails?.verification?.confidence || 0;
+    let verificationStatus: 'verified' | 'unverified' | 'failed' = 'failed';
+    
+    // CRITICAL: Check BOTH validationPassed and confidence
+    if (!validationPassed) {
+      // Validator explicitly marked as incorrect - always fail
+      verificationStatus = 'failed';
+    } else if (confidence >= 70) {
+      // High confidence and passed validation
+      verificationStatus = 'verified';
+    } else if (confidence >= 40) {
+      // Medium confidence but passed validation
+      verificationStatus = 'unverified';
+    } else {
+      // Low confidence - treat as failed
+      verificationStatus = 'failed';
+    }
+    
+    // 🚫 BLOCK FAILED VERIFICATIONS - Don't send incorrect answers to students
+    if (verificationStatus === 'failed') {
+      console.error(`❌ VERIFICATION FAILED - Blocking response (confidence: ${confidence}%)`);
+      if (validationDetails?.verification?.errors) {
+        console.error('   Errors detected:', validationDetails.verification.errors);
+      }
+      
+      const totalTime = Date.now() - requestStartTime;
+      console.log(`⏱️ [TIMING] === REQUEST BLOCKED AFTER: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
+      
+      return res.status(422).json({
+        error: 'Unable to verify answer accuracy',
+        message: 'Our AI detected potential errors in the solution. Please try rephrasing your question or breaking it into smaller parts.',
+        confidence,
+        details: validationDetails?.verification?.errors || []
+      });
+    }
+    
+    // Add solutionId and verification metadata to response
     const responseWithId = {
       ...formattedResult,
-      solutionId: diagrams.length > 0 ? solutionId : undefined
+      solutionId: diagrams.length > 0 ? solutionId : undefined,
+      verificationStatus,
+      verificationConfidence: confidence,
+      verificationWarnings: validationDetails?.verification?.warnings || []
     };
     
-    // ⚡ RETURN IMMEDIATELY - No waiting for diagrams!
+    if (verificationStatus === 'unverified') {
+      console.warn(`⚠️  Solution verification: unverified (confidence: ${confidence}%)`);
+      if (validationDetails?.verification?.warnings) {
+        console.warn('   Warnings:', validationDetails.verification.warnings);
+      }
+    }
+    
+    // ⚡ RETURN WITH VERIFICATION STATUS (only if verified or unverified, never failed)
     const totalTime = Date.now() - requestStartTime;
-    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately`);
+    console.log(`✅ Analysis complete - returning solution ${solutionId} (${verificationStatus})`);
     console.log(`⏱️ [TIMING] === TOTAL REQUEST TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
     res.json(responseWithId);
-    
-    // ⚡ BACKGROUND TASKS: Validation and diagram generation (non-blocking)
-    void validateSolution(result.problem || 'Image-based question', formattedResult)
-      .then(({ validationPassed, validationDetails }) => {
-        if (!validationPassed) {
-          console.warn('⚠️ Background validation failed:', validationDetails);
-        } else {
-          console.log('✅ Background validation passed');
-        }
-      })
-      .catch(err => {
-        console.error('⚠️ Background validation error (non-blocking):', err);
-      });
     
     // Generate diagrams in background if any exist
     if (diagrams.length > 0) {

@@ -31,6 +31,9 @@ export interface HomeworkSolution {
   steps: SolutionStep[];
   finalAnswer: string;
   solutionId?: string;
+  verificationStatus?: 'verified' | 'unverified' | 'failed';
+  verificationConfidence?: number;
+  verificationWarnings?: string[];
 }
 
 export interface ChatMessage {
