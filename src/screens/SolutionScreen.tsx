@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,6 +14,21 @@ import { colors, typography, spacing } from '../constants/theme';
 import { getSimplifiedExplanations, pollForDiagrams, DiagramStatus } from '../services/openai';
 import { SimplifiedExplanation } from '../types';
 import { getUserFriendlyErrorMessage } from '../utils/errorHandler';
+import { validateSolutionIntegrity } from '../utils/solutionValidation';
+
+type SectionHeaderProps = {
+  title: string;
+  subtitle?: string;
+};
+
+function SectionHeader({ title, subtitle }: SectionHeaderProps) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+    </View>
+  );
+}
 
 type SolutionScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Solution'>;
@@ -30,6 +45,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const [loadingSimplified, setLoadingSimplified] = useState(false);
   const [diagrams, setDiagrams] = useState<DiagramStatus[]>([]);
   const [diagramsComplete, setDiagramsComplete] = useState(false);
+  const validation = useMemo(() => validateSolutionIntegrity(currentSolution), [currentSolution]);
 
   useEffect(() => {
     console.log('🔍 SolutionScreen mounted. Has solution:', !!currentSolution);
@@ -144,6 +160,12 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
     }
   };
 
+  useEffect(() => {
+    if (!validation.isValid) {
+      console.warn('Solution validation issues detected', validation.issues);
+    }
+  }, [validation]);
+
   if (!currentSolution) return null;
 
   return (
@@ -152,25 +174,53 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Solution</Text>
+        <View>
+          <Text style={styles.headerTitle}>Solution</Text>
+          <Text style={styles.headerSubtitle}>Fully worked steps with educator-friendly pacing</Text>
+        </View>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        <Animated.View entering={FadeInUp.duration(500)} style={styles.problemCard}>
-          <View style={styles.problemIconContainer}>
-            <Ionicons name="document-text" size={24} color={colors.primary} />
-          </View>
-          <Text style={styles.problemLabel}>Problem</Text>
-          <View style={styles.problemTextContainer}>
-            <MathText content={currentSolution.problem} fontSize={typography.bodyLarge.fontSize} />
-          </View>
-        </Animated.View>
+        <View style={styles.section}>
+          <SectionHeader
+            title="Problem Statement"
+            subtitle="Carefully review the original question before diving into the reasoning."
+          />
+          {!validation.isValid && validation.issues.length > 0 && (
+            <View style={styles.validationCallout}>
+              <Ionicons name="alert-circle" size={20} color="#92400e" style={styles.validationIcon} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.validationTitle}>We noticed something unusual</Text>
+                {validation.issues.map((issue) => (
+                  <Text key={issue.code} style={styles.validationText}>
+                    • {issue.message}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          )}
 
-        {currentSolution.steps.map((step, index) => {
+          <Animated.View entering={FadeInUp.duration(500)} style={styles.problemCard}>
+            <View style={styles.problemIconContainer}>
+              <Ionicons name="document-text" size={24} color={colors.primary} />
+            </View>
+            <Text style={styles.problemLabel}>Problem</Text>
+            <View style={styles.problemTextContainer}>
+              <MathText content={currentSolution.problem} fontSize={typography.bodyLarge.fontSize} />
+            </View>
+          </Animated.View>
+        </View>
+
+        <View style={styles.section}>
+          <SectionHeader
+            title="Step-by-step reasoning"
+            subtitle="Each stage builds toward the final answer. Reveal animations pace comprehension."
+          />
+          {currentSolution.steps.map((step, index) => {
           const simplified = simplifiedExplanations.find(exp => exp.stepNumber === index + 1);
           const stepDiagram = diagrams.find(d => d.stepId === step.id);
-          
+
           return (
             <Animated.View
               key={step.id}
@@ -180,15 +230,21 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                 index >= revealedSteps && styles.stepCardPending,
               ]}
             >
-              <View style={[
-                styles.stepBadge,
-                index < revealedSteps ? styles.stepBadgeRevealed : styles.stepBadgePending,
-              ]}>
-                <Text style={styles.stepBadgeText}>{index + 1}</Text>
+              <View style={styles.stepHeader}>
+                <View style={[
+                  styles.stepBadge,
+                  index < revealedSteps ? styles.stepBadgeRevealed : styles.stepBadgePending,
+                ]}>
+                  <Text style={styles.stepBadgeText}>{index + 1}</Text>
+                </View>
+                <View style={styles.stepHeaderTextGroup}>
+                  <Text style={styles.stepTitle}>{step.title}</Text>
+                  <Text style={styles.stepMeta}>
+                    {currentSolution.subject} · Difficulty {currentSolution.difficulty}
+                  </Text>
+                </View>
               </View>
-              
-              <Text style={styles.stepTitle}>{step.title}</Text>
-              
+
               {stepDiagram && stepDiagram.status === 'ready' && stepDiagram.imageUrl && (
                 <View style={styles.diagramContainer}>
                   <Text style={styles.diagramLabel}>Visual Aid:</Text>
@@ -208,9 +264,9 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
               )}
               
               <View style={styles.stepContent}>
-                <MathText content={step.content} fontSize={typography.mathMedium.fontSize} />
+                <MathText content={step.content} fontSize={typography.mathSmall.fontSize} />
               </View>
-              
+
               {showStepExplanations && step.explanation && (
                 <View style={styles.explanationContainer}>
                   <Text style={styles.explanationText}>{step.explanation}</Text>
@@ -232,25 +288,33 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
               )}
             </Animated.View>
           );
-        })}
+          })}
+        </View>
 
         {allRevealed && (
-          <Animated.View entering={FadeInUp.duration(600)}>
-            <LinearGradient
-              colors={['#10b981', '#059669']}
-              style={styles.finalAnswerCard}
-            >
-              <Ionicons name="checkmark-circle" size={32} color="#ffffff" />
-              <Text style={styles.finalAnswerLabel}>Final Answer</Text>
-              <View style={styles.finalAnswerBox}>
-                <MathText
-                  content={currentSolution.finalAnswer}
-                  fontSize={typography.mathLarge.fontSize}
-                  color={colors.textPrimary}
-                />
-              </View>
-            </LinearGradient>
-          </Animated.View>
+          <View style={[styles.section, styles.finalSection]}>
+            <SectionHeader
+              title="Final answer"
+              subtitle="Double-check the concluding statement before submitting your work."
+            />
+            <Animated.View entering={FadeInUp.duration(600)}>
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                style={styles.finalAnswerCard}
+              >
+                <Ionicons name="checkmark-circle" size={32} color="#ffffff" />
+                <Text style={styles.finalAnswerLabel}>Verified Result</Text>
+                <View style={styles.finalAnswerBox}>
+                  <MathText
+                    content={currentSolution.finalAnswer}
+                    fontSize={typography.mathLarge.fontSize}
+                    color={colors.textPrimary}
+                  />
+                </View>
+                <Text style={styles.finalAnswerMeta}>Reviewed for completeness and clarity</Text>
+              </LinearGradient>
+            </Animated.View>
+          </View>
         )}
       </ScrollView>
 
@@ -334,7 +398,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     paddingTop: 50,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -345,24 +409,56 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
+    color: colors.textSecondary,
+  },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  section: {
+    marginBottom: spacing.xxl,
+  },
+  sectionHeader: {
+    marginBottom: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: typography.titleMedium.fontSize,
+    lineHeight: typography.titleMedium.lineHeight,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  sectionSubtitle: {
+    marginTop: 4,
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
+    color: colors.textSecondary,
   },
   problemCard: {
     backgroundColor: colors.surface,
     borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
   },
   problemIconContainer: {
     marginBottom: spacing.sm,
   },
   problemLabel: {
-    fontSize: typography.bodyLarge.fontSize,
-    lineHeight: typography.bodyLarge.lineHeight,
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
     fontWeight: '600',
     color: colors.textSecondary,
     marginBottom: spacing.sm,
@@ -372,24 +468,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   stepCard: {
     backgroundColor: colors.surface,
     borderRadius: 12,
-    padding: spacing.lg,
+    padding: spacing.xl,
     marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.12)',
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 4,
   },
   stepCardPending: {
     opacity: 0.3,
   },
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
   stepBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
   },
   stepBadgeRevealed: {
     backgroundColor: colors.secondary,
@@ -398,23 +505,32 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   stepBadgeText: {
-    fontSize: 14,
+    fontSize: typography.bodyMedium.fontSize,
     fontWeight: '700',
     color: '#ffffff',
   },
+  stepHeaderTextGroup: {
+    marginLeft: spacing.md,
+    flex: 1,
+  },
   stepTitle: {
-    fontSize: typography.bodyLarge.fontSize,
-    lineHeight: typography.bodyLarge.lineHeight,
+    fontSize: typography.titleMedium.fontSize,
+    lineHeight: typography.titleMedium.lineHeight,
     fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  stepMeta: {
+    marginTop: 2,
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
   },
   stepContent: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   explanationBox: {
     backgroundColor: '#fef3c7',
@@ -426,7 +542,7 @@ const styles = StyleSheet.create({
   },
   finalAnswerCard: {
     borderRadius: 12,
-    padding: spacing.xl,
+    padding: spacing.xxl,
     alignItems: 'center',
     marginBottom: spacing.lg,
     shadowColor: '#10b981',
@@ -445,9 +561,18 @@ const styles = StyleSheet.create({
   finalAnswerBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 8,
-    padding: spacing.lg,
+    padding: spacing.xl,
     width: '100%',
     alignItems: 'center',
+  },
+  finalAnswerMeta: {
+    marginTop: spacing.sm,
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  finalSection: {
+    paddingBottom: spacing.xl,
   },
   actionBar: {
     backgroundColor: colors.surface,
@@ -462,8 +587,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   sectionLabel: {
-    fontSize: typography.bodyLarge.fontSize,
-    lineHeight: typography.bodyLarge.lineHeight,
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
     fontWeight: '600',
     color: colors.textSecondary,
   },
@@ -481,7 +606,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   settingsToggleText: {
-    fontSize: 12,
+    fontSize: typography.caption.fontSize,
     color: colors.textSecondary,
   },
   actionRow: {
@@ -502,8 +627,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   helpButtonText: {
-    fontSize: typography.bodyLarge.fontSize,
-    lineHeight: typography.bodyLarge.lineHeight,
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
     fontWeight: '600',
     color: '#ffffff',
   },
@@ -517,8 +642,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   newProblemOutlineButtonText: {
-    fontSize: typography.bodyLarge.fontSize,
-    lineHeight: typography.bodyLarge.lineHeight,
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
     fontWeight: '600',
     color: '#ffffff',
   },
@@ -531,7 +656,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   diagramLabel: {
-    fontSize: 14,
+    fontSize: typography.bodyMedium.fontSize,
     fontWeight: '600',
     color: colors.textSecondary,
     marginBottom: spacing.sm,
@@ -543,7 +668,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   diagramLoading: {
-    fontSize: 14,
+    fontSize: typography.caption.fontSize,
     color: colors.textSecondary,
     marginTop: spacing.sm,
   },
@@ -562,8 +687,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   simplifiedLabel: {
-    fontSize: typography.bodyLarge.fontSize,
-    lineHeight: typography.bodyLarge.lineHeight,
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
     fontWeight: '600',
     color: '#92400e',
   },
@@ -574,9 +699,35 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(107, 114, 128, 0.2)',
   },
   explanationText: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
     color: '#9ca3af',
     fontStyle: 'italic',
+  },
+  validationCallout: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fef3c7',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fbbf24',
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  validationIcon: {
+    marginTop: 2,
+    marginRight: spacing.md,
+  },
+  validationTitle: {
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
+    fontWeight: '700',
+    color: '#92400e',
+    marginBottom: 2,
+  },
+  validationText: {
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
+    color: '#b45309',
   },
 });
