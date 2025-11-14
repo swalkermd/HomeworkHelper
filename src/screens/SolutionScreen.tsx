@@ -10,7 +10,7 @@ import { useHomeworkStore } from '../store/homeworkStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { RootStackParamList } from '../navigation/types';
 import MathText from '../components/MathText';
-import { colors, typography, spacing } from '../constants/theme';
+import { colors, useResponsiveTheme } from '../constants/theme';
 import { getSimplifiedExplanations, pollForDiagrams, DiagramStatus } from '../services/openai';
 import { SimplifiedExplanation } from '../types';
 import { getUserFriendlyErrorMessage } from '../utils/errorHandler';
@@ -19,13 +19,31 @@ import { validateSolutionIntegrity } from '../utils/solutionValidation';
 type SectionHeaderProps = {
   title: string;
   subtitle?: string;
+  typography: any;
+  spacing: any;
 };
 
-function SectionHeader({ title, subtitle }: SectionHeaderProps) {
+function SectionHeader({ title, subtitle, typography, spacing }: SectionHeaderProps) {
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+    <View style={{ marginBottom: spacing.md }}>
+      <Text style={{ 
+        fontSize: typography.titleMedium.fontSize, 
+        lineHeight: typography.titleMedium.lineHeight, 
+        fontWeight: '700' as const, 
+        color: colors.textPrimary 
+      }}>
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text style={{ 
+          marginTop: 4, 
+          fontSize: typography.bodyMedium.fontSize, 
+          lineHeight: typography.bodyMedium.lineHeight, 
+          color: colors.textSecondary 
+        }}>
+          {subtitle}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -38,6 +56,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const currentSolution = useHomeworkStore((state) => state.currentSolution);
   const reset = useHomeworkStore((state) => state.reset);
   const showStepExplanations = useSettingsStore((state) => state.showStepExplanations);
+  const { typography, spacing } = useResponsiveTheme();
   const [revealedSteps, setRevealedSteps] = useState(0);
   const [allRevealed, setAllRevealed] = useState(false);
   const [simplifiedMode, setSimplifiedMode] = useState(false);
@@ -63,6 +82,10 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
       navigation.navigate('Home');
       return;
     }
+
+    // Reset step reveal state when new solution loads
+    setRevealedSteps(0);
+    setAllRevealed(false);
 
     const timer = setInterval(() => {
       setRevealedSteps((prev) => {
@@ -168,6 +191,350 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
 
   if (!currentSolution) return null;
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      paddingTop: 50,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerTitle: {
+      fontSize: typography.titleLarge.fontSize,
+      lineHeight: typography.titleLarge.lineHeight,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    headerSubtitle: {
+      marginTop: 2,
+      fontSize: typography.caption.fontSize,
+      lineHeight: typography.caption.lineHeight,
+      color: colors.textSecondary,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    content: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.xl,
+      paddingBottom: spacing.xxl,
+    },
+    section: {
+      marginBottom: spacing.xxl,
+    },
+    sectionHeader: {
+      marginBottom: spacing.md,
+    },
+    sectionTitle: {
+      fontSize: typography.titleMedium.fontSize,
+      lineHeight: typography.titleMedium.lineHeight,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    sectionSubtitle: {
+      marginTop: 4,
+      fontSize: typography.bodyMedium.fontSize,
+      lineHeight: typography.bodyMedium.lineHeight,
+      color: colors.textSecondary,
+    },
+    problemCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: spacing.xl,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#111827',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.08,
+      shadowRadius: 16,
+      elevation: 6,
+    },
+    problemIconContainer: {
+      marginBottom: spacing.sm,
+    },
+    problemLabel: {
+      fontSize: typography.bodyMedium.fontSize,
+      lineHeight: typography.bodyMedium.lineHeight,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: spacing.sm,
+    },
+    problemTextContainer: {
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: spacing.lg,
+    },
+    stepCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: spacing.xl,
+      marginBottom: spacing.lg,
+      borderWidth: 1,
+      borderColor: 'rgba(99, 102, 241, 0.12)',
+      shadowColor: '#111827',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      elevation: 4,
+    },
+    stepCardPending: {
+      opacity: 0.3,
+    },
+    stepHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    stepBadge: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepBadgeRevealed: {
+      backgroundColor: colors.secondary,
+    },
+    stepBadgePending: {
+      backgroundColor: colors.border,
+    },
+    stepBadgeText: {
+      fontSize: typography.bodyMedium.fontSize,
+      fontWeight: '700',
+      color: '#ffffff',
+    },
+    stepHeaderTextGroup: {
+      marginLeft: spacing.md,
+      flex: 1,
+    },
+    stepTitle: {
+      fontSize: typography.titleMedium.fontSize,
+      lineHeight: typography.titleMedium.lineHeight,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    stepMeta: {
+      marginTop: 2,
+      fontSize: typography.caption.fontSize,
+      lineHeight: typography.caption.lineHeight,
+      color: colors.textSecondary,
+    },
+    stepContent: {
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: spacing.lg,
+    },
+    explanationBox: {
+      backgroundColor: '#fef3c7',
+      borderLeftWidth: 4,
+      borderLeftColor: '#f59e0b',
+      borderRadius: 8,
+      padding: spacing.md,
+      marginTop: spacing.md,
+    },
+    finalAnswerCard: {
+      borderRadius: 12,
+      padding: spacing.xxl,
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+      shadowColor: '#10b981',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    finalAnswerLabel: {
+      fontSize: typography.titleMedium.fontSize,
+      lineHeight: typography.titleMedium.lineHeight,
+      fontWeight: '700',
+      color: '#ffffff',
+      marginTop: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    finalAnswerBox: {
+      backgroundColor: '#ffffff',
+      borderRadius: 8,
+      padding: spacing.lg,
+      width: '100%',
+    },
+    finalAnswerMeta: {
+      marginTop: spacing.md,
+      fontSize: typography.bodyMedium.fontSize,
+      color: '#d1fae5',
+      fontStyle: 'italic',
+    },
+    explanationContainer: {
+      backgroundColor: colors.surfaceAlt,
+      borderLeftWidth: 4,
+      borderLeftColor: colors.primary,
+      borderRadius: 8,
+      padding: spacing.md,
+      marginTop: spacing.md,
+    },
+    explanationText: {
+      fontSize: typography.bodyMedium.fontSize,
+      lineHeight: typography.bodyMedium.lineHeight,
+      color: colors.textSecondary,
+    },
+    finalSection: {
+      marginTop: spacing.lg,
+    },
+    actionBar: {
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      padding: spacing.lg,
+      paddingBottom: 30,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    sectionLabel: {
+      fontSize: typography.bodyMedium.fontSize,
+      lineHeight: typography.bodyMedium.lineHeight,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    actionBarHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    settingsToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+    },
+    settingsToggleText: {
+      fontSize: typography.caption.fontSize,
+      color: colors.textSecondary,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginBottom: spacing.md,
+    },
+    helpButton: {
+      flex: 1,
+    },
+    gradientButton: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderRadius: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+    },
+    helpButtonText: {
+      fontSize: typography.bodyMedium.fontSize,
+      lineHeight: typography.bodyMedium.lineHeight,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
+    newProblemOutlineButton: {
+      backgroundColor: '#991b1b',
+      paddingVertical: spacing.md,
+      borderRadius: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+    },
+    newProblemOutlineButtonText: {
+      fontSize: typography.bodyMedium.fontSize,
+      lineHeight: typography.bodyMedium.lineHeight,
+      fontWeight: '600',
+      color: '#ffffff',
+    },
+    diagramContainer: {
+      marginTop: spacing.md,
+      marginBottom: spacing.md,
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 8,
+      padding: spacing.md,
+      alignItems: 'center',
+    },
+    diagramLabel: {
+      fontSize: typography.bodyMedium.fontSize,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: spacing.sm,
+    },
+    diagramImage: {
+      width: '100%',
+      aspectRatio: 1,
+      maxHeight: 400,
+      borderRadius: 8,
+    },
+    diagramLoading: {
+      fontSize: typography.caption.fontSize,
+      color: colors.textSecondary,
+      marginTop: spacing.xs,
+    },
+    simplifiedBox: {
+      backgroundColor: '#fef3c7',
+      borderRadius: 8,
+      padding: spacing.md,
+      marginTop: spacing.md,
+      borderLeftWidth: 4,
+      borderLeftColor: '#f59e0b',
+    },
+    simplifiedHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    simplifiedLabel: {
+      fontSize: typography.bodyMedium.fontSize,
+      fontWeight: '600',
+      color: '#92400e',
+    },
+    validationCallout: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: '#fef3c7',
+      borderLeftWidth: 4,
+      borderLeftColor: '#f59e0b',
+      borderRadius: 8,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      gap: spacing.sm,
+    },
+    validationIcon: {
+      marginTop: 2,
+    },
+    validationTitle: {
+      fontSize: typography.bodyMedium.fontSize,
+      fontWeight: '600',
+      color: '#92400e',
+      marginBottom: spacing.xs,
+    },
+    validationText: {
+      fontSize: typography.bodyMedium.fontSize,
+      color: '#78350f',
+      lineHeight: typography.bodyMedium.lineHeight,
+    },
+  });
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -186,6 +553,8 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
           <SectionHeader
             title="Problem Statement"
             subtitle="Carefully review the original question before diving into the reasoning."
+            typography={typography}
+            spacing={spacing}
           />
           {!validation.isValid && validation.issues.length > 0 && (
             <View style={styles.validationCallout}>
@@ -216,6 +585,8 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
           <SectionHeader
             title="Step-by-step reasoning"
             subtitle="Each stage builds toward the final answer. Reveal animations pace comprehension."
+            typography={typography}
+            spacing={spacing}
           />
           {currentSolution.steps.map((step, index) => {
           const simplified = simplifiedExplanations.find(exp => exp.stepNumber === index + 1);
@@ -296,6 +667,8 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
             <SectionHeader
               title="Final answer"
               subtitle="Double-check the concluding statement before submitting your work."
+              typography={typography}
+              spacing={spacing}
             />
             <Animated.View entering={FadeInUp.duration(600)}>
               <LinearGradient
@@ -386,348 +759,3 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    paddingTop: 50,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: {
-    fontSize: typography.titleLarge.fontSize,
-    lineHeight: typography.titleLarge.lineHeight,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  headerSubtitle: {
-    marginTop: 2,
-    fontSize: typography.caption.fontSize,
-    lineHeight: typography.caption.lineHeight,
-    color: colors.textSecondary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  section: {
-    marginBottom: spacing.xxl,
-  },
-  sectionHeader: {
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: typography.titleMedium.fontSize,
-    lineHeight: typography.titleMedium.lineHeight,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  sectionSubtitle: {
-    marginTop: 4,
-    fontSize: typography.bodyMedium.fontSize,
-    lineHeight: typography.bodyMedium.lineHeight,
-    color: colors.textSecondary,
-  },
-  problemCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#111827',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  problemIconContainer: {
-    marginBottom: spacing.sm,
-  },
-  problemLabel: {
-    fontSize: typography.bodyMedium.fontSize,
-    lineHeight: typography.bodyMedium.lineHeight,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  problemTextContainer: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: spacing.lg,
-  },
-  stepCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.12)',
-    shadowColor: '#111827',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  stepCardPending: {
-    opacity: 0.3,
-  },
-  stepHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  stepBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepBadgeRevealed: {
-    backgroundColor: colors.secondary,
-  },
-  stepBadgePending: {
-    backgroundColor: colors.border,
-  },
-  stepBadgeText: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  stepHeaderTextGroup: {
-    marginLeft: spacing.md,
-    flex: 1,
-  },
-  stepTitle: {
-    fontSize: typography.titleMedium.fontSize,
-    lineHeight: typography.titleMedium.lineHeight,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  stepMeta: {
-    marginTop: 2,
-    fontSize: typography.caption.fontSize,
-    lineHeight: typography.caption.lineHeight,
-    color: colors.textSecondary,
-  },
-  stepContent: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: spacing.lg,
-  },
-  explanationBox: {
-    backgroundColor: '#fef3c7',
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
-    borderRadius: 8,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  finalAnswerCard: {
-    borderRadius: 12,
-    padding: spacing.xxl,
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  finalAnswerLabel: {
-    fontSize: typography.titleLarge.fontSize,
-    lineHeight: typography.titleLarge.lineHeight,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginVertical: spacing.sm,
-  },
-  finalAnswerBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 8,
-    padding: spacing.xl,
-    width: '100%',
-    alignItems: 'center',
-  },
-  finalAnswerMeta: {
-    marginTop: spacing.sm,
-    fontSize: typography.caption.fontSize,
-    lineHeight: typography.caption.lineHeight,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  finalSection: {
-    paddingBottom: spacing.xl,
-  },
-  actionBar: {
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    padding: spacing.lg,
-    paddingBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  sectionLabel: {
-    fontSize: typography.bodyMedium.fontSize,
-    lineHeight: typography.bodyMedium.lineHeight,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  actionBarHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  settingsToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  settingsToggleText: {
-    fontSize: typography.caption.fontSize,
-    color: colors.textSecondary,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  helpButton: {
-    flex: 1,
-  },
-  gradientButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  helpButtonText: {
-    fontSize: typography.bodyMedium.fontSize,
-    lineHeight: typography.bodyMedium.lineHeight,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  newProblemOutlineButton: {
-    backgroundColor: '#991b1b',
-    paddingVertical: spacing.md,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  newProblemOutlineButtonText: {
-    fontSize: typography.bodyMedium.fontSize,
-    lineHeight: typography.bodyMedium.lineHeight,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  diagramContainer: {
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 8,
-    padding: spacing.md,
-    alignItems: 'center',
-  },
-  diagramLabel: {
-    fontSize: typography.bodyMedium.fontSize,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  diagramImage: {
-    width: '100%',
-    aspectRatio: 1,
-    maxHeight: 400,
-    borderRadius: 8,
-  },
-  diagramLoading: {
-    fontSize: typography.caption.fontSize,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
-  },
-  simplifiedBox: {
-    backgroundColor: '#fde68a',
-    borderLeftWidth: 4,
-    borderLeftColor: '#fbbf24',
-    borderRadius: 8,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  simplifiedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  simplifiedLabel: {
-    fontSize: typography.bodyMedium.fontSize,
-    lineHeight: typography.bodyMedium.lineHeight,
-    fontWeight: '600',
-    color: '#92400e',
-  },
-  explanationContainer: {
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(107, 114, 128, 0.2)',
-  },
-  explanationText: {
-    fontSize: typography.caption.fontSize,
-    lineHeight: typography.caption.lineHeight,
-    color: '#9ca3af',
-    fontStyle: 'italic',
-  },
-  validationCallout: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#fef3c7',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#fbbf24',
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  validationIcon: {
-    marginTop: 2,
-    marginRight: spacing.md,
-  },
-  validationTitle: {
-    fontSize: typography.bodyMedium.fontSize,
-    lineHeight: typography.bodyMedium.lineHeight,
-    fontWeight: '700',
-    color: '#92400e',
-    marginBottom: 2,
-  },
-  validationText: {
-    fontSize: typography.caption.fontSize,
-    lineHeight: typography.caption.lineHeight,
-    color: '#b45309',
-  },
-});
