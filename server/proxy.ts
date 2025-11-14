@@ -37,6 +37,9 @@ const mistralApiKey = process.env.MISTRAL_API_KEY;
 // Resolve Gemini configuration
 const geminiApiKey = process.env.GEMINI_API_KEY;
 
+// Resolve WolframAlpha configuration
+const wolframAlphaAppId = process.env.WOLFRAM_ALPHA_APP_ID;
+
 if (!openaiApiKey) {
   console.warn('⚠️ OpenAI API key not configured. Set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY.');
 }
@@ -47,6 +50,10 @@ if (!mistralApiKey) {
 
 if (!geminiApiKey) {
   console.warn('⚠️ Gemini API key not configured. Backup verification will be unavailable.');
+}
+
+if (!wolframAlphaAppId) {
+  console.warn('⚠️ WolframAlpha App ID not configured. Math verification will be unavailable.');
 }
 
 // CRITICAL: Health check endpoint FIRST - must respond immediately for deployment health checks
@@ -204,31 +211,36 @@ const geminiAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
 const GEMINI_USAGE_FILE = path.join(process.cwd(), 'data', 'gemini-usage.json');
 const GEMINI_MONTHLY_LIMIT = 200;
 
-interface GeminiUsage {
+// WolframAlpha usage tracking (2000 calls/month limit)
+const WOLFRAM_USAGE_FILE = path.join(process.cwd(), 'data', 'wolfram-usage.json');
+const WOLFRAM_MONTHLY_LIMIT = 2000;
+
+interface UsageTracking {
   monthKey: string;
   count: number;
 }
 
 const geminiLock = { locked: false, queue: [] as Array<() => void> };
+const wolframLock = { locked: false, queue: [] as Array<() => void> };
 
-async function withGeminiLock<T>(fn: () => Promise<T>): Promise<T> {
-  while (geminiLock.locked) {
-    await new Promise<void>(resolve => geminiLock.queue.push(resolve));
+async function withLock<T>(lock: { locked: boolean, queue: Array<() => void> }, fn: () => Promise<T>): Promise<T> {
+  while (lock.locked) {
+    await new Promise<void>(resolve => lock.queue.push(resolve));
   }
   
-  geminiLock.locked = true;
+  lock.locked = true;
   try {
     return await fn();
   } finally {
-    geminiLock.locked = false;
-    const next = geminiLock.queue.shift();
+    lock.locked = false;
+    const next = lock.queue.shift();
     if (next) next();
   }
 }
 
-async function getGeminiUsage(): Promise<GeminiUsage> {
+async function getUsage(file: string): Promise<UsageTracking> {
   try {
-    const data = await fs.promises.readFile(GEMINI_USAGE_FILE, 'utf8');
+    const data = await fs.promises.readFile(file, 'utf8');
     return JSON.parse(data);
   } catch (error) {
     return { monthKey: '', count: 0 };
@@ -236,9 +248,9 @@ async function getGeminiUsage(): Promise<GeminiUsage> {
 }
 
 async function incrementGeminiUsage(): Promise<boolean> {
-  return withGeminiLock(async () => {
+  return withLock(geminiLock, async () => {
     const currentMonthKey = new Date().toISOString().substring(0, 7);
-    const usage = await getGeminiUsage();
+    const usage = await getUsage(GEMINI_USAGE_FILE);
     
     if (usage.monthKey !== currentMonthKey) {
       usage.monthKey = currentMonthKey;
@@ -257,6 +269,28 @@ async function incrementGeminiUsage(): Promise<boolean> {
   });
 }
 
+async function incrementWolframUsage(): Promise<boolean> {
+  return withLock(wolframLock, async () => {
+    const currentMonthKey = new Date().toISOString().substring(0, 7);
+    const usage = await getUsage(WOLFRAM_USAGE_FILE);
+    
+    if (usage.monthKey !== currentMonthKey) {
+      usage.monthKey = currentMonthKey;
+      usage.count = 0;
+    }
+    
+    if (usage.count >= WOLFRAM_MONTHLY_LIMIT) {
+      console.warn(`⚠️ WolframAlpha monthly limit reached (${usage.count}/${WOLFRAM_MONTHLY_LIMIT})`);
+      return false;
+    }
+    
+    usage.count++;
+    await fs.promises.writeFile(WOLFRAM_USAGE_FILE, JSON.stringify(usage, null, 2));
+    console.log(`📊 WolframAlpha usage: ${usage.count}/${WOLFRAM_MONTHLY_LIMIT} this month`);
+    return true;
+  });
+}
+
 // In-memory verification store
 interface VerificationResult {
   status: 'pending' | 'verified' | 'unverified';
@@ -266,6 +300,403 @@ interface VerificationResult {
 }
 
 const verificationStore = new Map<string, VerificationResult>();
+
+// Math eligibility classifier - determines if a problem is suitable for WolframAlpha
+function isMathEligible(question: string, subject: string): boolean {
+  const mathSubjects = ['mathematics', 'math', 'algebra', 'geometry', 'calculus', 
+                        'trigonometry', 'statistics', 'physics', 'chemistry'];
+  
+  const mathKeywords = [
+    'solve', 'calculate', 'find', 'simplify', 'evaluate', 'compute',
+    'equation', 'integral', 'derivative', 'limit', 'matrix',
+    'factor', 'expand', 'differentiate', 'integrate'
+  ];
+  
+  const nonMathKeywords = ['explain', 'describe', 'essay', 'write', 'discuss', 'analyze'];
+  
+  // Check if subject is math-related
+  const isMathSubject = mathSubjects.some(s => subject.toLowerCase().includes(s));
+  
+  // Check for math keywords in question
+  const hasMathKeywords = mathKeywords.some(kw => 
+    question.toLowerCase().includes(kw)
+  );
+  
+  // Check for non-math keywords (essay questions, etc.)
+  const hasNonMathKeywords = nonMathKeywords.some(kw => 
+    question.toLowerCase().includes(kw)
+  );
+  
+  return (isMathSubject || hasMathKeywords) && !hasNonMathKeywords;
+}
+
+// Extract answer parts from multi-part solution
+function extractAnswerParts(finalAnswer: string, steps: any[]): Map<string, string> {
+  const parts = new Map<string, string>();
+  
+  // Try to extract labeled parts: (a), (b), (c), etc.
+  // More robust regex that handles nested parentheses
+  const lines = finalAnswer.split('\n');
+  let currentPart: string | null = null;
+  let currentValue: string[] = [];
+  
+  for (const line of lines) {
+    const partMatch = line.match(/^\s*\(([a-z])\)[:\s]*/i);
+    if (partMatch) {
+      // Save previous part if exists
+      if (currentPart && currentValue.length > 0) {
+        parts.set(currentPart, currentValue.join(' ').trim());
+      }
+      // Start new part
+      currentPart = partMatch[1].toLowerCase();
+      currentValue = [line.replace(/^\s*\([a-z]\)[:\s]*/i, '')];
+    } else if (currentPart && line.trim()) {
+      // Continue current part
+      currentValue.push(line.trim());
+    }
+  }
+  
+  // Save last part
+  if (currentPart && currentValue.length > 0) {
+    parts.set(currentPart, currentValue.join(' ').trim());
+  }
+  
+  // If no parts found in finalAnswer, check steps
+  if (parts.size === 0) {
+    steps.forEach(step => {
+      const stepMatch = step.title.match(/\(([a-z])\)/i);
+      if (stepMatch) {
+        const label = stepMatch[1].toLowerCase();
+        // Extract answer from step content - look for equals sign
+        const content = step.content;
+        const answerMatch = content.match(/=\s*(.+?)(?:\n|$)/);
+        if (answerMatch) {
+          parts.set(label, answerMatch[1].trim());
+        } else {
+          // If no equals, use last sentence
+          const lastSentence = content.split(/[.!?]/).filter((s: string) => s.trim()).pop();
+          if (lastSentence) {
+            parts.set(label, lastSentence.trim());
+          }
+        }
+      }
+    });
+  }
+  
+  return parts;
+}
+
+// Helper function to parse fractions and numbers
+function parseNumericValue(str: string): number | null {
+  // Remove common formatting
+  const cleaned = str.replace(/[,_\s]/g, '');
+  
+  // Remove any units (letters, compound units like m/s, m^2, etc.)
+  // Match the numeric part at the beginning, before any letters or unit symbols
+  const numericPart = cleaned.match(/^([-+]?\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?)/);
+  if (!numericPart) {
+    return null;
+  }
+  
+  const numStr = numericPart[1];
+  
+  // Try fraction first (e.g., "1/2", "3/4")
+  const fractionMatch = numStr.match(/^([-+]?\d+(?:\.\d+)?)\/([-+]?\d+(?:\.\d+)?)$/);
+  if (fractionMatch) {
+    const numerator = parseFloat(fractionMatch[1]);
+    const denominator = parseFloat(fractionMatch[2]);
+    if (denominator !== 0) {
+      return numerator / denominator;
+    }
+  }
+  
+  // Try regular number
+  const num = parseFloat(numStr);
+  return isNaN(num) ? null : num;
+}
+
+// WolframAlpha verification - uses computational engine for ground truth
+async function wolframAlphaVerification(
+  originalQuestion: string,
+  proposedSolution: any
+): Promise<ValidationResult> {
+  if (!wolframAlphaAppId) {
+    console.warn('⚠️ WolframAlpha App ID not configured');
+    return {
+      isValid: true,
+      errors: [],
+      warnings: ['WolframAlpha not configured'],
+      confidence: 50
+    };
+  }
+  
+  try {
+    console.log('🧮 Running WolframAlpha verification...');
+    
+    // Check rate limit
+    const canUse = await incrementWolframUsage();
+    if (!canUse) {
+      return {
+        isValid: true,
+        errors: [],
+        warnings: ['WolframAlpha monthly limit reached'],
+        confidence: 50
+      };
+    }
+    
+    // Extract parts from the solution
+    const answerParts = extractAnswerParts(proposedSolution.finalAnswer, proposedSolution.steps);
+    
+    // If multi-part, verify each part separately
+    if (answerParts.size > 0) {
+      console.log(`📝 Multi-part problem detected (${answerParts.size} parts)`);
+      const errors: string[] = [];
+      let verifiedParts = 0;
+      let inconclusiveParts = 0;
+      
+      for (const [label, proposedAnswer] of answerParts.entries()) {
+        // Extract the sub-question for this part - use more robust extraction
+        const questionLines = originalQuestion.split('\n');
+        let subQuestion = '';
+        
+        for (let i = 0; i < questionLines.length; i++) {
+          if (questionLines[i].match(new RegExp(`\\(${label}\\)`, 'i'))) {
+            // Found the part, take this line and potentially the next line if continuation
+            subQuestion = questionLines[i].replace(/^\s*\([a-z]\)[:\s]*/i, '').trim();
+            if (i + 1 < questionLines.length && !questionLines[i + 1].match(/^\s*\([a-z]\)/)) {
+              subQuestion += ' ' + questionLines[i + 1].trim();
+            }
+            break;
+          }
+        }
+        
+        if (!subQuestion) {
+          console.warn(`  ⚠️ Part (${label}): Could not extract sub-question`);
+          inconclusiveParts++;
+          continue;
+        }
+        
+        try {
+          const wolframUrl = `http://api.wolframalpha.com/v1/result?appid=${encodeURIComponent(wolframAlphaAppId)}&i=${encodeURIComponent(subQuestion)}`;
+          const response = await fetch(wolframUrl, { 
+            method: 'GET',
+            headers: { 'User-Agent': 'HomeworkHelper/1.0' },
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+          });
+          
+          if (response.ok) {
+            const wolframAnswer = await response.text();
+            console.log(`  Part (${label}): Proposed="${proposedAnswer}" | Wolfram="${wolframAnswer}"`);
+            
+            // Normalize and compare answers - be conservative to avoid false positives/negatives
+            const normalizedProposed = proposedAnswer.toLowerCase()
+              .replace(/\s+/g, '')
+              .replace(/[,_]/g, '')
+              .replace(/meters?/g, 'm')
+              .replace(/seconds?/g, 's');
+            
+            const normalizedWolfram = wolframAnswer.toLowerCase()
+              .replace(/\s+/g, '')
+              .replace(/[,_]/g, '')
+              .replace(/meters?/g, 'm')
+              .replace(/seconds?/g, 's');
+            
+            // Check for exact match first (most reliable)
+            if (normalizedProposed === normalizedWolfram) {
+              verifiedParts++;
+              console.log(`  ✓ Part (${label}) exact match`);
+            }
+            // Check if Wolfram answer is fully contained in student answer (student might have extra explanation)
+            else if (normalizedProposed.includes(normalizedWolfram) && normalizedWolfram.length >= 2) {
+              // Only accept containment if Wolfram answer is substantial (not just "2")
+              const isSubstantial = normalizedWolfram.length >= 3 || normalizedWolfram.match(/[=<>≤≥]/);
+              if (isSubstantial) {
+                verifiedParts++;
+                console.log(`  ✓ Part (${label}) contains Wolfram answer`);
+              } else {
+                // Too short, could be false positive - mark inconclusive
+                console.warn(`  ? Part (${label}) match uncertain (Wolfram answer too short: "${wolframAnswer}")`);
+                inconclusiveParts++;
+              }
+            }
+            // Check numeric equivalence for decimal/fraction conversions
+            else {
+              const proposedNum = parseNumericValue(normalizedProposed);
+              const wolframNum = parseNumericValue(normalizedWolfram);
+              
+              if (proposedNum !== null && wolframNum !== null) {
+                if (Math.abs(proposedNum - wolframNum) < 0.0001) {
+                  verifiedParts++;
+                  console.log(`  ✓ Part (${label}) numerically equivalent (${proposedNum} ≈ ${wolframNum})`);
+                } else {
+                  // Definite numeric mismatch
+                  errors.push(`Part (${label}): WolframAlpha got ${wolframNum} but solution shows ${proposedNum}`);
+                  console.log(`  ✗ Part (${label}) WRONG - numeric mismatch (${wolframNum} vs ${proposedNum})`);
+                }
+              } else {
+                // Can't parse as numbers - could be symbolic or formatting difference
+                console.warn(`  ? Part (${label}) uncertain - not numeric or format differs`);
+                inconclusiveParts++;
+              }
+            }
+          } else {
+            console.warn(`  ⚠️ Part (${label}): WolframAlpha returned ${response.status} - inconclusive`);
+            inconclusiveParts++;
+          }
+        } catch (partError) {
+          console.warn(`  ⚠️ Part (${label}) verification failed:`, partError);
+          inconclusiveParts++;
+        }
+      }
+      
+      const totalProcessed = verifiedParts + errors.length;
+      const allVerified = verifiedParts === answerParts.size && errors.length === 0;
+      
+      // If ANY errors were found, return unverified regardless of processable percentage
+      if (errors.length > 0) {
+        const confidence = answerParts.size > 0 ? Math.round((errors.length / answerParts.size) * 20) : 20;
+        console.log(`📊 WolframAlpha found ${errors.length} error(s) - marking as UNVERIFIED`);
+        return {
+          isValid: false,
+          errors,
+          warnings: inconclusiveParts > 0 ? [`${inconclusiveParts} additional parts could not be verified`] : [],
+          confidence
+        };
+      }
+      
+      // If inconclusive parts exist, cannot confidently verify - return as inconclusive to trigger AI fallback
+      if (inconclusiveParts > 0 || verifiedParts < answerParts.size) {
+        console.log(`📊 WolframAlpha inconclusive: ${verifiedParts}/${answerParts.size} verified, ${inconclusiveParts} inconclusive - triggering AI fallback`);
+        return {
+          isValid: true, // Mark as true so it doesn't fail, but low confidence triggers AI verification
+          errors: [],
+          warnings: [`WolframAlpha verified ${verifiedParts}/${answerParts.size} parts, ${inconclusiveParts} inconclusive - needs AI verification`],
+          confidence: 30 // Low confidence forces fallback to AI verification
+        };
+      }
+      
+      // All parts verified!
+      const confidence = 95;
+      console.log(`📊 WolframAlpha verification: ALL ${verifiedParts}/${answerParts.size} parts verified!`);
+      
+      return {
+        isValid: true,
+        errors: [],
+        warnings: [],
+        confidence
+      };
+    }
+    
+    // Single-answer problem - verify the whole answer
+    try {
+      const wolframUrl = `http://api.wolframalpha.com/v1/result?appid=${encodeURIComponent(wolframAlphaAppId)}&i=${encodeURIComponent(originalQuestion)}`;
+      const response = await fetch(wolframUrl, {
+        method: 'GET',
+        headers: { 'User-Agent': 'HomeworkHelper/1.0' }
+      });
+      
+      if (!response.ok) {
+        console.warn(`⚠️ WolframAlpha API returned ${response.status}`);
+        return {
+          isValid: true,
+          errors: [],
+          warnings: ['WolframAlpha could not solve this problem'],
+          confidence: 50
+        };
+      }
+      
+      const wolframAnswer = await response.text();
+      console.log(`🧮 Wolfram answer: "${wolframAnswer}"`);
+      console.log(`📝 Proposed answer: "${proposedSolution.finalAnswer}"`);
+      
+      // Normalize both answers for comparison - be conservative
+      const normalizedProposed = proposedSolution.finalAnswer.toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[,_]/g, '')
+        .replace(/meters?/g, 'm')
+        .replace(/seconds?/g, 's');
+      
+      const normalizedWolfram = wolframAnswer.toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[,_]/g, '')
+        .replace(/meters?/g, 'm')
+        .replace(/seconds?/g, 's');
+      
+      // Check for exact match first
+      if (normalizedProposed === normalizedWolfram) {
+        console.log(`✅ WolframAlpha verification: EXACT MATCH`);
+        return {
+          isValid: true,
+          errors: [],
+          warnings: [],
+          confidence: 95
+        };
+      }
+      
+      // Check if Wolfram answer is contained (student might have extra text)
+      if (normalizedProposed.includes(normalizedWolfram) && normalizedWolfram.length >= 3) {
+        console.log(`✅ WolframAlpha verification: CONTAINS (${normalizedWolfram})`);
+        return {
+          isValid: true,
+          errors: [],
+          warnings: [],
+          confidence: 85
+        };
+      }
+      
+      // Check numeric equivalence
+      const proposedNum = parseNumericValue(normalizedProposed);
+      const wolframNum = parseNumericValue(normalizedWolfram);
+      
+      if (proposedNum !== null && wolframNum !== null) {
+        if (Math.abs(proposedNum - wolframNum) < 0.0001) {
+          console.log(`✅ WolframAlpha verification: NUMERICALLY EQUIVALENT (${proposedNum} ≈ ${wolframNum})`);
+          return {
+            isValid: true,
+            errors: [],
+            warnings: [],
+            confidence: 90
+          };
+        } else {
+          // Definite numeric mismatch
+          console.log(`❌ WolframAlpha verification: WRONG - ${wolframNum} vs ${proposedNum}`);
+          return {
+            isValid: false,
+            errors: [`WolframAlpha computed ${wolframNum} but solution shows ${proposedNum}`],
+            warnings: [],
+            confidence: 20
+          };
+        }
+      }
+      
+      // Uncertain - could be format difference - mark as inconclusive
+      console.log(`⚠️ WolframAlpha verification: INCONCLUSIVE (not numeric or format differs)`);
+      return {
+        isValid: true,
+        errors: [],
+        warnings: ['WolframAlpha could not confidently verify - format might differ'],
+        confidence: 50
+      };
+    } catch (error) {
+      console.error('❌ WolframAlpha API error:', error);
+      return {
+        isValid: true,
+        errors: [],
+        warnings: ['WolframAlpha verification failed'],
+        confidence: 50
+      };
+    }
+    
+  } catch (error) {
+    console.error('❌ WolframAlpha verification error:', error);
+    return {
+      isValid: true,
+      errors: [],
+      warnings: ['WolframAlpha verification encountered an error'],
+      confidence: 50
+    };
+  }
+}
 
 // Cleanup old verifications after 1 hour
 setInterval(() => {
@@ -1332,12 +1763,46 @@ async function runVerificationPipeline(
   });
   
   try {
-    // Attempt 1: GPT-4o verification (temperature 0.3)
+    // Check if this is a math-eligible problem
+    const isMath = isMathEligible(originalQuestion, solution.subject || '');
+    
+    if (isMath && wolframAlphaAppId) {
+      console.log(`🧮 Math problem detected - using WolframAlpha for ground truth verification`);
+      
+      // Attempt 1: WolframAlpha verification (computational ground truth)
+      const wolframResult = await wolframAlphaVerification(originalQuestion, solution);
+      
+      if (wolframResult.isValid && wolframResult.confidence >= 70) {
+        console.log(`✅ WolframAlpha verification PASSED (confidence: ${wolframResult.confidence}%)`);
+        verificationStore.set(solutionId, {
+          status: 'verified',
+          confidence: wolframResult.confidence,
+          warnings: wolframResult.warnings,
+          timestamp: Date.now()
+        });
+        return;
+      }
+      
+      if (!wolframResult.isValid && wolframResult.confidence < 50) {
+        // WolframAlpha found a definite error
+        console.warn(`❌ WolframAlpha found errors - marking as unverified`);
+        verificationStore.set(solutionId, {
+          status: 'unverified',
+          confidence: wolframResult.confidence,
+          warnings: [...wolframResult.warnings, ...wolframResult.errors],
+          timestamp: Date.now()
+        });
+        return;
+      }
+      
+      console.log(`⚠️ WolframAlpha inconclusive, falling back to AI verification...`);
+    }
+    
+    // Attempt 2 (or 1 if not math): GPT-4o verification
     let verification = await crossModelVerification(originalQuestion, solution);
     
     if (verification.isValid && verification.confidence >= 70) {
-      // Success on first try
-      console.log(`✅ Verification passed on first attempt (confidence: ${verification.confidence}%)`);
+      console.log(`✅ GPT-4o verification passed (confidence: ${verification.confidence}%)`);
       verificationStore.set(solutionId, {
         status: 'verified',
         confidence: verification.confidence,
@@ -1347,13 +1812,12 @@ async function runVerificationPipeline(
       return;
     }
     
-    // Attempt 2: Retry GPT-4o with alternate prompt (higher temperature for fresh perspective)
-    console.log(`🔄 First attempt inconclusive, retrying with alternate approach...`);
-    
+    // Attempt 3: Retry GPT-4o
+    console.log(`🔄 First GPT-4o attempt inconclusive, retrying...`);
     const retryVerification = await crossModelVerification(originalQuestion, solution);
     
     if (retryVerification.isValid && retryVerification.confidence >= 70) {
-      console.log(`✅ Verification passed on retry (confidence: ${retryVerification.confidence}%)`);
+      console.log(`✅ GPT-4o retry passed (confidence: ${retryVerification.confidence}%)`);
       verificationStore.set(solutionId, {
         status: 'verified',
         confidence: retryVerification.confidence,
@@ -1363,28 +1827,11 @@ async function runVerificationPipeline(
       return;
     }
     
-    // Attempt 3: Gemini backup verification (if available and under limit)
-    if (geminiAI) {
-      console.log(`🔮 GPT-4o verification inconclusive, trying Gemini backup...`);
-      const geminiResult = await geminiVerification(originalQuestion, solution);
-      
-      if (geminiResult.isValid && geminiResult.confidence >= 70) {
-        console.log(`✅ Gemini verification passed (confidence: ${geminiResult.confidence}%)`);
-        verificationStore.set(solutionId, {
-          status: 'verified',
-          confidence: geminiResult.confidence,
-          warnings: [...verification.warnings, ...geminiResult.warnings],
-          timestamp: Date.now()
-        });
-        return;
-      }
-    }
-    
     // All verification attempts inconclusive - mark as unverified
     console.warn(`⚠️ All verification attempts inconclusive - marking as unverified`);
     verificationStore.set(solutionId, {
       status: 'unverified',
-      confidence: Math.max(verification.confidence, 0),
+      confidence: Math.max(verification.confidence, retryVerification.confidence, 0),
       warnings: ['Unable to verify solution accuracy', ...verification.warnings],
       timestamp: Date.now()
     });
