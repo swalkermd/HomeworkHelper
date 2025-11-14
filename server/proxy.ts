@@ -1138,7 +1138,7 @@ Respond in JSON format:
   "reasoning": "brief explanation of your assessment"
 }`;
 
-    const model = geminiAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = geminiAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: verificationPrompt }] }],
       generationConfig: {
@@ -1939,7 +1939,7 @@ Grade-appropriate language based on difficulty level.`
     // ⚡ RETURN IMMEDIATELY with pending verification status
     const responseWithId = {
       ...formattedResult,
-      solutionId: diagrams.length > 0 ? solutionId : undefined,
+      solutionId,
       verificationStatus: 'pending' as const,
       verificationConfidence: 0,
       verificationWarnings: []
