@@ -1144,8 +1144,8 @@ app.post('/api/analyze-text', async (req, res) => {
 - If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
 - CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
-- **ALWAYS use LaTeX \\frac{num}{den} or slash notation {num/den} for fractions**
-- **NEVER output fractions in vertical multi-line format** (e.g., "1\n2" is WRONG, use "\\frac{1}{2}" or "{1/2}")
+- **ALWAYS use LaTeX \\frac{num}{den} or slash notation num/den for fractions**
+- **DO NOT use raw text newlines between numerator and denominator** (the system renders fractions vertically automatically)
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
@@ -1727,8 +1727,8 @@ ${ocrText}
 - If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
 - CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
-- **ALWAYS use LaTeX \\frac{num}{den} or slash notation {num/den} for fractions**
-- **NEVER output fractions in vertical multi-line format** (e.g., "1\n2" is WRONG, use "\\frac{1}{2}" or "{1/2}")
+- **ALWAYS use LaTeX \\frac{num}{den} or slash notation num/den for fractions**
+- **DO NOT use raw text newlines between numerator and denominator** (the system renders fractions vertically automatically)
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
@@ -1846,8 +1846,8 @@ ${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multi
 - If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
 - CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
-- **ALWAYS use LaTeX \\frac{num}{den} or slash notation {num/den} for fractions**
-- **NEVER output fractions in vertical multi-line format** (e.g., "1\n2" is WRONG, use "\\frac{1}{2}" or "{1/2}")
+- **ALWAYS use LaTeX \\frac{num}{den} or slash notation num/den for fractions**
+- **DO NOT use raw text newlines between numerator and denominator** (the system renders fractions vertically automatically)
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
 - Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
