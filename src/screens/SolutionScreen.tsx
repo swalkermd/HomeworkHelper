@@ -619,7 +619,11 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
             </View>
             <Text style={styles.problemLabel}>Problem</Text>
             <View style={styles.problemTextContainer}>
-              <MathText content={currentSolution.problem} fontSize={typography.bodyLarge.fontSize} />
+              <MathText
+                content={currentSolution.problem}
+                structuredContent={currentSolution.problemStructured}
+                fontSize={typography.bodyLarge.fontSize}
+              />
             </View>
           </Animated.View>
         </View>
@@ -678,7 +682,11 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
               )}
               
               <View style={styles.stepContent}>
-                <MathText content={step.content} fontSize={typography.mathSmall.fontSize} />
+                <MathText
+                  content={step.content}
+                  structuredContent={step.structuredContent}
+                  fontSize={typography.mathSmall.fontSize}
+                />
               </View>
 
               {showStepExplanations && step.explanation && (
@@ -731,6 +739,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                 <View style={styles.finalAnswerBox}>
                   <FinalAnswerSection
                     content={currentSolution.finalAnswer}
+                    structuredContent={currentSolution.finalAnswerStructured}
                     isOnGreenBackground={false}
                   />
                 </View>

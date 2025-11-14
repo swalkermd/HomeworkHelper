@@ -12,11 +12,15 @@ export interface SelectedProblem {
   problemNumber?: string;
 }
 
+import { MathNode } from './math';
+
 export interface SolutionStep {
   id: string;
   title: string;
   content: string;
   explanation: string;
+  structuredContent?: MathNode[];
+  structuredExplanation?: MathNode[];
 }
 
 export interface SimplifiedExplanation {
@@ -30,6 +34,8 @@ export interface HomeworkSolution {
   difficulty: string;
   steps: SolutionStep[];
   finalAnswer: string;
+  problemStructured?: MathNode[];
+  finalAnswerStructured?: MathNode[];
   solutionId?: string;
   verificationStatus?: 'pending' | 'verified' | 'unverified';
   verificationConfidence?: number;

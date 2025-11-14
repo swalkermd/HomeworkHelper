@@ -3,21 +3,31 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import MathText from './MathText';
-import { normalizeSolutionContent, ContentBlock } from '../utils/mathFormatter';
-import { colors, typography } from '../constants/theme';
+import { normalizeSolutionContent } from '../utils/mathFormatter';
+import { parseMathContent } from '../utils/mathParser';
+import { colors } from '../constants/theme';
+import { MathNode } from '../types/math';
 
 interface FinalAnswerSectionProps {
   content: string;
+  structuredContent?: MathNode[];
   isOnGreenBackground?: boolean;
 }
 
-export default function FinalAnswerSection({ content, isOnGreenBackground = false }: FinalAnswerSectionProps) {
+export default function FinalAnswerSection({ content, structuredContent, isOnGreenBackground = false }: FinalAnswerSectionProps) {
   // Normalize content into structured blocks
   const blocks = normalizeSolutionContent(content);
-  
+
   // Check if we have multi-part answer (more than one block with labels)
   const isMultiPart = blocks.length > 1 && blocks.some(block => block.label);
-  
+
+  const derivedStructuredBlocks = React.useMemo(() => {
+    if (!isMultiPart) {
+      return [] as MathNode[][];
+    }
+    return blocks.map(block => parseMathContent(block.content));
+  }, [blocks, isMultiPart]);
+
   if (isMultiPart) {
     // Render as structured multi-part layout
     return (
@@ -37,6 +47,7 @@ export default function FinalAnswerSection({ content, isOnGreenBackground = fals
             <View style={styles.contentContainer}>
               <MathText
                 content={block.content}
+                structuredContent={derivedStructuredBlocks[index]}
                 fontSize={16}
                 color={isOnGreenBackground ? colors.textPrimary : colors.textPrimary}
                 isOnGreenBackground={isOnGreenBackground}
@@ -53,6 +64,7 @@ export default function FinalAnswerSection({ content, isOnGreenBackground = fals
     <View style={styles.container}>
       <MathText
         content={blocks[0]?.content || content}
+        structuredContent={structuredContent}
         fontSize={16}
         color={isOnGreenBackground ? colors.textPrimary : colors.textPrimary}
         isOnGreenBackground={isOnGreenBackground}
