@@ -507,7 +507,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 2,
-    transform: [{ translateY: -8 }],
   },
   fractionText: {
     textAlign: 'center',
