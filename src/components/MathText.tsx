@@ -36,186 +36,315 @@ export default function MathText({
   const parsedContent = structuredContent && structuredContent.length > 0
     ? structuredContent
     : parseMathContent(content);
-  
+
   // Check if content has fractions or images (which require View components)
   const hasComplexElements = parsedContent.some(part => part.type === 'fraction' || part.type === 'image');
-  
+
   // If no fractions/images, use nested Text for proper inline flow (prevents unwanted line breaks)
   if (!hasComplexElements) {
     return (
-      <Text style={{ fontSize, color }}>
-        {parsedContent.map((part, index) => renderTextPart(part, index, fontSize, color, isOnGreenBackground))}
+      <Text style={{ fontSize, color, lineHeight: fontSize * LINE_HEIGHT_MULTIPLIER }}>
+        {renderInlineContent(parsedContent, fontSize, color, isOnGreenBackground)}
       </Text>
     );
   }
-  
+
   // For content with fractions/images: create non-breaking clusters
   // Cluster ParsedPart[] directly to preserve all formatting (colors, fractions, etc.)
   const partClusters = clusterizeParsedParts(parsedContent);
-  
+
   return (
     <View style={styles.lineContainer}>
       {partClusters.map((cluster, clusterIndex) => (
         <View key={`cluster-${clusterIndex}`} style={styles.cluster}>
-          {cluster.parts.map((part, partIndex) => {
-            const key = `${clusterIndex}-${partIndex}`;
-            
-            // Handle fractions and complex parts with views
-            if (part.type === 'fraction' || part.type === 'image') {
-              return renderPart(part, partIndex, fontSize, color, isOnGreenBackground);
-            }
-
-            // Handle text parts inline
-            return renderTextPart(part, partIndex, fontSize, color, isOnGreenBackground);
-          })}
+          {renderCluster(cluster.parts, clusterIndex, fontSize, color, isOnGreenBackground)}
         </View>
       ))}
     </View>
   );
 }
 
-// Render text-only parts as nested Text (for inline flow without breaks)
-function renderTextPart(part: MathNode, index: number, baseFontSize: number, baseColor: string, isOnGreenBg: boolean): React.ReactNode {
-  // Helper to apply handwriting style wrapper if needed
-  const wrapWithHandwriting = (element: React.ReactNode) => {
-    if (part.isHandwritten) {
-      return <Text key={index} style={{ fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600' }}>{element}</Text>;
+function renderCluster(
+  parts: MathNode[],
+  clusterIndex: number,
+  baseFontSize: number,
+  baseColor: string,
+  isOnGreenBg: boolean,
+): React.ReactNode[] {
+  const elements: React.ReactNode[] = [];
+  let currentInline: React.ReactNode[] = [];
+
+  const flushInline = () => {
+    if (currentInline.length === 0) {
+      return;
     }
-    return element;
+
+    elements.push(
+      <Text
+        key={`cluster-${clusterIndex}-inline-${elements.length}`}
+        style={[
+          styles.inlineText,
+          {
+            fontSize: baseFontSize,
+            color: baseColor,
+            lineHeight: baseFontSize * LINE_HEIGHT_MULTIPLIER,
+          },
+        ]}
+      >
+        {currentInline}
+      </Text>,
+    );
+
+    currentInline = [];
   };
-  
+
+  parts.forEach((part, partIndex) => {
+    if (part.type === 'fraction' || part.type === 'image') {
+      flushInline();
+      elements.push(
+        renderComplexPart(part, `cluster-${clusterIndex}-complex-${partIndex}`, baseFontSize, baseColor, isOnGreenBg),
+      );
+      return;
+    }
+
+    currentInline.push(
+      renderInlineSpan(part, `cluster-${clusterIndex}-text-${partIndex}`, baseFontSize, baseColor, isOnGreenBg),
+    );
+  });
+
+  flushInline();
+
+  return elements;
+}
+
+function renderInlineContent(
+  parts: MathNode[],
+  baseFontSize: number,
+  baseColor: string,
+  isOnGreenBg: boolean,
+): React.ReactNode[] {
+  return parts.map((part, index) =>
+    renderInlineSpan(part, `inline-${index}`, baseFontSize, baseColor, isOnGreenBg),
+  );
+}
+
+function renderInlineSpan(
+  part: MathNode,
+  key: string,
+  baseFontSize: number,
+  baseColor: string,
+  isOnGreenBg: boolean,
+): React.ReactNode {
+  const handwritingStyle = part.isHandwritten
+    ? { fontFamily: 'Caveat', fontSize: baseFontSize * 1.25, fontWeight: '600' as const }
+    : null;
+
   switch (part.type) {
-    case 'highlighted':
+    case 'highlighted': {
       const highlightColor = getHighlightColor(part.color || '');
-      const highlightElement = (
-        <Text style={{ color: highlightColor, fontWeight: '600' }}>
+      return (
+        <Text
+          key={key}
+          style={[
+            { color: highlightColor, fontWeight: '600', lineHeight: baseFontSize * LINE_HEIGHT_MULTIPLIER },
+            handwritingStyle,
+          ]}
+        >
           {part.content}
         </Text>
       );
-      return wrapWithHandwriting(highlightElement);
-    
-    case 'arrow':
+    }
+
+    case 'arrow': {
       const arrowColor = isOnGreenBg ? '#ffffff' : colors.secondary;
-      return wrapWithHandwriting(
-        <Text style={{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor, position: 'relative', top: 3 }}>
-          {' → '}
+      return (
+        <Text
+          key={key}
+          style={[
+            {
+              color: arrowColor,
+              fontSize: baseFontSize * 1.35,
+              fontWeight: '700',
+              lineHeight: baseFontSize * LINE_HEIGHT_MULTIPLIER,
+              paddingHorizontal: baseFontSize * 0.1,
+            },
+            handwritingStyle,
+          ]}
+        >
+          {' → '}
         </Text>
       );
-    
+    }
+
     case 'italic':
-      return wrapWithHandwriting(
-        <Text style={{ fontStyle: 'italic' }}>
+      return (
+        <Text
+          key={key}
+          style={[
+            { fontStyle: 'italic', color: baseColor, lineHeight: baseFontSize * LINE_HEIGHT_MULTIPLIER },
+            handwritingStyle,
+          ]}
+        >
           {part.content}
         </Text>
       );
-    
-    case 'subscript':
+
+    case 'subscript': {
       const subscriptText = part.content.split('').map(char => SUBSCRIPT_MAP[char] || char).join('');
-      return wrapWithHandwriting(
-        <Text style={{ fontSize: baseFontSize * 0.7 }}>
+      return (
+        <Text
+          key={key}
+          style={[
+            {
+              fontSize: baseFontSize * 0.72,
+              color: baseColor,
+              lineHeight: baseFontSize,
+              position: 'relative',
+              top: baseFontSize * 0.18,
+            },
+            handwritingStyle,
+          ]}
+        >
           {subscriptText}
         </Text>
       );
-    
-    case 'superscript':
+    }
+
+    case 'superscript': {
       const superscriptText = part.content.split('').map(char => SUPERSCRIPT_MAP[char] || char).join('');
-      return wrapWithHandwriting(
-        <Text style={{ fontSize: baseFontSize * 0.7 }}>
+      return (
+        <Text
+          key={key}
+          style={[
+            {
+              fontSize: baseFontSize * 0.72,
+              color: baseColor,
+              lineHeight: baseFontSize,
+              position: 'relative',
+              top: -baseFontSize * 0.25,
+            },
+            handwritingStyle,
+          ]}
+        >
           {superscriptText}
         </Text>
       );
-    
-    default: // 'text'
+    }
+
+    case 'text':
+    default:
       if (part.isHandwritten) {
-        return <Text key={index} style={{ fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600' }}>{part.content}</Text>;
+        return (
+          <Text
+            key={key}
+            style={[
+              {
+                color: baseColor,
+                lineHeight: baseFontSize * LINE_HEIGHT_MULTIPLIER,
+              },
+              handwritingStyle,
+            ]}
+          >
+            {part.content}
+          </Text>
+        );
       }
-      return part.content;
+
+      return <React.Fragment key={key}>{part.content}</React.Fragment>;
   }
 }
 
 // Render all parts (including fractions/images) as View children
-function renderPart(part: MathNode, index: number, baseFontSize: number, baseColor: string, isOnGreenBg: boolean): React.ReactNode {
-  // Helper to get font style for handwritten content
-  const getHandwritingStyle = () => part.isHandwritten ? { fontFamily: 'Caveat', fontSize: baseFontSize * 1.3, fontWeight: '600' as const } : {};
-  
+function renderComplexPart(
+  part: MathNode,
+  key: string,
+  baseFontSize: number,
+  baseColor: string,
+  isOnGreenBg: boolean,
+): React.ReactNode {
+  const handwritingStyle = part.isHandwritten
+    ? { fontFamily: 'Caveat', fontWeight: '600' as const }
+    : null;
+
   switch (part.type) {
-    case 'fraction':
-      // Use the fraction's color if specified (for highlighted fractions), otherwise use base color
+    case 'fraction': {
       const fractionColor = part.color ? getHighlightColor(part.color) : baseColor;
-      const fractionWeight = part.color ? '600' : 'normal'; // Bold if highlighted
-      const fractionFont = part.isHandwritten ? { fontFamily: 'Caveat', fontWeight: '600' as const } : {};
+      const fractionWeight = part.color ? '600' : 'normal';
+      const fractionFontSize = baseFontSize * 0.82;
+      const lineThickness = Math.max(1, Math.round(baseFontSize / 14));
+
       return (
-        <View key={index} style={styles.fractionContainer}>
-          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: fractionColor, fontWeight: fractionWeight }, fractionFont]}>
+        <View key={key} style={[styles.fractionContainer, { marginHorizontal: baseFontSize * 0.12 }]}> 
+          <Text
+            style={[
+              styles.fractionText,
+              {
+                fontSize: fractionFontSize,
+                color: fractionColor,
+                fontWeight: fractionWeight,
+                lineHeight: fractionFontSize * 1.1,
+              },
+              handwritingStyle,
+            ]}
+          >
             {part.numerator}
           </Text>
-          <View style={[styles.fractionLine, { backgroundColor: fractionColor }]} />
-          <Text style={[styles.fractionText, { fontSize: baseFontSize * 0.7, color: fractionColor, fontWeight: fractionWeight }, fractionFont]}>
+          <View
+            style={[
+              styles.fractionLine,
+              {
+                backgroundColor: fractionColor,
+                height: lineThickness,
+                marginVertical: baseFontSize * 0.08,
+              },
+            ]}
+          />
+          <Text
+            style={[
+              styles.fractionText,
+              {
+                fontSize: fractionFontSize,
+                color: fractionColor,
+                fontWeight: fractionWeight,
+                lineHeight: fractionFontSize * 1.1,
+              },
+              handwritingStyle,
+            ]}
+          >
             {part.denominator}
           </Text>
         </View>
       );
-    
-    case 'highlighted':
-      const highlightColor = getHighlightColor(part.color || '');
-      return (
-        <Text key={index} style={[{ fontSize: baseFontSize, color: highlightColor, fontWeight: '600' }, getHandwritingStyle()]}>
-          {part.content}
-        </Text>
-      );
-    
-    case 'arrow':
-      const arrowColor = isOnGreenBg ? '#ffffff' : colors.secondary;
-      return (
-        <Text key={index} style={[{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor, position: 'relative', top: 3 }, getHandwritingStyle()]}>
-          {' → '}
-        </Text>
-      );
-    
-    case 'italic':
-      return (
-        <Text key={index} style={[{ fontSize: baseFontSize, color: baseColor, fontStyle: 'italic' }, getHandwritingStyle()]}>
-          {part.content}
-        </Text>
-      );
-    
-    case 'subscript':
-      const subscriptText = part.content.split('').map(char => SUBSCRIPT_MAP[char] || char).join('');
-      return (
-        <Text key={index} style={[{ fontSize: baseFontSize * 0.7, color: baseColor }, getHandwritingStyle()]}>
-          {subscriptText}
-        </Text>
-      );
-    
-    case 'superscript':
-      const superscriptText = part.content.split('').map(char => SUPERSCRIPT_MAP[char] || char).join('');
-      return (
-        <Text key={index} style={[{ fontSize: baseFontSize * 0.7, color: baseColor }, getHandwritingStyle()]}>
-          {superscriptText}
-        </Text>
-      );
-    
+    }
+
     case 'image':
       if (part.url) {
         return (
-          <View key={index} style={styles.imageContainer}>
+          <View key={key} style={styles.imageContainer}>
             <Image
               source={{ uri: part.url }}
               style={styles.image}
               resizeMode="contain"
             />
-            <Text style={[styles.imageCaption, { fontSize: baseFontSize * 0.8 }]}>
-              {part.content}
-            </Text>
+            {part.content ? (
+              <Text style={[styles.imageCaption, { fontSize: baseFontSize * 0.85, lineHeight: baseFontSize }]}>
+                {part.content}
+              </Text>
+            ) : null}
           </View>
         );
       }
       return null;
-    
-    case 'text':
+
     default:
       return (
-        <Text key={index} style={[{ fontSize: baseFontSize, color: baseColor }, getHandwritingStyle()]}>
+        <Text
+          key={key}
+          style={[
+            { fontSize: baseFontSize, color: baseColor, lineHeight: baseFontSize * LINE_HEIGHT_MULTIPLIER },
+            handwritingStyle,
+          ]}
+        >
           {part.content}
         </Text>
       );
@@ -237,39 +366,47 @@ function getHighlightColor(colorName: string): string {
   return colorMap[colorName.toLowerCase()] || colors.textPrimary;
 }
 
+const LINE_HEIGHT_MULTIPLIER = 1.35;
+
 const styles = StyleSheet.create({
   lineContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'baseline',
+    alignItems: 'flex-end',
+    maxWidth: '100%',
   },
   cluster: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
-    alignItems: 'baseline',
+    alignItems: 'flex-end',
+    flexShrink: 1,
+    maxWidth: '100%',
+    rowGap: 0,
+    columnGap: 0,
+  },
+  inlineText: {
+    flexShrink: 1,
   },
   fractionContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 2,
+    paddingHorizontal: 2,
   },
   fractionText: {
     textAlign: 'center',
-    lineHeight: 12,
   },
   fractionLine: {
-    height: 1,
     width: '100%',
-    marginVertical: 1,
   },
   imageContainer: {
     width: '100%',
     marginVertical: 8,
     alignItems: 'center',
+    alignSelf: 'stretch',
   },
   image: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: '100%',
     aspectRatio: 1,
     borderRadius: 8,
   },
