@@ -566,36 +566,98 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   // 1. Convert standalone fractions like "1/8" to "{1/8}" (for OCR-detected fractions)
   // NOTE: We no longer force decimal→fraction conversion. Format should match input.
   // CRITICAL: Don't match fractions that are part of decimal divisions like "19.6/5.0"
+  // FIXED: Use brace-aware tokenizer to prevent double-wrapping fractions like {240/41}
   const beforeFractionConversion = formatted;
   
-  // First, convert ALL fractions INSIDE color tags: [blue:12/5h - 10/5h] -> [blue:{12/5}h - {10/5}h]
-  // This regex handles multiple fractions within a single color tag by processing each tag's content
-  // Use negative lookbehind/lookahead for decimal points to avoid matching "19.6/5.0"
-  // Updated to handle variable fractions like x/10c, not just numeric fractions
-  // CRITICAL: Exclude unit expressions (m/s, km/h) by requiring at least one digit
-  formatted = formatted.replace(/\[(blue|red):([^\]]+)\]/g, (match, color, content) => {
-    // Convert all fractions inside this color tag's content, but NOT decimal divisions or units
-    // Pattern matches: numbers (12/5), mixed (3x/4, x/10c) - but NOT pure letters (m/s, km/h)
-    const convertedContent = content.replace(/(?<![{/.])([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)(?![}./])/g, (m: string, num: string, den: string) => {
-      // Only wrap if numerator or denominator contains at least one digit
-      // This excludes unit expressions like m/s, kg/m which are letter-only
-      if (/\d/.test(num) || /\d/.test(den)) {
-        return `{${num}/${den}}`;
+  // Brace-aware fraction wrapper - only wraps raw a/b tokens, not {a/b}
+  // CRITICAL: Only skips CURLY braces {...}, not parentheses () or brackets []
+  function wrapFractions(text: string): string {
+    let result = '';
+    let i = 0;
+    
+    while (i < text.length) {
+      // Check if we're at the start of a CURLY brace-wrapped section
+      // This ensures we skip already-wrapped fractions like {240/41}
+      // But we still process fractions in parentheses like (3/4) or √(9/16)
+      if (text[i] === '{') {
+        // Find the matching closing curly brace (handle unmatched braces gracefully)
+        let depth = 1;
+        let j = i + 1;
+        while (j < text.length && depth > 0) {
+          if (text[j] === '{') depth++;
+          else if (text[j] === '}') depth--;
+          j++;
+        }
+        // Copy the entire brace section unchanged (already wrapped)
+        // If unmatched, copy what we found and continue
+        result += text.substring(i, j);
+        i = j;
+        continue;
       }
-      return m; // Leave units unchanged
-    });
-    return `[${color}:${convertedContent}]`;
-  });
-  
-  // Then, convert any remaining standalone fractions outside color tags
-  // Handles both numeric fractions (1/8) and variable fractions (x/10c)
-  // Excludes unit expressions (m/s, km/h) by requiring at least one digit
-  formatted = formatted.replace(/(?<![{/.])([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)(?![}./])/g, (match: string, num: string, den: string) => {
-    // Only wrap if numerator or denominator contains at least one digit
-    if (/\d/.test(num) || /\d/.test(den)) {
-      return `{${num}/${den}}`;
+      
+      // Check if we're at a fraction pattern
+      // Match: any alphanumeric/any alphanumeric (e.g., 12/5, 3x/4, x/10, 240/41)
+      // CRITICAL: Preserve trailing unit suffixes when denom is purely numeric (e.g., 12/5h → {12/5}h)
+      // But keep algebraic variables inside (e.g., 3x/4y → {3x/4y})
+      const fractionMatch = text.substring(i).match(/^([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/);
+      if (fractionMatch) {
+        const num = fractionMatch[1];
+        const den = fractionMatch[2];
+        
+        // Only wrap if at least one side has a digit (excludes pure letter ratios like m/s)
+        const hasDigit = /\d/.test(num) || /\d/.test(den);
+        
+        // Not preceded/followed by decimal point (to avoid 19.6/5.0)
+        const notDecimal = (i === 0 || text[i - 1] !== '.') && (i + fractionMatch[0].length >= text.length || text[i + fractionMatch[0].length] !== '.');
+        
+        if (hasDigit && notDecimal) {
+          // Check if denominator is purely numeric with trailing letters (unit suffix case)
+          // E.g., "5h" → {12/5}h, but "4y" → {3x/4y} (algebraic variable)
+          const pureNumericDenMatch = den.match(/^(\d+)([a-zA-Z]+)$/);
+          
+          if (pureNumericDenMatch) {
+            // Denominator is pure number + letters
+            // Use unit allowlist to distinguish units from algebraic variables
+            const denNum = pureNumericDenMatch[1];
+            const suffix = pureNumericDenMatch[2].toLowerCase();
+            
+            // Common measurement units (includes common abbreviations, excludes algebraic variables x, y, z, a, b)
+            const commonUnits = ['h', 'hr', 'hrs', 'hour', 'hours', 'm', 'min', 'mins', 'minute', 'minutes', 's', 'sec', 'secs', 'second', 'seconds',
+                                 'c', 'f', 'k', // c=cups/celsius, f=fahrenheit, k=kilo/kelvin 
+                                 'cm', 'mm', 'km', 'meter', 'meters', 'ft', 'feet', 'in', 'inch', 'inches', 'yd', 'yard', 'yards', 'mi', 'mile', 'miles', 'mph',
+                                 'kg', 'g', 'mg', 'lb', 'lbs', 'oz', 'l', 'ml', 'gal', 'qt', 'pt', 'cup', 'cups', 'tbsp', 'tsp'];
+            
+            if (commonUnits.includes(suffix)) {
+              // Recognized unit → separate it
+              result += `{${num}/${denNum}}${pureNumericDenMatch[2]}`;
+            } else {
+              // Not a recognized unit → likely algebraic variable → keep together
+              result += `{${num}/${den}}`;
+            }
+          } else {
+            // Keep entire fraction together (includes algebraic cases like 3x/4y)
+            result += `{${num}/${den}}`;
+          }
+          i += fractionMatch[0].length;
+          continue;
+        }
+      }
+      
+      // Copy regular character
+      result += text[i];
+      i++;
     }
-    return match; // Leave units unchanged
+    
+    return result;
+  }
+  
+  // Apply fraction wrapping to entire text
+  formatted = wrapFractions(formatted);
+  
+  // Also apply inside color tags (process tag contents separately)
+  formatted = formatted.replace(/\[(blue|red):([^\]]+)\]/g, (match, color, content) => {
+    const wrappedContent = wrapFractions(content);
+    return `[${color}:${wrappedContent}]`;
   });
   
   if (debugLabel && beforeFractionConversion !== formatted) {
@@ -643,6 +705,91 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   }
   
   return formatted;
+}
+
+// Deterministic measurement diagram classifier
+function requiresMeasurementDiagram(question: string): { required: boolean; reason?: string } {
+  // Guard against undefined/null
+  if (!question || typeof question !== 'string') {
+    return { required: false };
+  }
+  
+  const lowerQuestion = question.toLowerCase();
+  
+  // Keyword groups for detection
+  const geometryActions = ['cut', 'divide', 'split', 'measure', 'draw', 'construct', 'build', 'fit', 'arrange'];
+  const measurementNouns = ['length', 'width', 'height', 'area', 'perimeter', 'volume', 'distance', 'piece', 'board', 'rope', 'wire', 'fabric'];
+  const units = /\b(inch|inches|foot|feet|yard|yards|meter|meters|centimeter|cm|millimeter|mm|kilometer|km|mile|miles|ft|yd)\b/i;
+  const fractions = /\d+\s*\{?\d+\/\d+\}?|\d+\/\d+/; // Matches "20 1/2" or "20{1/2}" or "1/2"
+  
+  let signalCount = 0;
+  const signals: string[] = [];
+  
+  // Check for geometry action keywords
+  if (geometryActions.some(action => lowerQuestion.includes(action))) {
+    signalCount++;
+    signals.push('geometry-action');
+  }
+  
+  // Check for measurement nouns
+  if (measurementNouns.some(noun => lowerQuestion.includes(noun))) {
+    signalCount++;
+    signals.push('measurement-noun');
+  }
+  
+  // Check for units
+  if (units.test(question)) {
+    signalCount++;
+    signals.push('units');
+  }
+  
+  // Check for fractions (common in measurement problems)
+  if (fractions.test(question)) {
+    signalCount++;
+    signals.push('fractions');
+  }
+  
+  // Require ≥2 signals to avoid false positives
+  if (signalCount >= 2) {
+    return {
+      required: true,
+      reason: `Detected ${signalCount} measurement signals: ${signals.join(', ')}`
+    };
+  }
+  
+  return { required: false };
+}
+
+// Auto-inject default diagram for measurement problems
+function applyMeasurementDiagramEnforcement(question: string, solution: any): any {
+  // Only apply if visualAids is empty or missing
+  if (solution.visualAids && solution.visualAids.length > 0) {
+    return solution; // Already has diagrams
+  }
+  
+  const check = requiresMeasurementDiagram(question);
+  if (!check.required) {
+    return solution; // Doesn't require diagram
+  }
+  
+  console.log(`📐 Auto-injecting measurement diagram: ${check.reason}`);
+  
+  // Extract key information for diagram description
+  const units = question.match(/(\d+(?:\s*\{?\d+\/\d+\}?)?)\s*(?:-?\s*)?(inch|inches|foot|feet|meter|meters|cm|ft|yd|yard|yards)/gi);
+  const unitsText = units ? units.slice(0, 3).join(', ') : 'the given measurements';
+  
+  // Create default visual aid
+  const defaultDiagram = {
+    type: 'geometry',
+    stepId: '1', // Attach to first step
+    description: `Diagram showing the measurement problem setup with ${unitsText}. Display the total length/size and how it's divided into pieces or sections. Label all measurements clearly with their units and show the relationships between parts.`
+  };
+  
+  // Inject diagram
+  return {
+    ...solution,
+    visualAids: [defaultDiagram]
+  };
 }
 
 // Apply formatting enforcement to entire AI response
@@ -1382,6 +1529,9 @@ Grade-appropriate language based on difficulty level.`
     
     // 🧬 BIOLOGY/CHEMISTRY KEYWORD DETECTION: Ensure visual aids for metabolic cycles
     result = ensureBiologyVisualAids(question, result);
+    
+    // 📐 MEASUREMENT DIAGRAM ENFORCEMENT: Auto-inject diagrams for geometry/measurement problems
+    result = applyMeasurementDiagramEnforcement(question, result);
     
     // ⚡ ASYNC DIAGRAM GENERATION: Generate unique solution ID
     const solutionId = crypto.randomBytes(16).toString('hex');
@@ -2251,6 +2401,9 @@ Grade-appropriate language based on difficulty level.`;
     
     // 🧬 BIOLOGY/CHEMISTRY KEYWORD DETECTION: Ensure visual aids for metabolic cycles
     result = ensureBiologyVisualAids(result.problem || '', result);
+    
+    // 📐 MEASUREMENT DIAGRAM ENFORCEMENT: Auto-inject diagrams for geometry/measurement problems
+    result = applyMeasurementDiagramEnforcement(result.problem ?? '', result);
     
     // ⚡ ASYNC DIAGRAM GENERATION: Generate unique solution ID
     const solutionId = crypto.randomBytes(16).toString('hex');

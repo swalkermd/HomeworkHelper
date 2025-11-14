@@ -50,10 +50,19 @@ export default function MathText({ content, fontSize = 14, color = colors.textPr
   }
   
   // For content with fractions/images: group consecutive text parts together
+  // CRITICAL FIX: Keep hyphen/unit suffixes attached to preceding fractions to prevent line breaks
   const groupedElements: React.ReactNode[] = [];
   let currentTextGroup: ParsedPart[] = [];
+  let skipNext = false;
   
-  parsedContent.forEach((part, index) => {
+  for (let index = 0; index < parsedContent.length; index++) {
+    if (skipNext) {
+      skipNext = false;
+      continue;
+    }
+    
+    const part = parsedContent[index];
+    
     if (part.type === 'fraction' || part.type === 'image') {
       // Flush accumulated text group first
       if (currentTextGroup.length > 0) {
@@ -64,13 +73,35 @@ export default function MathText({ content, fontSize = 14, color = colors.textPr
         );
         currentTextGroup = [];
       }
-      // Add the fraction/image
-      groupedElements.push(renderPart(part, index, fontSize, color, isOnGreenBackground));
+      
+      // Check if next part is text starting with hyphen or unit suffix
+      // If so, wrap fraction + suffix together to prevent line break
+      const nextPart = index + 1 < parsedContent.length ? parsedContent[index + 1] : null;
+      const startsWithHyphenOrUnit = nextPart && 
+                                     nextPart.type === 'text' && 
+                                     /^[-\u2013\u2014]/.test(nextPart.content); // Matches hyphen, en-dash, em-dash
+      
+      if (startsWithHyphenOrUnit && nextPart) {
+        // Wrap fraction + suffix in same View to keep them together
+        groupedElements.push(
+          <View key={`fraction-group-${index}`} style={{ flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'baseline' }}>
+            {renderPart(part, index, fontSize, color, isOnGreenBackground)}
+            <Text style={{ fontSize, color }}>
+              {renderTextPart(nextPart, index + 1, fontSize, color, isOnGreenBackground)}
+            </Text>
+          </View>
+        );
+        // Skip the next part since we already rendered it
+        skipNext = true;
+      } else {
+        // Add the fraction/image alone
+        groupedElements.push(renderPart(part, index, fontSize, color, isOnGreenBackground));
+      }
     } else {
       // Accumulate text parts
       currentTextGroup.push(part);
     }
-  });
+  }
   
   // Flush any remaining text group
   if (currentTextGroup.length > 0) {
