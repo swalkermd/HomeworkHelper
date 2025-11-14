@@ -90,6 +90,9 @@ const wolframAlphaAppId = process.env.WOLFRAM_ALPHA_APP_ID;
 const WOLFRAM_SHORT_ANSWER_API = 'http://api.wolframalpha.com/v1/result';
 const WOLFRAM_FULL_RESULTS_API = 'http://api.wolframalpha.com/v2/query';
 
+// OpenAI API timeout - prevent indefinite hanging
+const OPENAI_TIMEOUT_MS = 45000; // 45 seconds (well under 120s client timeout)
+
 if (!openaiApiKey) {
   console.warn('⚠️ OpenAI API key not configured. Set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY.');
 }
@@ -3137,7 +3140,7 @@ Grade-appropriate language based on difficulty level.`
             ],
             response_format: { type: "json_object" },
             max_tokens: 8192,
-          });
+          }, { timeout: OPENAI_TIMEOUT_MS });
           
           const content = response.choices[0]?.message?.content || "{}";
           
@@ -3169,7 +3172,7 @@ CRITICAL SIZE LIMIT: Your ENTIRE JSON response must be under 2,000 characters. T
               ],
               response_format: { type: "json_object" },
               max_tokens: 1500, // Hard limit to prevent oversized responses
-            });
+            }, { timeout: OPENAI_TIMEOUT_MS });
             
             const compressedContent = compressResponse.choices[0]?.message?.content || "{}";
             console.log(`✅ Compressed response: ${compressedContent.length} chars (was ${content.length})`);
