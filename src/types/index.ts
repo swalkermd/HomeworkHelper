@@ -31,7 +31,7 @@ export interface HomeworkSolution {
   steps: SolutionStep[];
   finalAnswer: string;
   solutionId?: string;
-  verificationStatus?: 'verified' | 'unverified' | 'failed';
+  verificationStatus?: 'pending' | 'verified' | 'unverified';
   verificationConfidence?: number;
   verificationWarnings?: string[];
 }

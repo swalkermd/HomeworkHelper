@@ -255,3 +255,31 @@ export async function pollForDiagrams(solutionId: string): Promise<DiagramsRespo
     return { diagrams: [], complete: false };
   }
 }
+
+export interface VerificationResponse {
+  status: 'pending' | 'verified' | 'unverified';
+  confidence: number;
+  warnings: string[];
+  timestamp: number;
+}
+
+export async function pollForVerification(solutionId: string): Promise<VerificationResponse | null> {
+  try {
+    const response = await fetch(`${API_URL}/verification/${solutionId}`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.warn('Verification not found');
+        return null;
+      }
+      console.warn('Temporary error fetching verification, will retry');
+      return null;
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.warn('Network error polling verification, will retry:', error);
+    return null;
+  }
+}

@@ -209,6 +209,23 @@ interface GeminiUsage {
   count: number;
 }
 
+const geminiLock = { locked: false, queue: [] as Array<() => void> };
+
+async function withGeminiLock<T>(fn: () => Promise<T>): Promise<T> {
+  while (geminiLock.locked) {
+    await new Promise<void>(resolve => geminiLock.queue.push(resolve));
+  }
+  
+  geminiLock.locked = true;
+  try {
+    return await fn();
+  } finally {
+    geminiLock.locked = false;
+    const next = geminiLock.queue.shift();
+    if (next) next();
+  }
+}
+
 async function getGeminiUsage(): Promise<GeminiUsage> {
   try {
     const data = await fs.promises.readFile(GEMINI_USAGE_FILE, 'utf8');
@@ -219,26 +236,25 @@ async function getGeminiUsage(): Promise<GeminiUsage> {
 }
 
 async function incrementGeminiUsage(): Promise<boolean> {
-  const currentMonthKey = new Date().toISOString().substring(0, 7); // "YYYY-MM"
-  const usage = await getGeminiUsage();
-  
-  // Reset counter if new month
-  if (usage.monthKey !== currentMonthKey) {
-    usage.monthKey = currentMonthKey;
-    usage.count = 0;
-  }
-  
-  // Check limit
-  if (usage.count >= GEMINI_MONTHLY_LIMIT) {
-    console.warn(`⚠️ Gemini monthly limit reached (${usage.count}/${GEMINI_MONTHLY_LIMIT})`);
-    return false;
-  }
-  
-  // Increment and save
-  usage.count++;
-  await fs.promises.writeFile(GEMINI_USAGE_FILE, JSON.stringify(usage, null, 2));
-  console.log(`📊 Gemini usage: ${usage.count}/${GEMINI_MONTHLY_LIMIT} this month`);
-  return true;
+  return withGeminiLock(async () => {
+    const currentMonthKey = new Date().toISOString().substring(0, 7);
+    const usage = await getGeminiUsage();
+    
+    if (usage.monthKey !== currentMonthKey) {
+      usage.monthKey = currentMonthKey;
+      usage.count = 0;
+    }
+    
+    if (usage.count >= GEMINI_MONTHLY_LIMIT) {
+      console.warn(`⚠️ Gemini monthly limit reached (${usage.count}/${GEMINI_MONTHLY_LIMIT})`);
+      return false;
+    }
+    
+    usage.count++;
+    await fs.promises.writeFile(GEMINI_USAGE_FILE, JSON.stringify(usage, null, 2));
+    console.log(`📊 Gemini usage: ${usage.count}/${GEMINI_MONTHLY_LIMIT} this month`);
+    return true;
+  });
 }
 
 // In-memory verification store

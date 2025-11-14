@@ -11,7 +11,7 @@ import { useSettingsStore } from '../store/settingsStore';
 import { RootStackParamList } from '../navigation/types';
 import MathText from '../components/MathText';
 import { colors, useResponsiveTheme } from '../constants/theme';
-import { getSimplifiedExplanations, pollForDiagrams, DiagramStatus } from '../services/openai';
+import { getSimplifiedExplanations, pollForDiagrams, pollForVerification, DiagramStatus } from '../services/openai';
 import { SimplifiedExplanation } from '../types';
 import { getUserFriendlyErrorMessage } from '../utils/errorHandler';
 import { validateSolutionIntegrity } from '../utils/solutionValidation';
@@ -64,7 +64,14 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const [loadingSimplified, setLoadingSimplified] = useState(false);
   const [diagrams, setDiagrams] = useState<DiagramStatus[]>([]);
   const [diagramsComplete, setDiagramsComplete] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'unverified'>('pending');
   const validation = useMemo(() => validateSolutionIntegrity(currentSolution), [currentSolution]);
+
+  useEffect(() => {
+    if (currentSolution?.solutionId) {
+      setVerificationStatus(currentSolution.verificationStatus || 'pending');
+    }
+  }, [currentSolution?.solutionId, currentSolution?.verificationStatus]);
 
   useEffect(() => {
     console.log('🔍 SolutionScreen mounted. Has solution:', !!currentSolution);
@@ -159,6 +166,40 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
 
     return () => clearInterval(pollInterval);
   }, [currentSolution?.solutionId, diagramsComplete]);
+
+  useEffect(() => {
+    if (!currentSolution?.solutionId || verificationStatus !== 'pending') return;
+
+    console.log('🔍 Starting verification polling for solution:', currentSolution.solutionId);
+    
+    const MAX_POLL_DURATION = 2 * 60 * 1000;
+    const POLL_INTERVAL = 3000;
+    const startTime = Date.now();
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const elapsedTime = Date.now() - startTime;
+        if (elapsedTime > MAX_POLL_DURATION) {
+          console.warn('⏱️ Verification polling timeout');
+          clearInterval(pollInterval);
+          setVerificationStatus('unverified');
+          return;
+        }
+        
+        const result = await pollForVerification(currentSolution.solutionId!);
+        
+        if (result && result.status !== 'pending') {
+          console.log('✅ Verification complete:', result.status);
+          setVerificationStatus(result.status);
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error('Error polling verification:', error);
+      }
+    }, POLL_INTERVAL);
+
+    return () => clearInterval(pollInterval);
+  }, [currentSolution?.solutionId, verificationStatus]);
 
   const handleSimplifyExplanation = async () => {
     if (!currentSolution || loadingSimplified) return;
@@ -675,7 +716,15 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                 colors={['#10b981', '#059669']}
                 style={styles.finalAnswerCard}
               >
-                <Ionicons name="checkmark-circle" size={32} color="#ffffff" />
+                {verificationStatus === 'pending' && (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                )}
+                {verificationStatus === 'verified' && (
+                  <Ionicons name="checkmark-circle" size={32} color="#ffffff" />
+                )}
+                {verificationStatus === 'unverified' && (
+                  <Ionicons name="alert-circle-outline" size={32} color="#ffffff" />
+                )}
                 <Text style={styles.finalAnswerLabel}>Answer</Text>
                 <View style={styles.finalAnswerBox}>
                   <MathText
