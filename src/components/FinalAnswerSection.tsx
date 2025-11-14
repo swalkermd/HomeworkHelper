@@ -45,7 +45,13 @@ export default function FinalAnswerSection({ content, structuredContent, isOnGre
     return (
       <View style={styles.container}>
         {blocks.map((block, index) => (
-          <View key={index} style={styles.partRow}>
+          <View 
+            key={index} 
+            style={[
+              styles.partRow,
+              index === blocks.length - 1 && styles.lastPartRow
+            ]}
+          >
             {block.label && (
               <View style={styles.labelContainer}>
                 <Text style={[
@@ -93,12 +99,15 @@ const styles = StyleSheet.create({
   partRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 18, // Generous spacing between parts (replaces gap)
+    marginBottom: 10, // Clean spacing between parts
     paddingVertical: 2,
+  },
+  lastPartRow: {
+    marginBottom: 0, // Remove trailing margin
   },
   labelContainer: {
     minWidth: 42,
-    marginRight: 14, // Space between label and content (replaces gap)
+    marginRight: 14, // Space between label and content
     paddingTop: 3,
   },
   label: {

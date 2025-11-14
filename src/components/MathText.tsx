@@ -274,7 +274,16 @@ function renderComplexPart(
       const lineThickness = Math.max(1, Math.round(baseFontSize / 14));
 
       return (
-        <View key={key} style={[styles.fractionContainer, { marginHorizontal: baseFontSize * 0.12 }]}> 
+        <View 
+          key={key} 
+          style={[
+            styles.fractionContainer, 
+            { 
+              marginHorizontal: baseFontSize * 0.12,
+              transform: [{ translateY: -baseFontSize * 0.22 }]
+            }
+          ]}
+        > 
           <Text
             style={[
               styles.fractionText,
@@ -372,13 +381,13 @@ const styles = StyleSheet.create({
   lineContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'center',
+    alignItems: 'baseline',
     maxWidth: '100%',
   },
   cluster: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
-    alignItems: 'center',
+    alignItems: 'baseline',
     flexShrink: 1,
     maxWidth: '100%',
   },
