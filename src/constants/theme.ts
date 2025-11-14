@@ -19,36 +19,52 @@ export const colors = {
 
 export const typography = {
   displayLarge: {
-    fontSize: isLandscape ? 32 : 20,
-    lineHeight: isLandscape ? 40 : 28,
+    fontSize: isLandscape ? 40 : 28,
+    lineHeight: isLandscape ? 48 : 36,
   },
   displayMedium: {
-    fontSize: isLandscape ? 24 : 18,
-    lineHeight: isLandscape ? 32 : 22,
+    fontSize: isLandscape ? 32 : 24,
+    lineHeight: isLandscape ? 40 : 32,
   },
   titleLarge: {
-    fontSize: isLandscape ? 18 : 14,
-    lineHeight: isLandscape ? 24 : 20,
+    fontSize: isLandscape ? 26 : 20,
+    lineHeight: isLandscape ? 34 : 28,
+  },
+  titleMedium: {
+    fontSize: isLandscape ? 22 : 18,
+    lineHeight: isLandscape ? 30 : 26,
   },
   bodyLarge: {
-    fontSize: isLandscape ? 16 : 13,
-    lineHeight: isLandscape ? 24 : 20,
+    fontSize: isLandscape ? 20 : 16,
+    lineHeight: isLandscape ? 30 : 24,
+  },
+  bodyMedium: {
+    fontSize: isLandscape ? 18 : 15,
+    lineHeight: isLandscape ? 28 : 22,
+  },
+  caption: {
+    fontSize: isLandscape ? 14 : 13,
+    lineHeight: isLandscape ? 22 : 20,
   },
   mathLarge: {
-    fontSize: isLandscape ? 20 : 14,
-    lineHeight: isLandscape ? 30 : 21,
+    fontSize: isLandscape ? 28 : 22,
+    lineHeight: isLandscape ? 38 : 32,
   },
   mathMedium: {
-    fontSize: isLandscape ? 17 : 13,
-    lineHeight: isLandscape ? 26 : 20,
+    fontSize: isLandscape ? 22 : 18,
+    lineHeight: isLandscape ? 32 : 28,
+  },
+  mathSmall: {
+    fontSize: isLandscape ? 18 : 16,
+    lineHeight: isLandscape ? 28 : 24,
   },
 };
 
 export const spacing = {
-  xs: isLandscape ? 4 : 2,
-  sm: isLandscape ? 8 : 4,
-  md: isLandscape ? 12 : 6,
-  lg: isLandscape ? 16 : 8,
-  xl: isLandscape ? 20 : 10,
-  xxl: isLandscape ? 24 : 12,
+  xs: isLandscape ? 6 : 4,
+  sm: isLandscape ? 10 : 8,
+  md: isLandscape ? 16 : 12,
+  lg: isLandscape ? 24 : 18,
+  xl: isLandscape ? 32 : 24,
+  xxl: isLandscape ? 40 : 32,
 };
