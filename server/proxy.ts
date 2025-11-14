@@ -999,7 +999,7 @@ async function crossModelVerification(
       .map((s: any) => `${s.title}: ${s.content}`)
       .join('\n');
     
-    const verificationPrompt = `You are a quality control expert verifying educational content for accuracy.
+    const verificationPrompt = `You are a rigorous quality control expert verifying educational content for accuracy. Your job is to catch errors that would mislead students.
 
 ORIGINAL PROBLEM:
 ${originalQuestion}
@@ -1013,20 +1013,44 @@ ${stepsText}
 
 Final Answer: ${proposedSolution.finalAnswer}
 
-YOUR TASK:
-1. Verify the mathematical/scientific accuracy of this solution
-2. Check that calculations are correct at each step
-3. Verify the final answer is accurate
-4. Identify any errors in logic, arithmetic, or problem-solving approach
-5. Confirm the solution actually addresses the question asked
+VERIFICATION PROTOCOL (CRITICAL - FOLLOW EXACTLY):
+
+STEP 1: SOLVE INDEPENDENTLY
+- First, solve the problem yourself from scratch WITHOUT looking at the proposed solution
+- Show your own work for each calculation
+- For multi-part problems (a, b, c, etc.), solve each part independently
+
+STEP 2: COMPARE SOLUTIONS
+- Compare your independent solution to the proposed solution
+- Check EACH sub-answer separately for multi-part problems
+- Verify numerical values match exactly
+- For calculus: verify signs, intervals, critical points, and endpoints
+- For algebra: verify arithmetic, factoring, and final simplification
+- Check that interval notation is correct (open vs closed, positive vs negative)
+
+STEP 3: IDENTIFY DISCREPANCIES
+- List EVERY difference you find, no matter how small
+- Pay special attention to:
+  * Sign errors (positive vs negative)
+  * Interval direction errors (increasing vs decreasing)
+  * Wrong critical points or endpoints
+  * Arithmetic mistakes in calculations
+  * Incorrect final numerical values
+  * Missing or extra parts in multi-part answers
+
+CRITICAL RULES:
+- If ANY sub-part of a multi-part problem is wrong, mark isCorrect: false
+- Be extremely strict with numerical answers - they must match exactly
+- Do NOT give the benefit of the doubt - students need accurate information
+- Confidence should reflect how thoroughly you checked each step
 
 Respond in JSON format:
 {
   "isCorrect": true/false,
-  "confidence": 0-100 (how confident you are in this assessment),
-  "errors": ["list of specific errors found, if any"],
-  "warnings": ["list of minor issues or improvements, if any"],
-  "reasoning": "brief explanation of your assessment"
+  "confidence": 0-100 (100 = perfect match, 0 = definitely wrong),
+  "errors": ["specific error in part X: expected Y but got Z"],
+  "warnings": ["minor issues that don't affect correctness"],
+  "reasoning": "summary of your independent solution and comparison"
 }`;
 
     const response = await openai.chat.completions.create({
@@ -1108,7 +1132,7 @@ async function geminiVerification(
       .map((s: any) => `${s.title}: ${s.content}`)
       .join('\n');
     
-    const verificationPrompt = `You are a quality control expert verifying educational content for accuracy.
+    const verificationPrompt = `You are a rigorous quality control expert verifying educational content for accuracy. Your job is to catch errors that would mislead students.
 
 ORIGINAL PROBLEM:
 ${originalQuestion}
@@ -1122,20 +1146,44 @@ ${stepsText}
 
 Final Answer: ${proposedSolution.finalAnswer}
 
-YOUR TASK:
-1. Verify the mathematical/scientific accuracy of this solution
-2. Check that calculations are correct at each step
-3. Verify the final answer is accurate
-4. Identify any errors in logic, arithmetic, or problem-solving approach
-5. Confirm the solution actually addresses the question asked
+VERIFICATION PROTOCOL (CRITICAL - FOLLOW EXACTLY):
+
+STEP 1: SOLVE INDEPENDENTLY
+- First, solve the problem yourself from scratch WITHOUT looking at the proposed solution
+- Show your own work for each calculation
+- For multi-part problems (a, b, c, etc.), solve each part independently
+
+STEP 2: COMPARE SOLUTIONS
+- Compare your independent solution to the proposed solution
+- Check EACH sub-answer separately for multi-part problems
+- Verify numerical values match exactly
+- For calculus: verify signs, intervals, critical points, and endpoints
+- For algebra: verify arithmetic, factoring, and final simplification
+- Check that interval notation is correct (open vs closed, positive vs negative)
+
+STEP 3: IDENTIFY DISCREPANCIES
+- List EVERY difference you find, no matter how small
+- Pay special attention to:
+  * Sign errors (positive vs negative)
+  * Interval direction errors (increasing vs decreasing)
+  * Wrong critical points or endpoints
+  * Arithmetic mistakes in calculations
+  * Incorrect final numerical values
+  * Missing or extra parts in multi-part answers
+
+CRITICAL RULES:
+- If ANY sub-part of a multi-part problem is wrong, mark isCorrect: false
+- Be extremely strict with numerical answers - they must match exactly
+- Do NOT give the benefit of the doubt - students need accurate information
+- Confidence should reflect how thoroughly you checked each step
 
 Respond in JSON format:
 {
   "isCorrect": true/false,
-  "confidence": 0-100 (how confident you are in this assessment),
-  "errors": ["list of specific errors found, if any"],
-  "warnings": ["list of minor issues or improvements, if any"],
-  "reasoning": "brief explanation of your assessment"
+  "confidence": 0-100 (100 = perfect match, 0 = definitely wrong),
+  "errors": ["specific error in part X: expected Y but got Z"],
+  "warnings": ["minor issues that don't affect correctness"],
+  "reasoning": "summary of your independent solution and comparison"
 }`;
 
     const model = geminiAI.getGenerativeModel({ model: "gemini-2.0-flash" });
