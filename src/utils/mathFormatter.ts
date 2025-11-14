@@ -301,3 +301,101 @@ export function clusterizeContent(content: string): string[] {
     cluster.tokens.map(t => t.value).join('')
   );
 }
+
+// Types for ParsedPart clustering
+export interface ParsedPart {
+  type: 'text' | 'fraction' | 'highlighted' | 'arrow' | 'italic' | 'image' | 'subscript' | 'superscript' | 'handwritten';
+  content: string;
+  color?: string;
+  url?: string;
+  numerator?: string;
+  denominator?: string;
+  isHandwritten?: boolean;
+}
+
+export interface ParsedPartCluster {
+  parts: ParsedPart[];  // Original parts with all formatting preserved
+  canBreakAfter: boolean;
+}
+
+/**
+ * Cluster ParsedPart[] array into non-breaking groups
+ * SIMPLIFIED: Keep highlighted content and fractions as non-breaking units
+ */
+export function clusterizeParsedParts(parsedContent: ParsedPart[]): ParsedPartCluster[] {
+  const clusters: ParsedPartCluster[] = [];
+  let currentCluster: ParsedPart[] = [];
+  
+  const flushCluster = () => {
+    if (currentCluster.length > 0) {
+      clusters.push({ parts: currentCluster, canBreakAfter: true });
+      currentCluster = [];
+    }
+  };
+  
+  for (let i = 0; i < parsedContent.length; i++) {
+    const part = parsedContent[i];
+    const next = i < parsedContent.length - 1 ? parsedContent[i + 1] : null;
+    
+    // Strategy: Keep entire highlighted spans as non-breaking units
+    // Keep fractions with adjacent context
+    // Allow regular text to break naturally
+    
+    if (part.type === 'highlighted') {
+      // Highlighted content (colored text) should never break
+      // Flush current cluster and make highlighted span its own cluster
+      flushCluster();
+      currentCluster.push(part);
+      
+      // Check if next part is also highlighted or a fraction - keep together
+      if (next && (next.type === 'highlighted' || next.type === 'fraction')) {
+        currentCluster.push(next);
+        i++; // Skip next
+      }
+      
+      flushCluster();
+    } else if (part.type === 'fraction' || part.type === 'image') {
+      // Keep fraction with current cluster if there's content before it
+      // This handles "= {1/2}" staying together
+      if (currentCluster.length > 0) {
+        currentCluster.push(part);
+        
+        // Check for suffix (unit, hyphen, closing delimiter)
+        if (next && next.type === 'text' && /^[-\u2013\u2014a-z\s\)\]\},;:]/i.test(next.content) && next.content.length < 10) {
+          currentCluster.push(next);
+          i++; // Skip next
+        }
+        
+        flushCluster();
+      } else {
+        // Standalone fraction
+        currentCluster.push(part);
+        
+        // Check for suffix
+        if (next && next.type === 'text' && /^[-\u2013\u2014a-z\s\)\]\},;:]/i.test(next.content) && next.content.length < 10) {
+          currentCluster.push(next);
+          i++; // Skip next
+        }
+        
+        flushCluster();
+      }
+    } else {
+      // Regular text, arrow, subscript, superscript
+      // Keep with current cluster
+      currentCluster.push(part);
+      
+      // Check if we should flush based on content
+      const content = part.content || '';
+      
+      // Flush after punctuation or long segments
+      if (content.includes(',') || content.includes('.') || content.length > 30) {
+        flushCluster();
+      }
+    }
+  }
+  
+  // Flush any remaining
+  flushCluster();
+  
+  return clusters;
+}

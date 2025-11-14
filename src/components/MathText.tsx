@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { typography, colors } from '../constants/theme';
-import { clusterizeContent } from '../utils/mathFormatter';
+import { clusterizeParsedParts } from '../utils/mathFormatter';
 
 interface MathTextProps {
   content: string;
@@ -51,72 +51,26 @@ export default function MathText({ content, fontSize = 14, color = colors.textPr
   }
   
   // For content with fractions/images: create non-breaking clusters
-  // Each cluster wraps in flexWrap:'nowrap' to prevent mid-equation breaks
-  const clusterElements: React.ReactNode[] = [];
-  let currentCluster: React.ReactNode[] = [];
-  let currentClusterText = '';
-  
-  const flushTextCluster = () => {
-    if (currentClusterText.trim()) {
-      // Clusterize the accumulated text
-      const textClusters = clusterizeContent(currentClusterText);
-      textClusters.forEach((clusterStr, idx) => {
-        clusterElements.push(
-          <View key={`cluster-${clusterElements.length}-${idx}`} style={styles.cluster}>
-            <Text style={{ fontSize, color }}>{clusterStr}</Text>
-          </View>
-        );
-      });
-      currentClusterText = '';
-    }
-  };
-  
-  for (let index = 0; index < parsedContent.length; index++) {
-    const part = parsedContent[index];
-    
-    if (part.type === 'fraction' || part.type === 'image') {
-      // Flush any accumulated text first
-      flushTextCluster();
-      
-      // Check if next part is text starting with hyphen or unit suffix
-      const nextPart = index + 1 < parsedContent.length ? parsedContent[index + 1] : null;
-      const startsWithHyphenOrUnit = nextPart && 
-                                     nextPart.type === 'text' && 
-                                     /^[-\u2013\u2014]/.test(nextPart.content);
-      
-      if (startsWithHyphenOrUnit && nextPart) {
-        // Wrap fraction + suffix in same non-breaking cluster
-        clusterElements.push(
-          <View key={`fraction-cluster-${index}`} style={styles.cluster}>
-            {renderPart(part, index, fontSize, color, isOnGreenBackground)}
-            <Text style={{ fontSize, color }}>
-              {renderTextPart(nextPart, index + 1, fontSize, color, isOnGreenBackground)}
-            </Text>
-          </View>
-        );
-        index++; // Skip next part since we consumed it
-      } else {
-        // Fraction/image alone as its own cluster
-        clusterElements.push(
-          <View key={`fraction-cluster-${index}`} style={styles.cluster}>
-            {renderPart(part, index, fontSize, color, isOnGreenBackground)}
-          </View>
-        );
-      }
-    } else {
-      // Accumulate text content for clustering
-      // Convert the text part back to string for clustering
-      const partText = part.content || '';
-      currentClusterText += partText;
-    }
-  }
-  
-  // Flush any remaining text
-  flushTextCluster();
+  // Cluster ParsedPart[] directly to preserve all formatting (colors, fractions, etc.)
+  const partClusters = clusterizeParsedParts(parsedContent);
   
   return (
     <View style={styles.lineContainer}>
-      {clusterElements}
+      {partClusters.map((cluster, clusterIndex) => (
+        <View key={`cluster-${clusterIndex}`} style={styles.cluster}>
+          {cluster.parts.map((part, partIndex) => {
+            const key = `${clusterIndex}-${partIndex}`;
+            
+            // Handle fractions and complex parts with views
+            if (part.type === 'fraction' || part.type === 'image') {
+              return renderPart(part, partIndex, fontSize, color, isOnGreenBackground);
+            }
+            
+            // Handle text parts inline
+            return renderTextPart(part, partIndex, fontSize, color, isOnGreenBackground);
+          })}
+        </View>
+      ))}
     </View>
   );
 }
@@ -503,6 +457,11 @@ const styles = StyleSheet.create({
   lineContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    alignItems: 'baseline',
+  },
+  cluster: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
     alignItems: 'baseline',
   },
   fractionContainer: {
