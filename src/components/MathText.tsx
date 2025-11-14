@@ -381,8 +381,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexShrink: 1,
     maxWidth: '100%',
-    rowGap: 0,
-    columnGap: 0,
   },
   inlineText: {
     flexShrink: 1,
