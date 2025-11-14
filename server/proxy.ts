@@ -3157,10 +3157,62 @@ Grade-appropriate language based on difficulty level.`
     let invalidReason = '';
     
     if (invalidCheck.isInvalid) {
-      console.warn(`⚠️ Invalid solution detected: ${invalidCheck.reason}`);
+      console.warn(`⚠️ Invalid solution detected on first attempt: ${invalidCheck.reason}`);
       console.warn(`📄 Solution preview:`, JSON.stringify(result).substring(0, 300));
-      invalidSolutionDetected = true;
-      invalidReason = invalidCheck.reason;
+      
+      // 🔄 IMMEDIATE RETRY: Give GPT-4o 2 more chances before showing invalid output
+      let retryCount = 0;
+      const maxRetries = 2;
+      
+      while (retryCount < maxRetries && invalidCheck.isInvalid) {
+        retryCount++;
+        console.log(`🔄 Retrying GPT-4o (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+        
+        try {
+          // Retry GPT-4o with fresh API call (reuses same prompt)
+          const retryResponse = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert educational AI tutor. Analyze the homework question and provide a step-by-step solution with proper formatting. CRITICAL: Provide complete, fully-formed solutions with all required fields (problem, subject, difficulty, steps array with id/title/content/explanation, finalAnswer, visualAids). Do NOT return incomplete or malformed JSON.`
+              },
+              {
+                role: "user",
+                content: question
+              }
+            ],
+            response_format: { type: "json_object" },
+            max_tokens: 8192,
+          });
+          
+          const retryContent = retryResponse.choices[0]?.message?.content || "{}";
+          result = JSON.parse(retryContent);
+          
+          // Check if retry produced valid solution
+          const retryCheck = isInvalidSolution(result);
+          if (!retryCheck.isInvalid) {
+            console.log(`✅ Retry ${retryCount} succeeded - valid solution generated`);
+            invalidSolutionDetected = false;
+            invalidReason = '';
+            break;
+          } else {
+            console.warn(`⚠️ Retry ${retryCount} still invalid: ${retryCheck.reason}`);
+            invalidCheck.isInvalid = retryCheck.isInvalid;
+            invalidCheck.reason = retryCheck.reason;
+          }
+        } catch (retryError) {
+          console.error(`❌ Retry ${retryCount} failed:`, retryError);
+          // Continue to next retry or fall through
+        }
+      }
+      
+      // If all retries failed, mark as invalid for WolframAlpha fallback
+      if (invalidCheck.isInvalid) {
+        console.warn(`⚠️ All ${maxRetries + 1} attempts produced invalid solutions - will trigger WolframAlpha fallback`);
+        invalidSolutionDetected = true;
+        invalidReason = invalidCheck.reason;
+      }
     }
     
     // 🧬 BIOLOGY/CHEMISTRY KEYWORD DETECTION: Ensure visual aids for metabolic cycles
