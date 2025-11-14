@@ -666,7 +666,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
           <View style={[styles.section, styles.finalSection]}>
             <SectionHeader
               title="Final answer"
-              subtitle="Double-check the concluding statement before submitting your work."
+              subtitle=""
               typography={typography}
               spacing={spacing}
             />
@@ -684,7 +684,6 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                     color={colors.textPrimary}
                   />
                 </View>
-                <Text style={styles.finalAnswerMeta}>Reviewed for completeness and clarity</Text>
               </LinearGradient>
             </Animated.View>
           </View>
