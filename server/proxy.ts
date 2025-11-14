@@ -351,6 +351,15 @@ interface VerificationResult {
 
 const verificationStore = new Map<string, VerificationResult>();
 
+// In-memory solution store for regenerated solutions
+interface StoredSolution {
+  solution: any;
+  timestamp: number;
+  regenerated: boolean;  // True if this was regenerated via WolframAlpha
+}
+
+const solutionStore = new Map<string, StoredSolution>();
+
 // Math eligibility classifier - determines if a problem is suitable for WolframAlpha
 function isMathEligible(question: string, subject: string): boolean {
   const mathSubjects = ['mathematics', 'math', 'algebra', 'geometry', 'calculus', 
@@ -951,12 +960,21 @@ function isInvalidSolution(solution: any): { isInvalid: boolean; reason: string 
   return { isInvalid: false, reason: '' };
 }
 
-// Cleanup old verifications after 1 hour
+// Cleanup old verifications and solutions after 1 hour
 setInterval(() => {
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  
+  // Clean verification store
   for (const [id, data] of verificationStore.entries()) {
     if (data.timestamp < oneHourAgo) {
       verificationStore.delete(id);
+    }
+  }
+  
+  // Clean solution store
+  for (const [id, data] of solutionStore.entries()) {
+    if (data.timestamp < oneHourAgo) {
+      solutionStore.delete(id);
     }
   }
 }, 5 * 60 * 1000);
@@ -2402,14 +2420,60 @@ async function runVerificationPipeline(
   });
   
   try {
-    // Check if this is a math-eligible problem
-    const isMath = isMathEligible(originalQuestion, solution.subject || '');
+    // 🚨 CHECK FOR INVALID SOLUTION FLAG - Regenerate with WolframAlpha if needed
+    let currentSolution = solution;
+    
+    if ((solution as any).__invalid) {
+      const invalidReason = (solution as any).__invalidReason || 'Unknown issue';
+      console.warn(`🚨 Invalid solution detected (${invalidReason}) - attempting WolframAlpha fallback...`);
+      
+      // Check if this is a math-eligible problem
+      const isMath = isMathEligible(originalQuestion, solution.subject || '');
+      
+      if (isMath && wolframAlphaAppId) {
+        console.log(`🔧 Triggering WolframAlpha solution regeneration for math problem...`);
+        
+        try {
+          const wolframSolution = await wolframAlphaSolveAndExplain(originalQuestion);
+          
+          if (wolframSolution) {
+            console.log(`✅ WolframAlpha successfully generated replacement solution`);
+            
+            // Format the WolframAlpha solution
+            const formattedWolframSolution = enforceResponseFormatting(wolframSolution);
+            const structuredWolframSolution = attachStructuredMathContent(formattedWolframSolution);
+            
+            // PERSIST the regenerated solution to the store
+            solutionStore.set(solutionId, {
+              solution: structuredWolframSolution,
+              timestamp: Date.now(),
+              regenerated: true
+            });
+            
+            // Replace current solution for verification
+            currentSolution = structuredWolframSolution;
+            
+            console.log(`✅ Invalid solution successfully regenerated and persisted via WolframAlpha`);
+          } else {
+            console.warn(`⚠️ WolframAlpha fallback returned null - will verify original solution`);
+          }
+        } catch (wolframError) {
+          console.error(`❌ WolframAlpha fallback error:`, wolframError);
+          // Continue with original solution verification
+        }
+      } else {
+        console.warn(`⚠️ Invalid solution detected but not math-eligible or WolframAlpha unavailable`);
+      }
+    }
+    
+    // Check if this is a math-eligible problem (use currentSolution which may be regenerated)
+    const isMath = isMathEligible(originalQuestion, currentSolution.subject || '');
     
     if (isMath && wolframAlphaAppId) {
       console.log(`🧮 Math problem detected - using WolframAlpha for ground truth verification`);
       
       // Attempt 1: WolframAlpha verification (computational ground truth)
-      const wolframResult = await wolframAlphaVerification(originalQuestion, solution);
+      const wolframResult = await wolframAlphaVerification(originalQuestion, currentSolution);
       
       if (wolframResult.isValid && wolframResult.confidence >= 70) {
         console.log(`✅ WolframAlpha verification PASSED (confidence: ${wolframResult.confidence}%)`);
@@ -2438,7 +2502,7 @@ async function runVerificationPipeline(
     }
     
     // Attempt 2 (or 1 if not math): GPT-4o verification
-    let verification = await crossModelVerification(originalQuestion, solution);
+    let verification = await crossModelVerification(originalQuestion, currentSolution);
     
     if (verification.isValid && verification.confidence >= 70) {
       console.log(`✅ GPT-4o verification passed (confidence: ${verification.confidence}%)`);
@@ -2453,7 +2517,7 @@ async function runVerificationPipeline(
     
     // Attempt 3: Retry GPT-4o
     console.log(`🔄 First GPT-4o attempt inconclusive, retrying...`);
-    const retryVerification = await crossModelVerification(originalQuestion, solution);
+    const retryVerification = await crossModelVerification(originalQuestion, currentSolution);
     
     if (retryVerification.isValid && retryVerification.confidence >= 70) {
       console.log(`✅ GPT-4o retry passed (confidence: ${retryVerification.confidence}%)`);
@@ -3082,6 +3146,18 @@ Grade-appropriate language based on difficulty level.`
       }
     );
     
+    // 🔍 INVALID SOLUTION DETECTION: Check for corrupted/mathematically invalid output
+    const invalidCheck = isInvalidSolution(result);
+    let invalidSolutionDetected = false;
+    let invalidReason = '';
+    
+    if (invalidCheck.isInvalid) {
+      console.warn(`⚠️ Invalid solution detected: ${invalidCheck.reason}`);
+      console.warn(`📄 Solution preview:`, JSON.stringify(result).substring(0, 300));
+      invalidSolutionDetected = true;
+      invalidReason = invalidCheck.reason;
+    }
+    
     // 🧬 BIOLOGY/CHEMISTRY KEYWORD DETECTION: Ensure visual aids for metabolic cycles
     result = ensureBiologyVisualAids(question, result);
     
@@ -3162,18 +3238,29 @@ Grade-appropriate language based on difficulty level.`
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
     const structuredResult = attachStructuredMathContent(formattedResult);
+    
+    // Add metadata for verification pipeline
+    if (invalidSolutionDetected) {
+      (structuredResult as any).__invalid = true;
+      (structuredResult as any).__invalidReason = invalidReason;
+    }
 
-    // ⚡ RETURN IMMEDIATELY with pending verification status
+    // ⚡ RETURN IMMEDIATELY with verification status (or invalid_pending if corrupted)
     const responseWithId = {
       ...structuredResult,
       solutionId,
-      verificationStatus: 'pending' as const,
+      verificationStatus: invalidSolutionDetected ? ('invalid_pending' as const) : ('pending' as const),
       verificationConfidence: 0,
-      verificationWarnings: []
+      verificationWarnings: invalidSolutionDetected ? [invalidReason] : [],
+      invalidReason: invalidSolutionDetected ? invalidReason : undefined
     };
     
     const totalTime = Date.now() - requestStartTime;
-    console.log(`✅ Analysis complete - returning solution ${solutionId} immediately (verification pending)`);
+    if (invalidSolutionDetected) {
+      console.log(`⚠️ Analysis complete - returning INVALID solution ${solutionId} (WolframAlpha fallback will run)`);
+    } else {
+      console.log(`✅ Analysis complete - returning solution ${solutionId} immediately (verification pending)`);
+    }
     console.log(`⏱️ [TIMING] === TOTAL REQUEST TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
     res.json(responseWithId);
     
@@ -4238,6 +4325,27 @@ app.get('/api/diagrams/:solutionId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching diagrams:', error);
     res.status(500).json({ error: 'Failed to fetch diagrams' });
+  }
+});
+
+// Endpoint to poll for regenerated solutions (WolframAlpha fallback)
+app.get('/api/solution/:solutionId', async (req, res) => {
+  try {
+    const { solutionId } = req.params;
+    
+    const storedSolution = solutionStore.get(solutionId);
+    if (!storedSolution) {
+      return res.status(404).json({ error: 'No regenerated solution available' });
+    }
+    
+    res.json({
+      solution: storedSolution.solution,
+      regenerated: storedSolution.regenerated,
+      timestamp: storedSolution.timestamp
+    });
+  } catch (error) {
+    console.error('Error fetching solution:', error);
+    res.status(500).json({ error: 'Failed to fetch solution' });
   }
 });
 
