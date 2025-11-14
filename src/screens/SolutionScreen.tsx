@@ -676,7 +676,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                 style={styles.finalAnswerCard}
               >
                 <Ionicons name="checkmark-circle" size={32} color="#ffffff" />
-                <Text style={styles.finalAnswerLabel}>Verified Result</Text>
+                <Text style={styles.finalAnswerLabel}>Answer</Text>
                 <View style={styles.finalAnswerBox}>
                   <MathText
                     content={currentSolution.finalAnswer}
