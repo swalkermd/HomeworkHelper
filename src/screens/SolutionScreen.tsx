@@ -611,7 +611,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                 <View style={styles.stepHeaderTextGroup}>
                   <Text style={styles.stepTitle}>{step.title}</Text>
                   <Text style={styles.stepMeta}>
-                    {currentSolution.subject} · Difficulty {currentSolution.difficulty}
+                    {currentSolution.subject}
                   </Text>
                 </View>
               </View>
