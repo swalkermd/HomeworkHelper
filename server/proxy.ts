@@ -23,6 +23,7 @@ import pRetry, { AbortError } from 'p-retry';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { parseMathContent } from '../src/utils/mathParser';
 
 const app = express();
 const PORT = 5000;
@@ -1331,7 +1332,7 @@ function applyMeasurementDiagramEnforcement(question: string, solution: any): an
 // Apply formatting enforcement to entire AI response
 function enforceResponseFormatting(response: any): any {
   const formatted = { ...response };
-  
+
   // Fix problem field
   if (formatted.problem) {
     console.log(`📝 BEFORE formatting problem: "${formatted.problem}"`);
@@ -1363,8 +1364,43 @@ function enforceResponseFormatting(response: any): any {
   if (formatted.finalAnswer) {
     formatted.finalAnswer = enforceProperFormatting(formatted.finalAnswer, 'finalAnswer');
   }
-  
+
   return formatted;
+}
+
+function attachStructuredMathContent(solution: any): any {
+  if (!solution || typeof solution !== 'object') {
+    return solution;
+  }
+
+  const safeParse = (text?: string): ReturnType<typeof parseMathContent> => {
+    if (!text || typeof text !== 'string') {
+      return [];
+    }
+
+    try {
+      return parseMathContent(text);
+    } catch (error) {
+      console.error('⚠️ Failed to parse math content for structured output:', error);
+      return [];
+    }
+  };
+
+  const structured = {
+    ...solution,
+    problemStructured: safeParse(solution.problem),
+    finalAnswerStructured: safeParse(solution.finalAnswer),
+  };
+
+  if (Array.isArray(solution.steps)) {
+    structured.steps = solution.steps.map((step: any) => ({
+      ...step,
+      structuredContent: safeParse(step.content),
+      structuredExplanation: safeParse(step.explanation),
+    }));
+  }
+
+  return structured;
 }
 
 // ============================================================================
@@ -2522,10 +2558,11 @@ Grade-appropriate language based on difficulty level.`
     
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
-    
+    const structuredResult = attachStructuredMathContent(formattedResult);
+
     // ⚡ RETURN IMMEDIATELY with pending verification status
     const responseWithId = {
-      ...formattedResult,
+      ...structuredResult,
       solutionId,
       verificationStatus: 'pending' as const,
       verificationConfidence: 0,
@@ -2538,15 +2575,15 @@ Grade-appropriate language based on difficulty level.`
     res.json(responseWithId);
     
     // 🔄 START ASYNC VERIFICATION PIPELINE (non-blocking)
-    void runVerificationPipeline(solutionId, question, formattedResult)
+    void runVerificationPipeline(solutionId, question, structuredResult)
       .catch(err => {
         console.error(`⚠️ Verification pipeline error for ${solutionId}:`, err);
       });
-    
+
     // Generate diagrams in background if any exist
     if (diagrams.length > 0) {
       const hostname = req.get('host');
-      void generateDiagramsInBackground(solutionId, diagrams, result.steps, hostname);
+      void generateDiagramsInBackground(solutionId, diagrams, structuredResult.steps, hostname);
     }
   } catch (error) {
     console.error('Error analyzing text:', error);
@@ -3393,13 +3430,14 @@ Grade-appropriate language based on difficulty level.`;
     
     // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
     const formattedResult = enforceResponseFormatting(result);
-    
+    const structuredResult = attachStructuredMathContent(formattedResult);
+
     // 🔒 SYNCHRONOUS VALIDATION - Verify accuracy BEFORE sending to user
     console.log('🔍 Running synchronous validation...');
     const validationStart = Date.now();
     let validationResult;
     try {
-      validationResult = await validateSolution(result.problem || 'Image-based question', formattedResult);
+      validationResult = await validateSolution(result.problem || 'Image-based question', structuredResult);
     } catch (validationError) {
       console.error('⚠️ Validation system error (non-blocking):', validationError);
       // If validator fails, allow solution through with warning
@@ -3456,7 +3494,7 @@ Grade-appropriate language based on difficulty level.`;
     
     // Add solutionId and verification metadata to response
     const responseWithId = {
-      ...formattedResult,
+      ...structuredResult,
       solutionId: diagrams.length > 0 ? solutionId : undefined,
       verificationStatus,
       verificationConfidence: confidence,
@@ -3479,7 +3517,7 @@ Grade-appropriate language based on difficulty level.`;
     // Generate diagrams in background if any exist
     if (diagrams.length > 0) {
       const hostname = req.get('host');
-      void generateDiagramsInBackground(solutionId, diagrams, result.steps, hostname);
+      void generateDiagramsInBackground(solutionId, diagrams, structuredResult.steps, hostname);
     }
   } catch (error: any) {
     console.error('❌ Error analyzing image:', error);

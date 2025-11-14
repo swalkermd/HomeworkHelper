@@ -1,11 +1,6 @@
 // Math content formatting utilities for structured, non-breaking layout
 
-export interface ContentBlock {
-  type: 'block' | 'inlineGroup';
-  label?: string; // For multi-part answers: "a)", "b)", etc.
-  content: string;
-  children?: ContentBlock[];
-}
+import { ContentBlock, MathNode } from '../types/math';
 
 // Patterns for non-breaking groups
 const NON_BREAKING_PATTERNS = [
@@ -302,19 +297,8 @@ export function clusterizeContent(content: string): string[] {
   );
 }
 
-// Types for ParsedPart clustering
-export interface ParsedPart {
-  type: 'text' | 'fraction' | 'highlighted' | 'arrow' | 'italic' | 'image' | 'subscript' | 'superscript' | 'handwritten';
-  content: string;
-  color?: string;
-  url?: string;
-  numerator?: string;
-  denominator?: string;
-  isHandwritten?: boolean;
-}
-
 export interface ParsedPartCluster {
-  parts: ParsedPart[];  // Original parts with all formatting preserved
+  parts: MathNode[];  // Original parts with all formatting preserved
   canBreakAfter: boolean;
 }
 
@@ -322,9 +306,9 @@ export interface ParsedPartCluster {
  * Cluster ParsedPart[] array into non-breaking groups
  * SIMPLIFIED: Keep highlighted content and fractions as non-breaking units
  */
-export function clusterizeParsedParts(parsedContent: ParsedPart[]): ParsedPartCluster[] {
+export function clusterizeParsedParts(parsedContent: MathNode[]): ParsedPartCluster[] {
   const clusters: ParsedPartCluster[] = [];
-  let currentCluster: ParsedPart[] = [];
+  let currentCluster: MathNode[] = [];
   
   const flushCluster = () => {
     if (currentCluster.length > 0) {
