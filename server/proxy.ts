@@ -1806,10 +1806,13 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
       }
       
       // Check if we're at a fraction pattern
-      // Match: any alphanumeric/any alphanumeric (e.g., 12/5, 3x/4, x/10, 240/41)
-      // CRITICAL: Preserve trailing unit suffixes when denom is purely numeric (e.g., 12/5h → {12/5}h)
-      // But keep algebraic variables inside (e.g., 3x/4y → {3x/4y})
-      const fractionMatch = text.substring(i).match(/^([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/);
+      // Strategy: Numerator can be alphanumeric, but denominator is DIGITS ONLY
+      // This automatically stops before trailing variables:
+      //   2/9x² → match "2/9" (denominator stops at digits) → {2/9}x²
+      //   3x/4 → match "3x/4" → {3x/4}
+      //   x/4 → match "x/4" → {x/4}
+      //   2/9x → match "2/9" (stops before x) → {2/9}x ✓ FIXED!
+      const fractionMatch = text.substring(i).match(/^([a-zA-Z0-9]+)\/([0-9]+)/);
       if (fractionMatch) {
         const num = fractionMatch[1];
         const den = fractionMatch[2];
@@ -1818,36 +1821,12 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
         const hasDigit = /\d/.test(num) || /\d/.test(den);
         
         // Not preceded/followed by decimal point (to avoid 19.6/5.0)
-        const notDecimal = (i === 0 || text[i - 1] !== '.') && (i + fractionMatch[0].length >= text.length || text[i + fractionMatch[0].length] !== '.');
+        const notDecimal = (i === 0 || text[i - 1] !== '.') && 
+                          (i + fractionMatch[0].length >= text.length || text[i + fractionMatch[0].length] !== '.');
         
         if (hasDigit && notDecimal) {
-          // Check if denominator is purely numeric with trailing letters (unit suffix case)
-          // E.g., "5h" → {12/5}h, but "4y" → {3x/4y} (algebraic variable)
-          const pureNumericDenMatch = den.match(/^(\d+)([a-zA-Z]+)$/);
-          
-          if (pureNumericDenMatch) {
-            // Denominator is pure number + letters
-            // Use unit allowlist to distinguish units from algebraic variables
-            const denNum = pureNumericDenMatch[1];
-            const suffix = pureNumericDenMatch[2].toLowerCase();
-            
-            // Common measurement units (includes common abbreviations, excludes algebraic variables x, y, z, a, b)
-            const commonUnits = ['h', 'hr', 'hrs', 'hour', 'hours', 'm', 'min', 'mins', 'minute', 'minutes', 's', 'sec', 'secs', 'second', 'seconds',
-                                 'c', 'f', 'k', // c=cups/celsius, f=fahrenheit, k=kilo/kelvin 
-                                 'cm', 'mm', 'km', 'meter', 'meters', 'ft', 'feet', 'in', 'inch', 'inches', 'yd', 'yard', 'yards', 'mi', 'mile', 'miles', 'mph',
-                                 'kg', 'g', 'mg', 'lb', 'lbs', 'oz', 'l', 'ml', 'gal', 'qt', 'pt', 'cup', 'cups', 'tbsp', 'tsp'];
-            
-            if (commonUnits.includes(suffix)) {
-              // Recognized unit → separate it
-              result += `{${num}/${denNum}}${pureNumericDenMatch[2]}`;
-            } else {
-              // Not a recognized unit → likely algebraic variable → keep together
-              result += `{${num}/${den}}`;
-            }
-          } else {
-            // Keep entire fraction together (includes algebraic cases like 3x/4y)
-            result += `{${num}/${den}}`;
-          }
+          // Wrap fraction
+          result += `{${num}/${den}}`;
           i += fractionMatch[0].length;
           continue;
         }
