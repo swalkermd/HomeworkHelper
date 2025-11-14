@@ -934,12 +934,13 @@ function isInvalidSolution(solution: any): { isInvalid: boolean; reason: string 
   }
   
   // Check 3: Detect mathematical contradictions in steps
+  // NOTE: Be very conservative here - only catch ACTUAL contradictions, not valid intermediate steps
   const contradictionPatterns = [
-    /\d+\s*=\s*0(?!\.\d)/,  // "4 = 0", "5 = 0" etc (but not "5 = 0.5")
-    /0\s*=\s*-?\d+(?!\.\d)/, // "0 = 4", "0 = -2" etc
     /false\s*=\s*true/i,
-    /impossible/i,
-    /cannot\s+be\s+solved/i
+    /true\s*=\s*false/i,
+    /impossible\s+to\s+solve/i,
+    /cannot\s+be\s+solved/i,
+    /no\s+solution\s+exists/i
   ];
   
   for (const step of solution.steps) {
