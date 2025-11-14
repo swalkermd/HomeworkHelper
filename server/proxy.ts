@@ -86,6 +86,10 @@ const geminiApiKey = process.env.GEMINI_API_KEY;
 // Resolve WolframAlpha configuration
 const wolframAlphaAppId = process.env.WOLFRAM_ALPHA_APP_ID;
 
+// WolframAlpha API endpoints
+const WOLFRAM_SHORT_ANSWER_API = 'http://api.wolframalpha.com/v1/result';
+const WOLFRAM_FULL_RESULTS_API = 'http://api.wolframalpha.com/v2/query';
+
 if (!openaiApiKey) {
   console.warn('⚠️ OpenAI API key not configured. Set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY.');
 }
@@ -742,6 +746,153 @@ async function wolframAlphaVerification(
       confidence: 50
     };
   }
+}
+
+// WolframAlpha solution generation fallback - use when GPT-4o produces invalid output
+async function wolframAlphaSolveAndExplain(originalQuestion: string): Promise<any | null> {
+  if (!wolframAlphaAppId) {
+    console.warn('⚠️ WolframAlpha App ID not configured - cannot generate fallback solution');
+    return null;
+  }
+  
+  try {
+    console.log('🔧 Attempting WolframAlpha solution generation fallback...');
+    
+    // Check rate limit
+    const canUse = await incrementWolframUsage();
+    if (!canUse) {
+      console.warn('⚠️ WolframAlpha monthly limit reached');
+      return null;
+    }
+    
+    // Try to get step-by-step solution from WolframAlpha Full Results API
+    const wolframUrl = `${WOLFRAM_FULL_RESULTS_API}?appid=${encodeURIComponent(wolframAlphaAppId)}&input=${encodeURIComponent(originalQuestion)}&podstate=Result__Step-by-step+solution&format=plaintext&output=json`;
+    
+    const response = await fetch(wolframUrl, {
+      method: 'GET',
+      headers: { 'User-Agent': 'HomeworkHelper/1.0' },
+      signal: AbortSignal.timeout(15000) // 15 second timeout
+    });
+    
+    if (!response.ok) {
+      console.warn(`⚠️ WolframAlpha API returned ${response.status}`);
+      // If step-by-step isn't available (premium feature), try simple result
+      return await wolframAlphaSimpleSolve(originalQuestion);
+    }
+    
+    const data = await response.json();
+    
+    // Extract step-by-step solution from pods
+    const pods = data?.queryresult?.pods || [];
+    let steps: string[] = [];
+    let finalAnswer = '';
+    
+    for (const pod of pods) {
+      if (pod.id === 'Result' || pod.title?.includes('Result')) {
+        const subpods = pod.subpods || [];
+        for (const subpod of subpods) {
+          if (subpod.title?.includes('Possible intermediate steps') || subpod.plaintext?.includes('Step')) {
+            // This is the step-by-step breakdown
+            const stepText = subpod.plaintext || '';
+            steps = stepText.split('\n').filter((line: string) => line.trim().length > 0);
+          } else if (subpod.plaintext) {
+            finalAnswer = subpod.plaintext;
+          }
+        }
+      }
+    }
+    
+    if (!finalAnswer && !steps.length) {
+      console.warn('⚠️ WolframAlpha did not return usable solution');
+      return null;
+    }
+    
+    console.log(`✓ WolframAlpha provided: ${steps.length} steps, final answer: "${finalAnswer}"`);
+    
+    // Now use GPT-4o to convert WolframAlpha's solution into our formatted step-by-step structure
+    return await convertWolframToFormattedSolution(originalQuestion, steps, finalAnswer);
+    
+  } catch (error) {
+    console.error('❌ WolframAlpha solution generation failed:', error);
+    return null;
+  }
+}
+
+// Fallback: Get simple answer from WolframAlpha and have GPT-4o explain it
+async function wolframAlphaSimpleSolve(originalQuestion: string): Promise<any | null> {
+  try {
+    const wolframUrl = `${WOLFRAM_SHORT_ANSWER_API}?appid=${encodeURIComponent(wolframAlphaAppId!)}&i=${encodeURIComponent(originalQuestion)}`;
+    
+    const response = await fetch(wolframUrl, {
+      method: 'GET',
+      headers: { 'User-Agent': 'HomeworkHelper/1.0' },
+      signal: AbortSignal.timeout(10000)
+    });
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const answer = await response.text();
+    console.log(`✓ WolframAlpha simple answer: "${answer}"`);
+    
+    // Have GPT-4o explain how to arrive at this answer
+    return await convertWolframToFormattedSolution(originalQuestion, [], answer);
+    
+  } catch (error) {
+    console.warn('⚠️ WolframAlpha simple solve failed:', error);
+    return null;
+  }
+}
+
+// Convert WolframAlpha solution to our app's formatted structure
+async function convertWolframToFormattedSolution(
+  originalQuestion: string,
+  wolframSteps: string[],
+  wolframAnswer: string
+): Promise<any> {
+  // Build a prompt asking GPT-4o to explain the solution in our format
+  const wolframStepsText = wolframSteps.length > 0 
+    ? `WolframAlpha provided these steps:\n${wolframSteps.join('\n')}\n\n`
+    : '';
+  
+  const prompt = `You are an expert educational AI tutor. WolframAlpha has solved this problem and provided the correct answer${wolframSteps.length > 0 ? ' with steps' : ''}.
+
+Problem: ${originalQuestion}
+
+${wolframStepsText}Final Answer from WolframAlpha: ${wolframAnswer}
+
+Your task: Create a complete step-by-step solution that explains HOW to arrive at this answer. Follow our standard formatting requirements:
+
+- Use proper color highlighting with [blue:] and [red:] tags
+- Break down the solution into clear, numbered steps
+- Include explanations for each step
+- Make sure the final answer matches WolframAlpha's answer EXACTLY
+- Use proper mathematical notation with fractions {num/den} where appropriate
+- For multi-part problems, break down the final answer into parts (a), (b), (c), etc.
+
+Respond in valid JSON format matching our solution structure.`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: "You are an expert math tutor creating step-by-step solutions. Always match the provided correct answer." },
+      { role: "user", content: prompt }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.3,
+    max_tokens: 4000
+  });
+  
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error('No response from GPT-4o');
+  }
+  
+  const solution = JSON.parse(content);
+  console.log('✓ Converted WolframAlpha solution to formatted structure');
+  
+  return solution;
 }
 
 // Cleanup old verifications after 1 hour
