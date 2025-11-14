@@ -26,54 +26,58 @@ const NON_BREAKING_PATTERNS = [
  */
 export function normalizeSolutionContent(content: string): ContentBlock[] {
   const blocks: ContentBlock[] = [];
-  
-  // Check if this is a multi-part answer
-  const multiPartRegex = /^([a-z]\)|\d+\)|\([a-z]\)|\(\d+\))/;
-  const lines = content.split('\n').filter(line => line.trim());
-  
-  let isMultiPart = false;
-  
-  // Detect if content has multi-part structure
-  if (lines.length > 1) {
-    const firstLineMatch = lines[0].trim().match(multiPartRegex);
-    const secondLineMatch = lines.length > 1 ? lines[1].trim().match(multiPartRegex) : null;
-    isMultiPart = !!(firstLineMatch && secondLineMatch);
+
+  if (!content.trim()) {
+    return blocks;
   }
-  
-  if (isMultiPart) {
-    // Parse multi-part answer - each part becomes a separate block
+
+  const labelPattern = /(^|\s)([a-z]\)|\([a-z]\)|\d+\)|\(\d+\))\s+/gi;
+  const normalizedContent = content.replace(/\r\n/g, '\n').trim();
+
+  const labelMatches = [...normalizedContent.matchAll(labelPattern)];
+  const hasMultipleLabels = labelMatches.length >= 2;
+
+  if (hasMultipleLabels) {
+    // Insert hard breaks before labels that appear mid-line so each part can be processed individually
+    const preparedContent = normalizedContent.replace(
+      /(\s+)(?=([a-z]\)|\([a-z]\)|\d+\)|\(\d+\))\s+)/gi,
+      '\n',
+    );
+
+    const lines = preparedContent
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
+
     for (const line of lines) {
-      const trimmed = line.trim();
-      const match = trimmed.match(/^([a-z]\)|\d+\)|\([a-z]\)|\(\d+\))\s*/);
-      
+      const match = line.match(/^([a-z]\)|\([a-z]\)|\d+\)|\(\d+\))\s*/i);
+
       if (match) {
         const label = match[1];
-        const content = trimmed.substring(match[0].length).trim();
-        
+        const remainingContent = line.substring(match[0].length).trim();
+
         blocks.push({
           type: 'block',
           label,
-          content,
+          content: remainingContent,
         });
       } else if (blocks.length > 0) {
         // Continuation of previous part
-        blocks[blocks.length - 1].content += ' ' + trimmed;
+        blocks[blocks.length - 1].content = `${blocks[blocks.length - 1].content} ${line}`.trim();
       } else {
-        // No label but we're in multi-part mode - create unlabeled block
         blocks.push({
           type: 'block',
-          content: trimmed,
+          content: line,
         });
       }
     }
   } else {
-    // Single block content - but still mark inline groups for non-breaking
     blocks.push({
       type: 'block',
-      content: content.trim(),
+      content: normalizedContent,
     });
   }
-  
+
   return blocks;
 }
 
