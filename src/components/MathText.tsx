@@ -357,7 +357,7 @@ function renderTextPart(part: ParsedPart, index: number, baseFontSize: number, b
     case 'arrow':
       const arrowColor = isOnGreenBg ? '#ffffff' : colors.secondary;
       return wrapWithHandwriting(
-        <Text style={{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor }}>
+        <Text style={{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor, position: 'relative', top: 3 }}>
           {' → '}
         </Text>
       );
@@ -427,7 +427,7 @@ function renderPart(part: ParsedPart, index: number, baseFontSize: number, baseC
     case 'arrow':
       const arrowColor = isOnGreenBg ? '#ffffff' : colors.secondary;
       return (
-        <Text key={index} style={[{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor }, getHandwritingStyle()]}>
+        <Text key={index} style={[{ fontSize: baseFontSize * 1.5, fontWeight: '900', color: arrowColor, position: 'relative', top: 3 }, getHandwritingStyle()]}>
           {' → '}
         </Text>
       );
