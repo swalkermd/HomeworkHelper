@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { typography, colors } from '../constants/theme';
+import { clusterizeContent } from '../utils/mathFormatter';
 
 interface MathTextProps {
   content: string;
@@ -49,72 +50,73 @@ export default function MathText({ content, fontSize = 14, color = colors.textPr
     );
   }
   
-  // For content with fractions/images: group consecutive text parts together
-  // CRITICAL FIX: Keep hyphen/unit suffixes attached to preceding fractions to prevent line breaks
-  const groupedElements: React.ReactNode[] = [];
-  let currentTextGroup: ParsedPart[] = [];
-  let skipNext = false;
+  // For content with fractions/images: create non-breaking clusters
+  // Each cluster wraps in flexWrap:'nowrap' to prevent mid-equation breaks
+  const clusterElements: React.ReactNode[] = [];
+  let currentCluster: React.ReactNode[] = [];
+  let currentClusterText = '';
+  
+  const flushTextCluster = () => {
+    if (currentClusterText.trim()) {
+      // Clusterize the accumulated text
+      const textClusters = clusterizeContent(currentClusterText);
+      textClusters.forEach((clusterStr, idx) => {
+        clusterElements.push(
+          <View key={`cluster-${clusterElements.length}-${idx}`} style={styles.cluster}>
+            <Text style={{ fontSize, color }}>{clusterStr}</Text>
+          </View>
+        );
+      });
+      currentClusterText = '';
+    }
+  };
   
   for (let index = 0; index < parsedContent.length; index++) {
-    if (skipNext) {
-      skipNext = false;
-      continue;
-    }
-    
     const part = parsedContent[index];
     
     if (part.type === 'fraction' || part.type === 'image') {
-      // Flush accumulated text group first
-      if (currentTextGroup.length > 0) {
-        groupedElements.push(
-          <Text key={`text-group-${groupedElements.length}`} style={{ fontSize, color }}>
-            {currentTextGroup.map((textPart, i) => renderTextPart(textPart, i, fontSize, color, isOnGreenBackground))}
-          </Text>
-        );
-        currentTextGroup = [];
-      }
+      // Flush any accumulated text first
+      flushTextCluster();
       
       // Check if next part is text starting with hyphen or unit suffix
-      // If so, wrap fraction + suffix together to prevent line break
       const nextPart = index + 1 < parsedContent.length ? parsedContent[index + 1] : null;
       const startsWithHyphenOrUnit = nextPart && 
                                      nextPart.type === 'text' && 
-                                     /^[-\u2013\u2014]/.test(nextPart.content); // Matches hyphen, en-dash, em-dash
+                                     /^[-\u2013\u2014]/.test(nextPart.content);
       
       if (startsWithHyphenOrUnit && nextPart) {
-        // Wrap fraction + suffix in same View to keep them together
-        groupedElements.push(
-          <View key={`fraction-group-${index}`} style={{ flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'baseline' }}>
+        // Wrap fraction + suffix in same non-breaking cluster
+        clusterElements.push(
+          <View key={`fraction-cluster-${index}`} style={styles.cluster}>
             {renderPart(part, index, fontSize, color, isOnGreenBackground)}
             <Text style={{ fontSize, color }}>
               {renderTextPart(nextPart, index + 1, fontSize, color, isOnGreenBackground)}
             </Text>
           </View>
         );
-        // Skip the next part since we already rendered it
-        skipNext = true;
+        index++; // Skip next part since we consumed it
       } else {
-        // Add the fraction/image alone
-        groupedElements.push(renderPart(part, index, fontSize, color, isOnGreenBackground));
+        // Fraction/image alone as its own cluster
+        clusterElements.push(
+          <View key={`fraction-cluster-${index}`} style={styles.cluster}>
+            {renderPart(part, index, fontSize, color, isOnGreenBackground)}
+          </View>
+        );
       }
     } else {
-      // Accumulate text parts
-      currentTextGroup.push(part);
+      // Accumulate text content for clustering
+      // Convert the text part back to string for clustering
+      const partText = part.content || '';
+      currentClusterText += partText;
     }
   }
   
-  // Flush any remaining text group
-  if (currentTextGroup.length > 0) {
-    groupedElements.push(
-      <Text key={`text-group-${groupedElements.length}`} style={{ fontSize, color }}>
-        {currentTextGroup.map((textPart, i) => renderTextPart(textPart, i, fontSize, color, isOnGreenBackground))}
-      </Text>
-    );
-  }
+  // Flush any remaining text
+  flushTextCluster();
   
   return (
     <View style={styles.lineContainer}>
-      {groupedElements}
+      {clusterElements}
     </View>
   );
 }

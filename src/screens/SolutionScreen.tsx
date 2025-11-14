@@ -10,6 +10,7 @@ import { useHomeworkStore } from '../store/homeworkStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { RootStackParamList } from '../navigation/types';
 import MathText from '../components/MathText';
+import FinalAnswerSection from '../components/FinalAnswerSection';
 import { colors, useResponsiveTheme } from '../constants/theme';
 import { getSimplifiedExplanations, pollForDiagrams, pollForVerification, DiagramStatus } from '../services/openai';
 import { SimplifiedExplanation } from '../types';
@@ -728,10 +729,9 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                 )}
                 <Text style={styles.finalAnswerLabel}>Answer</Text>
                 <View style={styles.finalAnswerBox}>
-                  <MathText
+                  <FinalAnswerSection
                     content={currentSolution.finalAnswer}
-                    fontSize={typography.mathLarge.fontSize}
-                    color={colors.textPrimary}
+                    isOnGreenBackground={false}
                   />
                 </View>
               </LinearGradient>
