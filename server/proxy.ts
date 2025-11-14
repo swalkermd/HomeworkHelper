@@ -895,6 +895,62 @@ Respond in valid JSON format matching our solution structure.`;
   return solution;
 }
 
+// Detect if AI-generated solution is corrupted or mathematically invalid
+function isInvalidSolution(solution: any): { isInvalid: boolean; reason: string } {
+  // Check 1: Missing required fields
+  if (!solution || !solution.finalAnswer || !solution.steps || !Array.isArray(solution.steps)) {
+    return { isInvalid: true, reason: 'Missing required solution fields' };
+  }
+  
+  // Check 2: Detect garbage text patterns in solution
+  const fullText = JSON.stringify(solution).toLowerCase();
+  const garbagePatterns = [
+    /invalid\s+excess\s+duplicate\s+rendering/i,
+    /truthident/i,
+    /corrupt/i,
+    /\[object\s+object\]/i,
+    /undefined/gi,
+    /null\s+reference/i
+  ];
+  
+  for (const pattern of garbagePatterns) {
+    if (pattern.test(fullText)) {
+      return { isInvalid: true, reason: `Corrupted output detected (matched: ${pattern})` };
+    }
+  }
+  
+  // Check 3: Detect mathematical contradictions in steps
+  const contradictionPatterns = [
+    /\d+\s*=\s*0(?!\.\d)/,  // "4 = 0", "5 = 0" etc (but not "5 = 0.5")
+    /0\s*=\s*-?\d+(?!\.\d)/, // "0 = 4", "0 = -2" etc
+    /false\s*=\s*true/i,
+    /impossible/i,
+    /cannot\s+be\s+solved/i
+  ];
+  
+  for (const step of solution.steps) {
+    const stepText = (step.content || '') + (step.title || '');
+    for (const pattern of contradictionPatterns) {
+      if (pattern.test(stepText)) {
+        return { isInvalid: true, reason: `Mathematical contradiction detected: ${pattern}` };
+      }
+    }
+  }
+  
+  // Check 4: Solution too short (likely incomplete)
+  if (solution.steps.length === 0 || (solution.steps.length === 1 && solution.steps[0].content.length < 20)) {
+    return { isInvalid: true, reason: 'Solution suspiciously short (likely incomplete)' };
+  }
+  
+  // Check 5: Final answer is empty or just punctuation
+  const cleanAnswer = solution.finalAnswer.replace(/[^\w\d]/g, '');
+  if (cleanAnswer.length < 2) {
+    return { isInvalid: true, reason: 'Final answer is empty or invalid' };
+  }
+  
+  return { isInvalid: false, reason: '' };
+}
+
 // Cleanup old verifications after 1 hour
 setInterval(() => {
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
