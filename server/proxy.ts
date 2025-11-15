@@ -3522,55 +3522,26 @@ app.post('/api/analyze-image', async (req, res) => {
   const requestStartTime = Date.now();
   try {
     const { imageUri, problemNumber } = req.body;
-    console.log('🎯 Starting GPT-4o Vision analysis...');
+    console.log('🎯 Starting GPT-4o Vision analysis (single-call approach)...');
     console.log('⏱️ [TIMING] Request received at:', new Date().toISOString());
+    if (problemNumber) {
+      console.log(`📍 Target problem: #${problemNumber}`);
+    }
     
     let result = await pRetry(
       async () => {
         try {
-          // PURE GPT-4o VISION STRATEGY:
-          // 1. If problemNumber: GPT-4o Vision locates problem → crop → GPT-4o Vision solves from cropped image
-          // 2. If no problemNumber: GPT-4o Vision solves from full image
-          // 3. Optimized prompts for maximum OCR accuracy (decimals, fractions, symbols)
+          // SIMPLIFIED PURE GPT-4o VISION STRATEGY:
+          // Single Vision call analyzes the full image and solves the requested problem
+          // No locate/crop step - GPT-4o handles problem identification internally
           
-          let analysisImageUri = imageUri;
-          let problemLocated = false;
-
-          // Step 1: Locate and crop if problem number is specified
-          if (problemNumber && openai) {
-            console.log(`🎯 OPENAI-ONLY FLOW: GPT-4o locates problem #${problemNumber} → crop → GPT-4o solves`);
-            const visionStartTime = Date.now();
-            
-            const problemCoords = await locateProblemWithVision(imageUri, problemNumber);
-            console.log(`⏱️ [TIMING] GPT-4o Vision locator completed in ${Date.now() - visionStartTime}ms`);
-            
-            if (problemCoords) {
-              const cropStartTime = Date.now();
-              const croppedImage = await cropImageWithNormalizedCoords(imageUri, problemCoords);
-              console.log(`⏱️ [TIMING] Image cropping completed in ${Date.now() - cropStartTime}ms`);
-              
-              if (croppedImage) {
-                analysisImageUri = croppedImage;
-                problemLocated = true;
-                console.log('✅ [METRICS] Problem located and cropped successfully');
-              } else {
-                console.log('⚠️ [METRICS] Cropping failed - using full image');
-              }
-            } else {
-              console.log('⚠️ [METRICS] Problem not found by Vision locator - using full image');
-            }
-          }
-
-          // Step 2: GPT-4o Vision directly analyzes the image (cropped or full)
-          console.log(`⏱️ [TIMING] Starting GPT-4o Vision analysis on ${problemLocated ? 'CROPPED' : 'FULL'} image...`);
+          console.log(`⏱️ [TIMING] Starting GPT-4o Vision analysis on full image...`);
           const visionStart = Date.now();
 
-          // OpenAI GPT-4o Vision - Analyzing image with detailed math equation OCR
-          // Build system message for GPT-4o Vision analysis
-          // IMPORTANT: If image was already cropped to the specific problem, don't ask GPT-4o to find the problem number
+          // Build system message with EXPLICIT JSON SCHEMA requirements
           let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
 
-${problemNumber && !problemLocated ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
+${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
 You MUST solve ONLY problem #${problemNumber}.
 - The image may contain MULTIPLE problems.
 - You must IGNORE all other problems.
@@ -3579,8 +3550,27 @@ You MUST solve ONLY problem #${problemNumber}.
 - Do NOT stop at the first line.
 - Do NOT solve any other problem number.
 - In your "problem" field, include ONLY the text for problem #${problemNumber}.
-- If you cannot clearly identify problem #${problemNumber}, respond with an error in your JSON indicating "Problem #${problemNumber} not found in the image."
-🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : problemLocated ? `This image has been pre-cropped to show a specific problem. Solve the problem shown in this image.` : 'If multiple problems exist, solve the most prominent one.'}
+🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.'}
+
+📋 **REQUIRED JSON STRUCTURE:**
+You MUST return a JSON object with these EXACT fields:
+{
+  "problem": "string - the complete problem text",
+  "subject": "string - subject area (e.g., 'Math', 'Chemistry', 'Physics')",
+  "difficulty": "string - grade level (e.g., '9-12', 'College+')",
+  "steps": [
+    {
+      "id": "string - unique step identifier (e.g., '1', '2', '3')",
+      "title": "string - concise action heading for this step",
+      "content": "string - the solution step with formatted math",
+      "explanation": "string - single sentence explaining the reasoning"
+    }
+  ],
+  "finalAnswer": "string - the final answer with highlighting",
+  "visualAids": []
+}
+
+**CRITICAL:** Never use different field names like "stepByStepSolution" - you MUST use the exact field names shown above.
 
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
@@ -3641,7 +3631,7 @@ You MUST solve ONLY problem #${problemNumber}.
 - **CRITICAL**: You can nest color tags inside handwritten tags: [handwritten:[red:answer]] works perfectly
 - The handwriting font makes the answer feel personal and relatable to the student's own work`;
               
-              console.log('⏱️ [TIMING] Starting GPT-4o Vision analysis...');
+              console.log('⏱️ [TIMING] Calling GPT-4o Vision API...');
               const gptStart = Date.now();
               const response = await openai.chat.completions.create({
                 model: "gpt-4o",
@@ -3655,12 +3645,12 @@ You MUST solve ONLY problem #${problemNumber}.
                     content: [
                       {
                         type: "text",
-                        text: `Analyze the homework problem in this image and provide a complete step-by-step solution in JSON format.${problemNumber && !problemLocated ? ` Remember to solve ONLY problem #${problemNumber}.` : ''}`
+                        text: `Analyze the homework problem in this image and provide a complete step-by-step solution in JSON format.${problemNumber ? ` IMPORTANT: Solve ONLY problem #${problemNumber}.` : ''}`
                       },
                       {
                         type: "image_url",
                         image_url: {
-                          url: analysisImageUri
+                          url: imageUri
                         }
                       }
                     ]
@@ -3669,10 +3659,10 @@ You MUST solve ONLY problem #${problemNumber}.
                 response_format: { type: "json_object" },
                 max_tokens: 8192,
               });
-              console.log(`⏱️ [TIMING] GPT-4o analysis completed in ${Date.now() - gptStart}ms`);
+              console.log(`⏱️ [TIMING] GPT-4o Vision analysis completed in ${Date.now() - gptStart}ms`);
               
               let content = response.choices[0]?.message?.content || "{}";
-              console.log('📝 [DEBUG] Raw GPT-4o response content:', content.substring(0, 500));
+              console.log('📝 [DEBUG] Raw GPT-4o response (first 500 chars):', content.substring(0, 500));
               
               const parsed = JSON.parse(content);
               console.log('📝 [DEBUG] Parsed JSON keys:', Object.keys(parsed));
@@ -3684,12 +3674,12 @@ You MUST solve ONLY problem #${problemNumber}.
               
               if (!parsed.problem || !parsed.subject || !parsed.difficulty || !parsed.steps || !Array.isArray(parsed.steps)) {
                 console.error('❌ [DEBUG] Missing fields in response. Has problem:', !!parsed.problem, 'Has subject:', !!parsed.subject, 'Has difficulty:', !!parsed.difficulty, 'Has steps:', !!parsed.steps, 'Steps is array:', Array.isArray(parsed.steps));
+                console.error('❌ [DEBUG] Full response:', content);
                 throw new Error('OpenAI response missing required fields (problem, subject, difficulty, or steps array)');
               }
 
               // Validate that the solution addresses the requested problem number
-              // Skip this check if we already cropped to the specific problem (problem number may not be in cropped region)
-              if (problemNumber && !problemLocated) {
+              if (problemNumber) {
                 const problemText = parsed.problem.toLowerCase();
                 const hasTargetNumber =
                   problemText.includes(`#${problemNumber}`) ||
@@ -3702,8 +3692,6 @@ You MUST solve ONLY problem #${problemNumber}.
                   console.warn(`   Problem text: ${parsed.problem.substring(0, 100)}...`);
                   // Log warning but don't block - GPT may have found the problem without explicit numbering
                 }
-              } else if (problemLocated) {
-                console.log(`✅ Skipping problem number validation - image was pre-cropped to problem #${problemNumber}`);
               }
 
               console.log('✅ OpenAI Vision analysis complete');
