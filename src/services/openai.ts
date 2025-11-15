@@ -270,7 +270,7 @@ export async function pollForDiagrams(solutionId: string): Promise<DiagramsRespo
 }
 
 export interface VerificationResponse {
-  status: 'pending' | 'verified' | 'unverified';
+  status: 'pending' | 'verified' | 'unverified' | 'invalid_pending';
   confidence: number;
   warnings: string[];
   timestamp: number;

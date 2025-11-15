@@ -65,13 +65,15 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const [loadingSimplified, setLoadingSimplified] = useState(false);
   const [diagrams, setDiagrams] = useState<DiagramStatus[]>([]);
   const [diagramsComplete, setDiagramsComplete] = useState(false);
-  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'unverified' | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'unverified' | 'invalid_pending' | null>(null);
   const validation = useMemo(() => validateSolutionIntegrity(currentSolution), [currentSolution]);
 
   useEffect(() => {
     if (currentSolution?.solutionId) {
       console.log('🔄 Syncing verification status from solution:', currentSolution.verificationStatus);
-      setVerificationStatus(currentSolution.verificationStatus || 'pending');
+      const status = currentSolution.verificationStatus;
+      const normalizedStatus = status === 'invalid_pending' ? 'pending' : status || 'pending';
+      setVerificationStatus(normalizedStatus);
     }
   }, [currentSolution?.solutionId, currentSolution?.verificationStatus]);
 
@@ -170,7 +172,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   }, [currentSolution?.solutionId, diagramsComplete]);
 
   useEffect(() => {
-    if (!currentSolution?.solutionId || verificationStatus !== 'pending') return;
+    if (!currentSolution?.solutionId || (verificationStatus !== 'pending' && verificationStatus !== 'invalid_pending')) return;
 
     console.log('🔍 Starting verification polling for solution:', currentSolution.solutionId);
     
@@ -190,10 +192,12 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
         
         const result = await pollForVerification(currentSolution.solutionId!);
         
-        if (result && result.status !== 'pending') {
+        if (result && result.status && result.status !== 'pending' && result.status !== 'invalid_pending') {
           console.log('✅ Verification complete:', result.status);
           setVerificationStatus(result.status);
           clearInterval(pollInterval);
+        } else if (result?.status === 'invalid_pending') {
+          setVerificationStatus('pending');
         }
       } catch (error) {
         console.error('Error polling verification:', error);
@@ -726,7 +730,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                 colors={['#10b981', '#059669']}
                 style={styles.finalAnswerCard}
               >
-                {(verificationStatus === 'pending' || verificationStatus === null) && (
+                {(verificationStatus === 'pending' || verificationStatus === 'invalid_pending' || verificationStatus === null) && (
                   <ActivityIndicator size="small" color="#ffffff" />
                 )}
                 {verificationStatus === 'verified' && (

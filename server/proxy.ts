@@ -1197,20 +1197,61 @@ function matchesProblemStart(problemNumber: string, text: string): boolean {
     return false;
   }
 
-  const escaped = escapeRegExp(normalizedProblem);
-  const patterns: RegExp[] = [
-    new RegExp(`^(?:problem\\s+)?#?${escaped}(?=\\b|[).:-])`),
-    new RegExp(`^(?:problem\\s+)?#?${escaped}\\b`)
-  ];
-
-  const numericValue = Number.parseInt(normalizedProblem, 10);
-  if (!Number.isNaN(numericValue)) {
-    patterns.push(new RegExp(`^(?:problem\\s+)?#?${numericValue}\\s*[).:-]`));
-    patterns.push(new RegExp(`^(?:problem\\s+)?#?${numericValue}\\b`));
-    patterns.push(new RegExp(`^#?${numericValue}\\b`));
+  const sanitizedProblem = normalizedProblem.replace(/[^a-z0-9]/g, '');
+  if (!sanitizedProblem) {
+    return false;
   }
 
-  return patterns.some((pattern) => pattern.test(lowerText));
+  const escapedFull = escapeRegExp(normalizedProblem);
+  const patterns: RegExp[] = [
+    new RegExp(`^(?:problem\\s+)?#?${escapedFull}(?=\\b|\\s|[).:-]|$)`),
+    new RegExp(`^(?:problem\\s+)?#?${escapedFull}\\s*[).:-]`)
+  ];
+
+  const digitMatch = sanitizedProblem.match(/^(\d{1,3})/);
+  const numericPrefix = digitMatch ? digitMatch[1] : '';
+  const suffix = numericPrefix ? sanitizedProblem.slice(numericPrefix.length) : '';
+
+  if (numericPrefix) {
+    const escapedDigits = escapeRegExp(numericPrefix);
+    patterns.push(new RegExp(`^(?:problem\\s+)?#?${escapedDigits}(?!\\d)(?=\\b|\\s|[).:-]|$)`));
+    patterns.push(new RegExp(`^(?:problem\\s+)?#?${escapedDigits}\\s*[).:-]`));
+    patterns.push(new RegExp(`^[\[(\s]*${escapedDigits}[)\]]?(?=\\s|[).:-]|$)`));
+
+    if (suffix) {
+      const escapedSuffix = escapeRegExp(suffix);
+      patterns.push(new RegExp(`^(?:problem\\s+)?#?${escapedDigits}${escapedSuffix}(?=\\b|\\s|[).:-]|$)`));
+      patterns.push(new RegExp(`^(?:problem\\s+)?#?${escapedDigits}\\s*${escapedSuffix}(?=\\b|\\s|[).:-]|$)`));
+      patterns.push(new RegExp(`^[\[(\s]*${escapedDigits}${escapedSuffix}[)\]]?(?=\\s|[).:-]|$)`));
+    } else {
+      patterns.push(new RegExp(`^#?${escapedDigits}(?!\\d)(?=\\b|\\s|[).:-]|$)`));
+    }
+  }
+
+  const sanitizedText = lowerText.replace(/[^a-z0-9]/g, '');
+
+  const passesSanitizedCheck = (target: string) => {
+    if (!target) {
+      return false;
+    }
+
+    const prefixes = [target, `problem${target}`, `problemno${target}`, `prob${target}`, `#${target}`];
+
+    return prefixes.some((prefix) => {
+      if (!prefix || !sanitizedText.startsWith(prefix)) {
+        return false;
+      }
+
+      const nextChar = sanitizedText.charAt(prefix.length);
+      return nextChar ? !/\d/.test(nextChar) : true;
+    });
+  };
+
+  return (
+    patterns.some((pattern) => pattern.test(lowerText)) ||
+    passesSanitizedCheck(sanitizedProblem) ||
+    passesSanitizedCheck(numericPrefix)
+  );
 }
 
 function extractLeadingProblemNumber(text: string): number | null {
@@ -1219,7 +1260,7 @@ function extractLeadingProblemNumber(text: string): number | null {
     return null;
   }
 
-  const match = trimmed.match(/^(?:problem\s+)?#?(\d{1,3})(?=\s|[).:-])/i);
+  const match = trimmed.match(/^(?:problem\s+)?#?(\d{1,3})(?=(?:\s|$|[).:-]|[a-z]))/i);
   if (match) {
     return Number.parseInt(match[1], 10);
   }
@@ -1350,9 +1391,22 @@ function looksLikeProblemHeader(text: string): boolean {
     return true;
   }
 
+  if (/^(?:problem\s+)?#?\d{1,3}[a-z]/u.test(normalized)) {
+    return true;
+  }
+
   if (/^(?:problem\s+)?#?\d{1,3}\b/u.test(normalized)) {
     const remainder = normalized.replace(/^(?:problem\s+)?#?\d{1,3}\b\s*/u, '');
     return remainder.length > 0;
+  }
+
+  const sanitized = normalized.replace(/[^a-z0-9]/g, '');
+  const numericPrefix = sanitized.match(/^(\d{1,3})/);
+  if (numericPrefix) {
+    const nextChar = sanitized.charAt(numericPrefix[1].length);
+    if (!nextChar || !/\d/.test(nextChar)) {
+      return true;
+    }
   }
 
   return false;
@@ -1374,7 +1428,7 @@ function extractProblemTextFallback(problemNumber: string, rawText: string): str
   let startIndex = trimmedLines.findIndex((line) => matchesProblemStart(normalizedProblem, line));
 
   if (startIndex === -1 && !Number.isNaN(targetNumber)) {
-    const altPattern = new RegExp(`(^|\\s)(?:problem\\s*)?#?${targetNumber}(?=\\s|[).:-])`, 'i');
+    const altPattern = new RegExp(`(^|\\s)(?:problem\\s*)?#?${targetNumber}(?=\\s|[).:-]|[a-z])`, 'i');
     startIndex = trimmedLines.findIndex((line) => altPattern.test(line));
   }
 
