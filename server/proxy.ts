@@ -1479,6 +1479,185 @@ function extractProblemTextFallback(problemNumber: string, rawText: string): str
   return combined.length > 0 ? combined : null;
 }
 
+/**
+ * Uses GPT-4o Vision to locate a specific problem number and return normalized bounding box coordinates
+ * Returns coordinates as percentages (0-1) for easier cropping
+ */
+async function locateProblemWithVision(imageUri: string, problemNumber: string): Promise<{
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+} | null> {
+  if (!openai) {
+    console.warn('⚠️ OpenAI client not available for vision-based problem location');
+    return null;
+  }
+
+  try {
+    console.log(`📍 Using GPT-4o Vision to locate problem #${problemNumber}...`);
+    
+    const locatorPrompt = `You are a precise problem locator for homework images. Your task is to identify the EXACT location of a specific problem number on the page.
+
+CRITICAL TASK:
+Find problem #${problemNumber} in this image and return its bounding box coordinates.
+
+INSTRUCTIONS:
+1. Locate problem #${problemNumber} (look for markers like "#${problemNumber}", "Problem ${problemNumber}", "${problemNumber}.", "${problemNumber})")
+2. Identify the FULL extent of this problem including:
+   - The problem number/label
+   - All parts of the question (a, b, c, etc.)
+   - Any equations, diagrams, or figures that are part of THIS problem
+   - Stop at the next problem number or clear divider
+3. Return NORMALIZED coordinates (0.0 to 1.0 range) where:
+   - 0.0 = top/left edge of image
+   - 1.0 = bottom/right edge of image
+   - Example: top: 0.25 means 25% down from top
+
+RESPONSE FORMAT (JSON only):
+{
+  "found": true,
+  "problemNumber": "${problemNumber}",
+  "boundingBox": {
+    "top": 0.15,
+    "left": 0.10,
+    "bottom": 0.35,
+    "right": 0.90
+  }
+}
+
+If problem #${problemNumber} is NOT found:
+{
+  "found": false,
+  "problemNumber": "${problemNumber}",
+  "error": "Problem #${problemNumber} not visible in image"
+}
+
+CRITICAL: Respond with ONLY valid JSON. No markdown, no explanations.`;
+
+    const response = await openai.chat.completions.create(
+      {
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: locatorPrompt },
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageUri,
+                  detail: "high" // High detail for accurate location
+                }
+              }
+            ]
+          }
+        ],
+        temperature: 0.1, // Low temperature for consistent location
+        max_tokens: 300
+      },
+      { timeout: OPENAI_TIMEOUT_MS }
+    );
+
+    const content = response.choices[0]?.message?.content?.trim();
+    if (!content) {
+      console.warn('⚠️ GPT-4o Vision returned empty response for problem location');
+      return null;
+    }
+
+    // Parse JSON response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : content;
+    const result = JSON.parse(jsonStr);
+
+    if (!result.found || !result.boundingBox) {
+      console.log(`⚠️ Problem #${problemNumber} not found by GPT-4o Vision:`, result.error);
+      return null;
+    }
+
+    const { top, left, bottom, right } = result.boundingBox;
+    
+    // Validate coordinates are in valid range
+    if (top < 0 || top > 1 || left < 0 || left > 1 || bottom < 0 || bottom > 1 || right < 0 || right > 1) {
+      console.warn('⚠️ Invalid coordinates returned by GPT-4o Vision:', result.boundingBox);
+      return null;
+    }
+
+    if (top >= bottom || left >= right) {
+      console.warn('⚠️ Invalid bounding box dimensions:', result.boundingBox);
+      return null;
+    }
+
+    console.log(`✅ Problem #${problemNumber} located at: top=${(top*100).toFixed(1)}%, left=${(left*100).toFixed(1)}%, bottom=${(bottom*100).toFixed(1)}%, right=${(right*100).toFixed(1)}%`);
+    
+    return { top, left, bottom, right };
+  } catch (error) {
+    console.error('❌ Error locating problem with GPT-4o Vision:', error);
+    return null;
+  }
+}
+
+/**
+ * Crops image using normalized coordinates (0-1 range)
+ */
+async function cropImageWithNormalizedCoords(imageDataUri: string, coords: {
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+}): Promise<string | null> {
+  if (!imageDataUri || !imageDataUri.startsWith('data:')) {
+    console.warn('⚠️ Cannot crop image: image URI is not a data URI');
+    return null;
+  }
+
+  const match = imageDataUri.match(/^data:(.+);base64,(.*)$/);
+  if (!match) {
+    console.warn('⚠️ Cannot crop image: data URI is malformed');
+    return null;
+  }
+
+  const [, mimeType, base64Data] = match;
+
+  try {
+    const sharpModule = await loadSharpModule();
+    if (!sharpModule) {
+      return null;
+    }
+
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    const metadata = await sharpModule(imageBuffer).metadata();
+
+    const imageWidth = metadata.width;
+    const imageHeight = metadata.height;
+
+    if (!imageWidth || !imageHeight) {
+      console.warn('⚠️ Unable to read image dimensions for cropping');
+      return null;
+    }
+
+    // Convert normalized coordinates to pixels
+    const left = Math.max(0, Math.floor(coords.left * imageWidth));
+    const top = Math.max(0, Math.floor(coords.top * imageHeight));
+    const right = Math.min(imageWidth, Math.ceil(coords.right * imageWidth));
+    const bottom = Math.min(imageHeight, Math.ceil(coords.bottom * imageHeight));
+
+    const width = Math.max(1, right - left);
+    const height = Math.max(1, bottom - top);
+
+    console.log(`✂️ Cropping image: ${imageWidth}x${imageHeight} → region at (${left},${top}) size ${width}x${height}`);
+
+    const croppedBuffer = await sharpModule(imageBuffer)
+      .extract({ left, top, width, height })
+      .toBuffer();
+
+    return `data:${mimeType};base64,${croppedBuffer.toString('base64')}`;
+  } catch (error) {
+    console.warn('⚠️ Failed to crop image:', error);
+    return null;
+  }
+}
+
 async function cropImageToBoundingBox(imageDataUri: string, region: ProblemBoundingRegion['boundingBox']): Promise<string | null> {
   if (!imageDataUri || !imageDataUri.startsWith('data:')) {
     console.warn('⚠️ Cannot crop image: image URI is not a data URI');
@@ -3505,28 +3684,67 @@ app.post('/api/analyze-image', async (req, res) => {
     let result = await pRetry(
       async () => {
         try {
-          // STRATEGY: Always try Mistral OCR first (superior accuracy)
-          // Then decide based on content whether to use text analysis or vision
+          // NEW HYBRID STRATEGY (when problemNumber is provided):
+          // 1. GPT-4o Vision locates the problem → returns coordinates
+          // 2. Crop image to that region
+          // 3. Mistral OCR extracts text from cropped image (superior symbol accuracy)
+          // 4. GPT-4o analyzes Mistral text to solve
           
           let analysisImageUriForVision = imageUri;
+          let croppedImageForOcr: string | null = null;
+          let usedVisionLocator = false;
+
+          // Try new hybrid approach if problem number is specified
+          if (problemNumber && openai) {
+            console.log('🎯 NEW HYBRID FLOW: GPT-4o locator → crop → Mistral OCR → GPT-4o solver');
+            const visionStartTime = Date.now();
+            
+            // Step 1: Use GPT-4o Vision to locate the problem
+            const problemCoords = await locateProblemWithVision(imageUri, problemNumber);
+            console.log(`⏱️ [TIMING] GPT-4o Vision locator completed in ${Date.now() - visionStartTime}ms`);
+            
+            if (problemCoords) {
+              // Step 2: Crop image to problem region
+              const cropStartTime = Date.now();
+              croppedImageForOcr = await cropImageWithNormalizedCoords(imageUri, problemCoords);
+              console.log(`⏱️ [TIMING] Image cropping completed in ${Date.now() - cropStartTime}ms`);
+              
+              if (croppedImageForOcr) {
+                usedVisionLocator = true;
+                analysisImageUriForVision = croppedImageForOcr; // Use cropped image for Vision fallback if needed
+                console.log('✅ [METRICS] Vision locator SUCCESS - problem isolated and cropped');
+              } else {
+                console.log('⚠️ [METRICS] Vision locator PARTIAL - coords found but crop failed, falling back to legacy Mistral bounding boxes');
+              }
+            } else {
+              console.log('⚠️ [METRICS] Vision locator MISS - problem not found, falling back to legacy Mistral bounding boxes');
+            }
+          }
 
           if (mistral) {
             try {
               const startTime = Date.now();
 
-              // Step 1: Extract text using Mistral's superior OCR
-              console.log('⏱️ [TIMING] Starting Mistral OCR...');
+              // Step 3: Extract text using Mistral's superior OCR
+              // Use cropped image if available (from vision locator), otherwise full image
+              const imageForOcr = croppedImageForOcr || imageUri;
+              console.log(`⏱️ [TIMING] Starting Mistral OCR on ${croppedImageForOcr ? 'CROPPED' : 'FULL'} image...`);
               const {
                 text: rawOcrText,
                 confidence: ocrConfidence,
                 boundingBoxes
-              } = await extractTextWithMistral(imageUri);
+              } = await extractTextWithMistral(imageForOcr);
               console.log(`⏱️ [TIMING] Mistral OCR completed in ${Date.now() - startTime}ms`);
 
               if (rawOcrText && rawOcrText.trim().length > 0) {
                 let focusedOcrText = rawOcrText;
 
-                if (problemNumber && boundingBoxes.length > 0) {
+                // Skip problem isolation logic if we already used Vision locator + crop
+                if (usedVisionLocator) {
+                  console.log('✅ Using full OCR text from Vision-located cropped image (problem already isolated)');
+                  focusedOcrText = rawOcrText; // The cropped image already contains only the target problem
+                } else if (problemNumber && boundingBoxes.length > 0) {
+                  // Fallback to old Mistral bounding box logic if Vision locator wasn't used
                   const region = extractProblemBoundingRegion(problemNumber, boundingBoxes);
                   if (region) {
                     if (region.combinedText.trim().length > 0) {
@@ -3536,7 +3754,7 @@ app.post('/api/analyze-image', async (req, res) => {
                     const cropped = await cropImageToBoundingBox(imageUri, region.boundingBox);
                     if (cropped) {
                       analysisImageUriForVision = cropped;
-                      console.log('✂️ Cropped image to selected problem bounding box.');
+                      console.log('✂️ Cropped image to selected problem bounding box (Mistral fallback).');
                     } else {
                       console.log('⚠️ Cropped image unavailable, using full image for analysis.');
                     }
@@ -3547,7 +3765,7 @@ app.post('/api/analyze-image', async (req, res) => {
                   console.log('⚠️ Mistral OCR did not return bounding boxes for targeted selection. Using full OCR text.');
                 }
 
-                if (problemNumber && focusedOcrText === rawOcrText) {
+                if (problemNumber && focusedOcrText === rawOcrText && !usedVisionLocator) {
                   const fallbackText = extractProblemTextFallback(problemNumber, rawOcrText);
                   if (fallbackText) {
                     focusedOcrText = fallbackText;
