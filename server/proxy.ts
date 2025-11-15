@@ -3632,8 +3632,7 @@ You MUST solve ONLY problem #${problemNumber}.
 - BAD Answer: "The ratio can be expressed as two to three to four based on the proportion given..."
 
 🖊️ **HANDWRITTEN PROBLEMS - Use Handwriting Font in Final Answer:**
-- **You have access to BOTH the OCR text AND the original image** - examine the image to detect handwriting
-- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper, handwritten numbers/symbols)
+- **Examine the image to detect if it's handwritten** (look for irregular letters, pen/pencil marks, notebook paper, handwritten numbers/symbols)
 - If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags with colored highlights inside
 - **Example:**
   - Handwritten math problem: finalAnswer = "[handwritten:[red:x = 7]]" (handwriting font with red highlight)
@@ -3641,7 +3640,7 @@ You MUST solve ONLY problem #${problemNumber}.
 - **CRITICAL**: You can nest color tags inside handwritten tags: [handwritten:[red:answer]] works perfectly
 - The handwriting font makes the answer feel personal and relatable to the student's own work`;
               
-              console.log('⏱️ [TIMING] Starting GPT-4o analysis (with image for handwriting detection)...');
+              console.log('⏱️ [TIMING] Starting GPT-4o Vision analysis...');
               const gptStart = Date.now();
               const response = await openai.chat.completions.create({
                 model: "gpt-4o",
@@ -3655,7 +3654,7 @@ You MUST solve ONLY problem #${problemNumber}.
                     content: [
                       {
                         type: "text",
-                        text: `Please analyze the OCR-extracted problem text above and provide a complete step-by-step solution in JSON format. I'm also providing the original image so you can detect if it's handwritten and format the final answer accordingly.`
+                        text: `Analyze the homework problem in this image and provide a complete step-by-step solution in JSON format.${problemNumber ? ` Remember to solve ONLY problem #${problemNumber}.` : ''}`
                       },
                       {
                         type: "image_url",

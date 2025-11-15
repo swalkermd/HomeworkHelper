@@ -18,7 +18,7 @@ A custom `MathText` component renders complex mathematical notation, including v
 
 A comprehensive cross-platform image conversion solution handles various image formats and URIs. Cross-platform API communication is handled through platform-aware URL construction. The "I Still Don't Get It" feature provides simplified, intuitive, and grade-appropriate explanations for each solution step, focusing on reasoning and analogies, with a two-tier contextual explanation system supporting subject-aware verbosity.
 
-Feature specifications include multiple input methods (text, photo, gallery), AI-powered problem analysis (GPT-4o Vision for images, GPT-4o for text), progressive step-by-step solutions, and improved OCR accuracy using a hybrid approach (Mistral OCR + GPT-4o-mini correction + GPT-4o analysis). The AI is instructed to match input number format and explicitly state common denominators. For essay questions, AI provides guidance and a complete essay. For multiple-choice questions, the correct letter option is included. Server-side formatting enforcement includes post-processing for consistent mathematical formatting, two-pass fraction wrapping (numeric-first pass prevents variables being trapped in fractions like `{2/9x}²`, algebraic pass preserves expressions like `{3x/4y}`), comprehensive whitespace normalization, and stripping LaTeX command artifacts. Multi-part answers are formatted with preserved line breaks.
+Feature specifications include multiple input methods (text, photo, gallery), AI-powered problem analysis using pure GPT-4o Vision (direct image analysis with optimized prompts for OCR accuracy on decimals, fractions, and mathematical symbols), progressive step-by-step solutions. The AI is instructed to match input number format and explicitly state common denominators. For essay questions, AI provides guidance and a complete essay. For multiple-choice questions, the correct letter option is included. Server-side formatting enforcement includes post-processing for consistent mathematical formatting, two-pass fraction wrapping (numeric-first pass prevents variables being trapped in fractions like `{2/9x}²`, algebraic pass preserves expressions like `{3x/4y}`), comprehensive whitespace normalization, and stripping LaTeX command artifacts. Multi-part answers are formatted with preserved line breaks.
 
 A multi-stage Quality Control & Validation System ensures solution accuracy through structural validation, cross-model verification, confidence scoring (reads from top-level validation payload), and comprehensive logging, running asynchronously. Performance optimizations include an asynchronous architecture for instant responses with progressive diagram loading and validation in the background. Diagram generation is optimized with hash-based caching. Multi-step problems now include a strategic overview as Step 1, identifying problem type, approach, and goal. OpenAI SDK calls timeout after 45 seconds to prevent indefinite hangs.
 
@@ -30,8 +30,8 @@ A multi-stage Quality Control & Validation System ensures solution accuracy thro
 The application uses a proxy server architecture (port 5000) that centralizes API endpoints and handles CORS. It proxies frontend requests in development and serves the built Expo web app in production. The server is configured for Autoscale deployment with environment-aware behavior, including health checks and smart environment detection. Production deployment requires manual configuration of environment secrets and includes enhanced error handling and structured logging.
 
 ## External Dependencies
-- **AI Integration:** OpenAI GPT-4o (vision, text analysis, Q&A, image generation) via Replit AI Integrations, Mistral OCR API, WolframAlpha Short Answers API (math verification), Google Gemini 2.0 Flash (optional legacy backup).
-- **Image Handling:** `expo-camera`, `expo-image-picker`, `expo-image`, `expo-file-system`.
+- **AI Integration:** OpenAI GPT-4o (vision, text analysis, Q&A, image generation) via Replit AI Integrations, WolframAlpha Short Answers API (math verification), Google Gemini 2.0 Flash (optional legacy backup).
+- **Image Handling:** `expo-camera`, `expo-image-picker`, `expo-image`, `expo-file-system`, `sharp` (server-side cropping).
 - **Platform Detection:** `expo-constants`.
 - **Haptics:** `expo-haptics`.
 - **Icons:** `expo-vector-icons`.
@@ -40,15 +40,20 @@ The application uses a proxy server architecture (port 5000) that centralizes AP
 
 ## Known Issues & Limitations
 
-### OCR Problem Selection (Bounding Box Detection)
-**Status**: Partially functional  
-**Issue**: When users photograph a page with multiple problems and select a specific problem number, the bounding box detection often fails with `⚠️ Unable to locate problem-specific bounding boxes`. This causes the system to send the entire page's OCR text to GPT-4o Vision, which then picks a random problem instead of the user-selected one.
+### Problem Selection from Multi-Problem Worksheets
+**Status**: Using GPT-4o Vision locator (newly implemented)  
+**Architecture**: Pure OpenAI-only approach - no OCR text extraction or Mistral dependencies.
 
-**Root Cause**: The main branch OCR improvements merged bounding-box aggregation and dynamic image cropping using the Sharp library, but the bounding box detection logic may not be robust enough to consistently identify individual problems on densely-packed homework pages.
+**Flow**:
+1. When user selects problem #X, GPT-4o Vision locates the problem and returns normalized bounding box coordinates (0.0-1.0 range)
+2. Sharp library crops image to that region
+3. GPT-4o Vision analyzes cropped image directly and solves
 
-**Impact**: Users cannot reliably select specific problems from multi-problem images. The system may solve a different problem than requested.
+**Benefits**: Simpler architecture, fewer API calls, no modality switching (Vision → Vision instead of Vision → OCR Text → GPT-4o)
 
-**Workaround**: Crop images to show only one problem before uploading, or verify the AI selected the correct problem before trusting the solution.
+**Potential Issues**: GPT-4o Vision bounding box detection may occasionally miss problems on densely-packed pages or select wrong problem boundaries.
+
+**Workaround**: If problem selection fails, crop images to show only one problem before uploading, or verify the AI selected the correct problem before trusting the solution.
 
 ### Validation Error UX (Infinite Spinner on 422 Errors)
 **Status**: Functional but poor UX  
