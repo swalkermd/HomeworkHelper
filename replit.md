@@ -41,19 +41,22 @@ The application uses a proxy server architecture (port 5000) that centralizes AP
 ## Known Issues & Limitations
 
 ### Problem Selection from Multi-Problem Worksheets
-**Status**: Using GPT-4o Vision locator (newly implemented)  
-**Architecture**: Pure OpenAI-only approach - no OCR text extraction or Mistral dependencies.
+**Status**: ❌ UNRELIABLE - Known Limitation  
+**Architecture**: Pure GPT-4o Vision with strong problem-targeting prompts.
 
-**Flow**:
-1. When user selects problem #X, GPT-4o Vision locates the problem and returns normalized bounding box coordinates (0.0-1.0 range)
-2. Sharp library crops image to that region
-3. GPT-4o Vision analyzes cropped image directly and solves
+**Current Approach**:
+Single GPT-4o Vision call analyzes full worksheet image and attempts to locate specific problem by number.
 
-**Benefits**: Simpler architecture, fewer API calls, no modality switching (Vision → Vision instead of Vision → OCR Text → GPT-4o)
+**Known Issue - Incorrect Problem Selection**:
+GPT-4o Vision frequently selects the WRONG problem on densely-packed worksheets, even with explicit instructions. Testing shows it may find *a* problem with the requested number, but not necessarily the *correct* one (e.g., user requests problem #26 which is a fraction problem, but GPT-4o solves a different equation problem also labeled #26).
 
-**Potential Issues**: GPT-4o Vision bounding box detection may occasionally miss problems on densely-packed pages or select wrong problem boundaries.
+**Root Cause**: 
+Vision models struggle with spatial reasoning on multi-problem worksheets. Attempted solutions (Mistral OCR bounding boxes, GPT-4o Vision coordinate detection, cropping strategies) all proved unreliable for production use.
 
-**Workaround**: If problem selection fails, crop images to show only one problem before uploading, or verify the AI selected the correct problem before trusting the solution.
+**REQUIRED WORKAROUND**:
+**Users MUST crop images to show only ONE problem before uploading.** This is the only reliable way to ensure the correct problem is solved.
+
+**Impact**: Multi-problem worksheet support is effectively non-functional. The problem number selector in the UI cannot be trusted to work correctly.
 
 ### Validation Error UX (Infinite Spinner on 422 Errors)
 **Status**: Functional but poor UX  
