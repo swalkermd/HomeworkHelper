@@ -3567,9 +3567,10 @@ app.post('/api/analyze-image', async (req, res) => {
 
           // OpenAI GPT-4o Vision - Analyzing image with detailed math equation OCR
           // Build system message for GPT-4o Vision analysis
+          // IMPORTANT: If image was already cropped to the specific problem, don't ask GPT-4o to find the problem number
           let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
 
-${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
+${problemNumber && !problemLocated ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
 You MUST solve ONLY problem #${problemNumber}.
 - The image may contain MULTIPLE problems.
 - You must IGNORE all other problems.
@@ -3579,7 +3580,7 @@ You MUST solve ONLY problem #${problemNumber}.
 - Do NOT solve any other problem number.
 - In your "problem" field, include ONLY the text for problem #${problemNumber}.
 - If you cannot clearly identify problem #${problemNumber}, respond with an error in your JSON indicating "Problem #${problemNumber} not found in the image."
-🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.'}
+🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : problemLocated ? `This image has been pre-cropped to show a specific problem. Solve the problem shown in this image.` : 'If multiple problems exist, solve the most prominent one.'}
 
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
@@ -3654,7 +3655,7 @@ You MUST solve ONLY problem #${problemNumber}.
                     content: [
                       {
                         type: "text",
-                        text: `Analyze the homework problem in this image and provide a complete step-by-step solution in JSON format.${problemNumber ? ` Remember to solve ONLY problem #${problemNumber}.` : ''}`
+                        text: `Analyze the homework problem in this image and provide a complete step-by-step solution in JSON format.${problemNumber && !problemLocated ? ` Remember to solve ONLY problem #${problemNumber}.` : ''}`
                       },
                       {
                         type: "image_url",
@@ -3687,7 +3688,8 @@ You MUST solve ONLY problem #${problemNumber}.
               }
 
               // Validate that the solution addresses the requested problem number
-              if (problemNumber) {
+              // Skip this check if we already cropped to the specific problem (problem number may not be in cropped region)
+              if (problemNumber && !problemLocated) {
                 const problemText = parsed.problem.toLowerCase();
                 const hasTargetNumber =
                   problemText.includes(`#${problemNumber}`) ||
@@ -3700,6 +3702,8 @@ You MUST solve ONLY problem #${problemNumber}.
                   console.warn(`   Problem text: ${parsed.problem.substring(0, 100)}...`);
                   // Log warning but don't block - GPT may have found the problem without explicit numbering
                 }
+              } else if (problemLocated) {
+                console.log(`✅ Skipping problem number validation - image was pre-cropped to problem #${problemNumber}`);
               }
 
               console.log('✅ OpenAI Vision analysis complete');
