@@ -280,7 +280,7 @@ function renderComplexPart(
             styles.fractionContainer, 
             { 
               marginHorizontal: baseFontSize * 0.12,
-              transform: [{ translateY: -baseFontSize * 0.22 }]
+              transform: [{ translateY: -baseFontSize * 0.34 }]
             }
           ]}
         > 
