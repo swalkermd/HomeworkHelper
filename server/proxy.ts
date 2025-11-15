@@ -3671,7 +3671,10 @@ You MUST solve ONLY problem #${problemNumber}.
               console.log(`⏱️ [TIMING] GPT-4o analysis completed in ${Date.now() - gptStart}ms`);
               
               let content = response.choices[0]?.message?.content || "{}";
+              console.log('📝 [DEBUG] Raw GPT-4o response content:', content.substring(0, 500));
+              
               const parsed = JSON.parse(content);
+              console.log('📝 [DEBUG] Parsed JSON keys:', Object.keys(parsed));
               
               // Validate parsed result
               if (!parsed || typeof parsed !== 'object') {
@@ -3679,6 +3682,7 @@ You MUST solve ONLY problem #${problemNumber}.
               }
               
               if (!parsed.problem || !parsed.subject || !parsed.difficulty || !parsed.steps || !Array.isArray(parsed.steps)) {
+                console.error('❌ [DEBUG] Missing fields in response. Has problem:', !!parsed.problem, 'Has subject:', !!parsed.subject, 'Has difficulty:', !!parsed.difficulty, 'Has steps:', !!parsed.steps, 'Steps is array:', Array.isArray(parsed.steps));
                 throw new Error('OpenAI response missing required fields (problem, subject, difficulty, or steps array)');
               }
 
