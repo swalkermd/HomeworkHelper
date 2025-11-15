@@ -37,7 +37,7 @@ export interface HomeworkSolution {
   problemStructured?: MathNode[];
   finalAnswerStructured?: MathNode[];
   solutionId?: string;
-  verificationStatus?: 'pending' | 'verified' | 'unverified';
+  verificationStatus?: 'pending' | 'verified' | 'unverified' | 'invalid_pending';
   verificationConfidence?: number;
   verificationWarnings?: string[];
 }
