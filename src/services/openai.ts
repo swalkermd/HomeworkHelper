@@ -12,6 +12,19 @@ const IS_PRODUCTION = hostname.includes('replit.app') || hostname.includes('repl
 const API_REQUEST_TIMEOUT_MS = IS_PRODUCTION ? 120000 : 45000;
 console.log('⏱️ API timeout configured:', API_REQUEST_TIMEOUT_MS / 1000, 'seconds', IS_PRODUCTION ? '(production)' : '(development)', '| hostname:', hostname);
 
+function buildApiError(response: Response, fallbackMessage: string, errorData: any): Error {
+  const detailedMessage =
+    (errorData && (errorData.message || errorData.error)) ||
+    `${fallbackMessage}${response.status ? ` (status ${response.status})` : ''}`;
+  const apiError = new Error(detailedMessage);
+  apiError.name = 'ApiError';
+  (apiError as any).status = response.status;
+  if (errorData?.details) {
+    (apiError as any).details = errorData.details;
+  }
+  return apiError;
+}
+
 export async function analyzeTextQuestion(question: string): Promise<any> {
   try {
     console.log('📡 Calling API:', `${API_URL}/analyze-text`);
@@ -42,7 +55,7 @@ export async function analyzeTextQuestion(question: string): Promise<any> {
       console.error('❌ Response not OK:', response.status);
       const errorData = await response.json().catch(() => ({}));
       console.error('❌ Error data:', errorData);
-      throw new Error(errorData.error || 'Failed to analyze question');
+      throw buildApiError(response, 'Failed to analyze question', errorData);
     }
     
     console.log('📡 Parsing JSON response...');
@@ -98,7 +111,7 @@ export async function analyzeImageQuestion(imageUri: string, problemNumber?: str
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error('API Error Response:', response.status, errorData);
-      throw new Error(errorData.error || 'Failed to analyze image');
+      throw buildApiError(response, 'Failed to analyze image', errorData);
     }
     
     console.log('🔍 Parsing response JSON...');
