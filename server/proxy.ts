@@ -17,7 +17,6 @@ import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import cors from 'cors';
 import OpenAI from 'openai';
-import { Mistral } from '@mistralai/mistralai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import pRetry, { AbortError } from 'p-retry';
 import fs from 'fs';
@@ -77,9 +76,6 @@ const PORT = 5000;
 const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
 const openaiBaseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL;
 
-// Resolve Mistral configuration
-const mistralApiKey = process.env.MISTRAL_API_KEY;
-
 // Resolve Gemini configuration
 const geminiApiKey = process.env.GEMINI_API_KEY;
 
@@ -95,10 +91,6 @@ const OPENAI_TIMEOUT_MS = 45000; // 45 seconds (well under 120s client timeout)
 
 if (!openaiApiKey) {
   console.warn('⚠️ OpenAI API key not configured. Set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY.');
-}
-
-if (!mistralApiKey) {
-  console.warn('⚠️ Mistral API key not configured. Hybrid OCR will fall back to OpenAI only.');
 }
 
 if (!geminiApiKey) {
@@ -117,27 +109,19 @@ app.get('/health', (req, res) => {
 // API configuration diagnostic endpoint - shows what's available without exposing keys
 app.get('/api/config-check', (req, res) => {
   const openaiConfigured = !!openaiApiKey;
-  const mistralConfigured = !!mistralApiKey;
 
   res.json({
     environment: process.env.REPLIT_DEPLOYMENT === '1' ? 'production' : 'development',
     apis: {
       openai: openaiConfigured
         ? 'configured ✅'
-        : 'missing ❌ (set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY)',
-      mistral: mistralConfigured
-        ? 'configured ✅'
-        : 'missing ❌ (set MISTRAL_API_KEY)'
+        : 'missing ❌ (set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY)'
     },
-    ocrMode: mistralConfigured && openaiConfigured
-      ? 'Hybrid OCR (Mistral for STEM + OpenAI for general)'
-      : openaiConfigured
-      ? 'OpenAI GPT-4o Vision only'
+    ocrMode: openaiConfigured
+      ? 'OpenAI GPT-4o Vision with detailed math equation OCR'
       : 'No OCR configured',
-    message: mistralConfigured && openaiConfigured
-      ? 'STEM questions use Mistral OCR (94% math accuracy), general questions use OpenAI'
-      : openaiConfigured
-      ? 'Using OpenAI GPT-4o Vision for all image analysis'
+    message: openaiConfigured
+      ? 'Using OpenAI GPT-4o Vision exclusively for all image analysis with fine-tuned math equation support'
       : 'Please configure API keys'
   });
 });
@@ -253,9 +237,6 @@ const openai = new OpenAI({
   apiKey: openaiApiKey,
   baseURL: openaiBaseURL || undefined,
 });
-
-// Initialize Mistral client for superior STEM OCR
-const mistral = mistralApiKey ? new Mistral({ apiKey: mistralApiKey }) : null;
 
 // Initialize Gemini client for backup verification
 const geminiAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
@@ -995,9 +976,8 @@ setInterval(() => {
 
 /**
  * STEM CONTENT DETECTION - Analyzes extracted text to determine if it's STEM content
- * 
+ *
  * Returns true if the text contains strong STEM indicators (math, science, equations).
- * Mistral OCR achieves 94.29% accuracy on complex mathematical equations.
  */
 function detectStemFromText(text: string): boolean {
   if (!text || text.trim().length === 0) {
@@ -1040,142 +1020,6 @@ function detectStemFromText(text: string): boolean {
   
   console.log(`🎯 STEM detection: ${isStem} (score: ${stemScore}/20 indicators)`);
   return isStem;
-}
-
-/**
- * MISTRAL OCR HANDLER - Extracts text from images using Mistral's superior math recognition
- * 
- * Returns extracted markdown text and confidence score.
- */
-async function extractTextWithMistral(imageUri: string): Promise<{ text: string; confidence: number; boundingBoxes: OcrBoundingBox[] }> {
-  if (!mistral) {
-    throw new Error('Mistral client not initialized');
-  }
-
-  try {
-    console.log('🔍 Using Mistral OCR for superior STEM text extraction...');
-
-    // Mistral OCR expects either imageUrl or documentBase64
-    const response = await mistral.ocr.process({
-      model: 'mistral-ocr-latest',
-      document: {
-        type: 'image_url',
-        imageUrl: imageUri
-      },
-      includeImageBase64: false,
-      bboxAnnotationFormat: {
-        type: 'json_schema',
-        jsonSchema: {
-          name: 'HomeworkBoundingBoxAnnotation',
-          description: 'Text extracted from each bounding box region of the worksheet.',
-          schemaDefinition: {
-            type: 'object',
-            properties: {
-              text: {
-                type: 'string',
-                description: 'Exact OCR text contained within this bounding box.'
-              }
-            },
-            required: ['text'],
-            additionalProperties: true
-          }
-        }
-      },
-      documentAnnotationFormat: {
-        type: 'json_schema',
-        jsonSchema: {
-          name: 'HomeworkDocumentAnnotation',
-          description: 'Structured text content for the entire worksheet image.',
-          schemaDefinition: {
-            type: 'object',
-            properties: {
-              text: {
-                type: 'string',
-                description: 'Combined OCR text for the full document.'
-              }
-            },
-            required: ['text'],
-            additionalProperties: true
-          }
-        }
-      }
-    });
-
-    if (!response.pages || response.pages.length === 0) {
-      throw new Error('Mistral OCR returned no pages');
-    }
-
-    // Extract markdown from first page
-    const extractedText = response.pages[0].markdown || '';
-
-    const boundingBoxes: OcrBoundingBox[] = [];
-
-    for (const page of response.pages) {
-      const pageWidth = page.dimensions?.width ?? null;
-      const pageHeight = page.dimensions?.height ?? null;
-      if (page.images && Array.isArray(page.images)) {
-        for (const image of page.images) {
-          const annotationText = parseMistralBoundingBoxAnnotation(image.imageAnnotation);
-          boundingBoxes.push({
-            text: annotationText,
-            top: image.topLeftY ?? 0,
-            left: image.topLeftX ?? 0,
-            bottom: image.bottomRightY ?? image.topLeftY ?? 0,
-            right: image.bottomRightX ?? image.topLeftX ?? 0,
-            pageIndex: page.index ?? 0,
-            pageWidth,
-            pageHeight
-          });
-        }
-      }
-    }
-
-    // Mistral OCR has ~94% accuracy, but we can estimate confidence
-    // based on text quality (non-empty, reasonable length)
-    const confidence = extractedText.trim().length > 0 ? 0.94 : 0.0;
-
-    console.log(`✅ Mistral OCR extracted ${extractedText.length} characters (confidence: ${(confidence * 100).toFixed(1)}%)`);
-    console.log('📝 Extracted text preview:', extractedText.substring(0, 200));
-
-    return {
-      text: extractedText,
-      confidence,
-      boundingBoxes
-    };
-  } catch (error) {
-    console.error('❌ Mistral OCR error:', error);
-    throw error;
-  }
-}
-
-function parseMistralBoundingBoxAnnotation(annotation?: string | null): string {
-  if (!annotation) {
-    return '';
-  }
-
-  const trimmed = annotation.trim();
-  if (!trimmed) {
-    return '';
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (parsed && typeof parsed === 'object') {
-      if (typeof parsed.text === 'string') {
-        return parsed.text;
-      }
-      if (Array.isArray(parsed.lines)) {
-        return parsed.lines.join('\n');
-      }
-      if (typeof parsed.content === 'string') {
-        return parsed.content;
-      }
-    }
-  } catch (error) {
-    // Annotation was not JSON - fall back to raw string
-  }
-
-  return trimmed;
 }
 
 function escapeRegExp(value: string): string {
@@ -3720,98 +3564,22 @@ app.post('/api/analyze-image', async (req, res) => {
           // Step 2: GPT-4o Vision directly analyzes the image (cropped or full)
           console.log(`⏱️ [TIMING] Starting GPT-4o Vision analysis on ${problemLocated ? 'CROPPED' : 'FULL'} image...`);
           const visionStart = Date.now();
-              const {
-                text: rawOcrText,
-                confidence: ocrConfidence,
-                boundingBoxes
-              } = await extractTextWithMistral(imageForOcr);
-              console.log(`⏱️ [TIMING] Mistral OCR completed in ${Date.now() - startTime}ms`);
 
-              if (rawOcrText && rawOcrText.trim().length > 0) {
-                let focusedOcrText = rawOcrText;
-
-                // Skip problem isolation logic if we already used Vision locator + crop
-                if (usedVisionLocator) {
-                  console.log('✅ Using full OCR text from Vision-located cropped image (problem already isolated)');
-                  focusedOcrText = rawOcrText; // The cropped image already contains only the target problem
-                } else if (problemNumber && boundingBoxes.length > 0) {
-                  // Fallback to old Mistral bounding box logic if Vision locator wasn't used
-                  const region = extractProblemBoundingRegion(problemNumber, boundingBoxes);
-                  if (region) {
-                    if (region.combinedText.trim().length > 0) {
-                      focusedOcrText = region.combinedText;
-                    }
-
-                    const cropped = await cropImageToBoundingBox(imageUri, region.boundingBox);
-                    if (cropped) {
-                      analysisImageUriForVision = cropped;
-                      console.log('✂️ Cropped image to selected problem bounding box (Mistral fallback).');
-                    } else {
-                      console.log('⚠️ Cropped image unavailable, using full image for analysis.');
-                    }
-                  } else {
-                    console.log('⚠️ Unable to locate problem-specific bounding boxes. Using full OCR text.');
-                  }
-                } else if (problemNumber) {
-                  console.log('⚠️ Mistral OCR did not return bounding boxes for targeted selection. Using full OCR text.');
-                }
-
-                if (problemNumber && focusedOcrText === rawOcrText && !usedVisionLocator) {
-                  const fallbackText = extractProblemTextFallback(problemNumber, rawOcrText);
-                  if (fallbackText) {
-                    focusedOcrText = fallbackText;
-                    console.log('🛟 Applied text-based fallback segmentation for problem selection.');
-                  } else {
-                    console.log('⚠️ Text-based fallback could not isolate the requested problem.');
-                  }
-                }
-
-                // Step 2: Analyze the extracted text to determine if it's STEM content (BEFORE correction)
-                const stemCheckStart = Date.now();
-                const isStemContent = detectStemFromText(focusedOcrText);
-                console.log(`⏱️ [TIMING] STEM detection completed in ${Date.now() - stemCheckStart}ms`);
-
-                // Step 3: Apply post-OCR correction ONLY for STEM content (optimization: saves 6-8s on non-STEM)
-                let ocrText = focusedOcrText;
-                if (isStemContent) {
-                  console.log('⏱️ [TIMING] Starting OCR correction (STEM content)...');
-                  const correctionStart = Date.now();
-                  ocrText = await correctOcrText(focusedOcrText);
-                  console.log(`⏱️ [TIMING] OCR correction completed in ${Date.now() - correctionStart}ms`);
-                } else {
-                  console.log('⏱️ [OPTIMIZATION] Skipping OCR correction for non-STEM content');
-                }
-
-                if (isStemContent) {
-                  console.log('🔬 STEM content detected → Using Mistral OCR + OpenAI text analysis');
-                  // HYBRID PATH 1: Mistral OCR + OpenAI Text Analysis (for STEM)
-              // Step 2: Use OpenAI GPT-4o (text mode) to analyze the extracted text
-              console.log(`📝 Using Mistral OCR text (${(ocrConfidence * 100).toFixed(1)}% confidence) with OpenAI analysis`);
-              
-              const systemMessage = `You are an expert educational AI tutor. You have been provided with HIGH-ACCURACY text extracted by Mistral OCR (${(ocrConfidence * 100).toFixed(1)}% confidence).
-
-⚠️ CRITICAL: You MUST respond with valid JSON only.
-
-🎯 **USE THE OCR TEXT BELOW AS YOUR PRIMARY SOURCE**
-The OCR text has been extracted by Mistral's specialized OCR engine (94.29% accuracy on complex math equations).
-Trust this text for all numbers, decimals, variables, operators, and equation structure.
+          // OpenAI GPT-4o Vision - Analyzing image with detailed math equation OCR
+          // Build system message for GPT-4o Vision analysis
+          let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
 
 ${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
 You MUST solve ONLY problem #${problemNumber}.
-- The OCR text below may contain MULTIPLE problems.
+- The image may contain MULTIPLE problems.
 - You must IGNORE all other problems.
 - Look for problem markers like "#${problemNumber}", "Problem ${problemNumber}", "${problemNumber}.", "${problemNumber})"
 - Read the ENTIRE multi-line problem #${problemNumber} including all parts (a, b, c) and conditions.
 - Do NOT stop at the first line.
 - Do NOT solve any other problem number.
 - In your "problem" field, include ONLY the text for problem #${problemNumber}.
-- If you cannot clearly identify problem #${problemNumber}, respond with an error in your JSON indicating "Problem #${problemNumber} not found in the provided text."
+- If you cannot clearly identify problem #${problemNumber}, respond with an error in your JSON indicating "Problem #${problemNumber} not found in the image."
 🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.'}
-
-**OCR-EXTRACTED TEXT:**
-\`\`\`
-${ocrText}
-\`\`\`
 
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
@@ -3892,7 +3660,7 @@ ${ocrText}
                       {
                         type: "image_url",
                         image_url: {
-                          url: analysisImageUriForVision
+                          url: analysisImageUri
                         }
                       }
                     ]
@@ -3931,618 +3699,9 @@ ${ocrText}
                 }
               }
 
-              console.log('✅ Hybrid OCR complete: Mistral OCR + OpenAI analysis');
+              console.log('✅ OpenAI Vision analysis complete');
               return parsed;
-            }
-          }
-        } catch (mistralError) {
-          console.warn('⚠️  Mistral OCR pipeline issue - falling back to OpenAI Vision:', mistralError);
-        }
-      }
-
-      // HYBRID PATH 2: OpenAI GPT-4o Vision (for non-STEM or fallback)
-          // Build system message for GPT-4o Vision analysis
-          let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
-
-⚠️ CRITICAL: You MUST respond with valid JSON only.
-
-${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
-You MUST solve ONLY problem #${problemNumber}.
-- The image may contain MULTIPLE problems.
-- You must IGNORE all other problems.
-- Look for problem markers like "#${problemNumber}", "Problem ${problemNumber}", "${problemNumber}.", "${problemNumber})"
-- Read the ENTIRE multi-line problem #${problemNumber} including all parts (a, b, c) and conditions.
-- Do NOT stop at the first line.
-- Do NOT solve any other problem number.
-- In your "problem" field, include ONLY the text for problem #${problemNumber}.
-- If you cannot clearly identify problem #${problemNumber}, respond with an error in your JSON indicating "Problem #${problemNumber} not found in the image."
-🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.'}
-
-🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
-- If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
-- If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
-- For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
-- CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
-- **ALWAYS use LaTeX \\frac{num}{den} or slash notation num/den for fractions**
-- **DO NOT use raw text newlines between numerator and denominator** (the system renders fractions vertically automatically)
-
-🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
-- Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
-- Use [red:result] for the outcome (e.g., "= [red:24]")
-- **CRITICAL:** Include operators WITH the number when showing multiplication/division operations
-  - CORRECT: "[blue:8 ×] {1/8}(3d - 2) = [blue:8 ×] {1/4}(d + 5)"
-  - WRONG: "[blue:8] × {1/8}" (operator outside the tag causes line breaks)
-- Example: "Multiply both sides by [blue:8 ×] to eliminate fractions: [blue:8 ×] {1/8}(3d - 2) = [blue:8 ×] {1/4}(d + 5) simplifies to [red:(3d - 2) = 2(d + 5)]"
-- NEVER skip color highlighting - it's essential for student understanding!
-- **CRITICAL:** Keep all text (including punctuation) on the SAME LINE as color tags. NEVER write: "[red:phototropism]\n." Instead write: "[red:phototropism]."
-
-📝 **ESSAY QUESTIONS - SPECIAL FORMAT:**
-**If the question requires an essay/written response** (common in Language Arts, Bible Studies, History, or opinion questions):
-- Use ONLY ONE step with id "1" titled "Key Concepts for Your Essay"
-- In this single step, provide GUIDANCE and RECOMMENDATIONS for the student on what themes to address and how to structure their essay
-- Put the COMPLETE, POLISHED, FINAL ESSAY in the finalAnswer field - NOT advice or recommendations
-- **CRITICAL:** The finalAnswer must be the ACTUAL ESSAY ITSELF written as a finished piece, not instructions on how to write it
-- The essay should be well-structured with introduction, body paragraphs, and conclusion
-- Highlight key concepts and vocabulary with [red:term] throughout the essay
-- **Example:**
-  - Step 1 content (GUIDANCE): "Your essay should address [blue:three main themes]: the protagonist's journey, the [red:symbolism] of the setting, and the [red:moral lesson]. Begin with an engaging introduction that states your thesis. Each body paragraph should focus on one theme with [blue:specific examples] from the text. Conclude by summarizing how these elements work together."
-  - finalAnswer (ACTUAL ESSAY): "In Harper Lee's novel To Kill a Mockingbird, the protagonist Scout Finch embarks on a transformative journey from innocence to moral awareness. The story explores how childhood experiences shape our understanding of justice and [red:prejudice] in society. Throughout the narrative, Scout's father Atticus serves as a moral compass, teaching her that true courage means standing up for what is right even when facing overwhelming opposition. The [red:symbolism] of the mockingbird represents innocence and the harm caused by destroying it without reason..."
-  - WRONG finalAnswer: "To write this essay, you should discuss the protagonist's journey. Include examples from the text. Make sure to address symbolism..." (This is advice, not an essay!)
-
-🎯 **MULTI-STEP PROBLEMS - MANDATORY OVERVIEW IN STEP 1:**
-**For any problem requiring multiple steps (math, physics, chemistry, multi-part analysis), Step 1 MUST be a simple overview that helps orient the student.**
-
-**Purpose:** Help students understand the "big picture" before diving into detailed calculations. This centers their approach and shows the general strategy.
-
-**Step 1 Requirements for Multi-Step Problems:**
-- **Title:** Should identify the problem type (e.g., "Identify Problem Type and Approach", "Problem Type: Projectile Motion", "Strategy: Composite Shape Area")
-- **Content:** Write 2-3 SHORT sentences that explain:
-  1. What type of problem this is (e.g., "This is a [red:linear equation] with fractions on both sides")
-  2. The general approach we'll use (e.g., "We'll [blue:eliminate fractions first], then [blue:collect like terms], and finally [blue:isolate the variable]")
-  3. Optional: What our goal is (e.g., "Our goal is to find the value of [red:d]")
-- **Explanation:** Brief note about why this approach makes sense (e.g., "Starting with a clear plan helps us stay organized through multiple steps")
-
-**Examples:**
-
-**Math Problem (Linear Equation):**
-- Step 1 Title: "Identify Problem Type and Approach"
-- Step 1 Content: "This is a [red:linear equation] with fractional coefficients on both sides. We'll [blue:multiply both sides by a common multiple] to eliminate fractions, then [blue:distribute and combine like terms] to solve for [red:d]. This systematic approach keeps the algebra organized."
-- Step 1 Explanation: "Understanding our strategy upfront prevents confusion when working with multiple fractions"
-
-**Physics Problem (Projectile Motion):**
-- Step 1 Title: "Problem Type: Projectile Motion"
-- Step 1 Content: "This is a [red:2D projectile motion] problem where we need to find maximum height and range. We'll [blue:break velocity into components], use [blue:kinematic equations for vertical motion] to find peak height, and [blue:calculate horizontal distance] using time of flight. The parabolic trajectory means vertical and horizontal motions are independent."
-- Step 1 Explanation: "Separating the motion into vertical and horizontal components simplifies what looks like a complex 2D problem"
-
-**Geometry Problem:**
-- Step 1 Title: "Approach: Composite Shape Area"
-- Step 1 Content: "This shape is a [red:composite figure] made of a rectangle and semicircle. We'll [blue:find the area of each shape separately] using their respective formulas, then [blue:add them together]. Breaking complex shapes into simpler parts is the key strategy here."
-- Step 1 Explanation: "Dividing the composite shape into familiar pieces (rectangle + semicircle) makes the calculation straightforward"
-
-**Chemistry Problem:**
-- Step 1 Title: "Strategy: Stoichiometry Calculation"
-- Step 1 Content: "This is a [red:limiting reactant problem] requiring stoichiometry. We'll [blue:convert grams to moles], [blue:use mole ratios] from the balanced equation to identify which reactant runs out first, then [blue:calculate product yield] based on the limiting reactant."
-- Step 1 Explanation: "Following the moles pathway (grams → moles → mole ratio → moles → grams) is the systematic approach for all stoichiometry problems"
-
-**CRITICAL:** This overview step does NOT replace detailed work - it simply provides a roadmap. Steps 2, 3, 4, etc. will contain the actual calculations and detailed solution work.
-
-**When NOT to use overview step:**
-- Simple one-step problems (e.g., "What is 5 + 3?")
-- Essay questions (already have special format)
-- Multiple choice questions that only need elimination logic
-
-📊 **RATIO FILL-IN-THE-BLANK PROBLEMS:**
-**If the problem contains empty boxes/blanks to be filled with ratio numbers:**
-- **Recognize ratio patterns:** Look for "ratio of A to B", "_ : _ : _", "Fill in: ___ to ___"
-- **Format the answer clearly:**
-  - PREFERRED: Recreate the original format with filled boxes, e.g., "Box 1: [red:3], Box 2: [red:5], Box 3: [red:7]" or "Ratio: [red:3]:[red:5]:[red:7]"
-  - MINIMUM: List each ratio component with clear labels, e.g., "First number = [red:3], Second number = [red:5], Third number = [red:7]"
-- **Avoid confusing prose:** Do NOT say "the ratio can be expressed as..." Instead, directly state "The answer is [red:3]:[red:5]:[red:7]"
-- **Highlight ratio numbers:** Always use [red:number] for the actual ratio values to make them stand out
-
-**Example:**
-- Question: "Complete the ratio: ___ : ___ : ___ (The angles of a triangle are in ratio 2:3:4)"
-- GOOD Answer: "The completed ratio is [red:2]:[red:3]:[red:4]" or "Box 1 = [red:2], Box 2 = [red:3], Box 3 = [red:4]"
-- BAD Answer: "The ratio can be expressed as two to three to four based on the proportion given..."
-
-**🚨 CRITICAL OCR ACCURACY INSTRUCTIONS - READ EVERY CHARACTER CAREFULLY 🚨**
-
-⚠️⚠️⚠️ ABSOLUTE PRIORITY: READ EVERY SINGLE CHARACTER WITH EXTREME CARE ⚠️⚠️⚠️
-
-**MOST CRITICAL - DECIMAL POINTS AND NUMBERS:**
-- **DECIMAL POINTS ARE TINY BUT ESSENTIAL** - Look for EVERY decimal point (.) with maximum attention
-- WRONG: Reading "3.14" as "314" - NEVER miss decimal points!
-- WRONG: Reading "0.5" as "5" or "05" - Leading zeros matter!
-- WRONG: Reading "2.75" as "275" or "2.7" - Count digits after decimal carefully!
-- **VERIFY EVERY NUMBER:** Is it 3.14 or 314? Is it 0.5 or 5? Is it 19.6 or 196?
-- Common decimal numbers in homework: 3.14, 0.5, 2.75, 9.8, 19.6, 14.7
-- **Before solving ANY problem, scan for decimal points and verify you captured EVERY digit correctly**
-
-**🚨 CRITICAL - LETTERS vs NUMBERS CONFUSION (MOST COMMON OCR ERROR):**
-DO NOT confuse these commonly misread pairs - VERIFY CONTEXT:
-- **"r" is a LETTER, "1" is a NUMBER** - WRONG: Reading "rt" as "11" (should be r and t!)
-- **"t" is a LETTER, "1" is a NUMBER** - WRONG: Reading "rate" as "1a1e"
-- **"l" (lowercase L) is a LETTER, "1" is a NUMBER** - Context matters: "al" not "a1"
-- **"I" (capital i) is a LETTER, "1" is a NUMBER** - In words, it's probably "I"
-- **"O" (letter) vs "0" (zero)** - In variables (vO, aO) it's usually letter O
-- **"S" (letter) vs "5" (number)** - In words like "distance" it's letter S
-- **"Z" (letter) vs "2" (number)** - Check context carefully
-- **"B" (letter) vs "8" (number)** - In formulas, B is usually a coefficient variable
-
-**VERIFICATION RULE FOR LETTERS VS NUMBERS:**
-1. If it appears in a WORD or VARIABLE NAME → It's a LETTER (rate, time, velocity, rt, vt)
-2. If it appears ALONE as a COEFFICIENT or VALUE → Check carefully (is "1t" really "1×t" or is it "lt"?)
-3. **COMMON PHYSICS VARIABLES:** r (radius), t (time), v (velocity), a (acceleration), d (distance), h (height)
-4. **If you see "rt" it means r × t (radius times time), NOT "11"!**
-5. **If you see "vt" it means v × t (velocity times time), NOT two numbers!**
-
-**CHARACTER-BY-CHARACTER ACCURACY CHECKLIST:**
-✓ DECIMAL POINTS (.) - Tiny dots that change entire meaning! Look twice!
-✓ NEGATIVE SIGNS (-) - Don't confuse with subtraction operators
-✓ PLUS/MINUS SIGNS (+, -) - Are they there or missing?
-✓ PARENTHESES ( ) - Opening and closing must match
-✓ EQUALS SIGNS (=) - Where is the equation split?
-✓ VARIABLES (x, d, a, b, c, t, h, etc.) - Correct letter?
-✓ COEFFICIENTS (numbers before variables) - All digits present?
-✓ EXPONENTS (², ³, ^2, ^3) - Is there a power?
-✓ DIVISION SLASHES (/) - Fraction or division?
-✓ COMMAS in large numbers (1,000) - Present or not?
-
-1. **TRANSCRIBE EXACTLY character-by-character** from the image:
-   - Look for fraction coefficients BEFORE parentheses: "1/8(3d - 2)" means multiply (3d-2) by the fraction 1/8
-   - "1/4(d + 5)" means multiply (d+5) by the fraction 1/4
-   - These are LINEAR equations, NOT fractions equal to expressions
-   - The equation should have TWO sides separated by "=" - do NOT add extra terms!
-   
-2. **⚠️ COMMON OCR MISTAKES TO AVOID - CRITICALLY IMPORTANT:**
-   - **MISSING DECIMAL POINTS** - The #1 OCR error! Always check: is it "3.14" or "314"?
-   - **FRACTION COEFFICIENTS:** Look VERY carefully at fractions before parentheses
-     * If you see "1/8(3d-2)", it's ONE-EIGHTH times (3d-2), NOT "12(3d-2)" or "12/8(3d-2)"
-     * The numerator is the digit "1" (one), NOT "12" (twelve)
-     * Common error: misreading the "1/" as "12" - VERIFY the numerator is a SINGLE digit
-   - DO NOT misread "1/8" as "12/8", "18", "12", or add "12(d) +" - the numerator is ALWAYS "1" (one)
-   - DO NOT misread "1/4" as "14", "12/4", or "1/14" - look for the slash carefully
-   - DO NOT misread "+" as missing - "(d + 5)" must keep the plus sign
-   - DO NOT add extra terms like "12(d) +" that don't exist in the image!
-   - Fractions like 1/8, 1/4, 1/2, 1/3 are VERY common in homework - don't overcomplicate them!
-   - **SPECIFIC EXAMPLE:** Image shows "1/8(3d-2)=1/4(d+5)" → Transcribe as EXACTLY that, NOT "12(3d-2)=1/4(d+5)"
-   
-3. **Common patterns you might see:**
-   - "1/8(3d - 2) = 1/4(d + 5)" → This is LINEAR (no d² term), solve with basic algebra
-   - "2/5h - 7 = 12/5h - 2h + 3" → This is LINEAR, collect like terms
-   - "2(4r + 6) = 2/3(12r + 18)" → This is LINEAR, distribute and solve
-   
-4. **MANDATORY OCR VERIFICATION - Before solving, ALWAYS verify:**
-   ✓ **DECIMAL POINTS:** Did I capture EVERY decimal point? (3.14 not 314, 0.5 not 5, 19.6 not 196)
-   ✓ **ALL DIGITS:** Is it "3.14159" with 5 decimal places, or "3.14" with 2? Count carefully!
-   ✓ **NEGATIVE SIGNS:** Is the number negative? (-5 not 5, -0.5 not 0.5)
-   ✓ **FRACTION COEFFICIENTS:** Is "1/8" actually 1/8 or did you misread as 12/8?
-   ✓ **PARENTHESES:** Are they in the right place and matched correctly?
-   ✓ **OPERATORS:** Did you capture all +, -, ×, ÷ signs correctly?
-   ✓ **EXPONENTS:** Is there a superscript? (x² not x, m/s² not m/s)
-   ✓ **VARIABLES:** Correct letters? (d not b, h not n, x not y)
-   
-   **FINAL CHECK:** Read the entire problem aloud mentally, character by character, to catch any errors.
-   
-4. **SOLUTION METHOD SELECTION:**
-   - If NO squared terms (d², x², etc.) → LINEAR equation → Use: multiply, distribute, collect terms, divide
-   - If you see ax² + bx + c = 0 → QUADRATIC equation → Use: quadratic formula
-   - NEVER use quadratic formula for linear equations!
-   
-5. **Write the EXACT transcription in "problem" field** for verification
-
-💡 **STEP EXPLANATIONS - CONTEXTUAL LEARNING:**
-**MANDATORY: Every step must include a concise "explanation" field that provides immediate learning context.**
-
-**Purpose:** Help students understand WHY we're doing each step, not just WHAT we're doing.
-
-**Guidelines:**
-- **Length:** ONE concise sentence that captures the key insight or reasoning for this step
-- **Tone:** Conversational and encouraging, like a tutor sitting beside the student
-- **Focus:** Explain the PURPOSE or STRATEGY behind the step, not just repeat what's in the content
-
-**Subject-Aware Verbosity:**
-- **Math/Physics:** Keep explanations MINIMAL and focused on the mathematical operation
-  - Example: "We're finding a common denominator so we can add these fractions together."
-  - Example: "Isolating the variable on one side will help us find its value."
-- **Essays/History/Science (non-quantitative):** Use MORE VERBOSE explanations that provide narrative context
-  - Example: "This paragraph establishes your thesis by connecting the historical context to your main argument about social change."
-  - Example: "Understanding the hormone's role helps explain how the plant responds to environmental stimuli."
-- **Multiple Choice:** Brief reasoning about the elimination logic or why the correct answer fits
-  - Example: "We can eliminate options A and B because they don't account for the energy lost to friction."
-
-**What to Include:**
-✓ The strategic reason for this step ("We need to eliminate the fraction to solve for x")
-✓ The mathematical principle being applied ("Common denominators allow us to combine fractions")
-✓ The connection to the problem goal ("This brings us closer to finding the vertex coordinates")
-
-**What NOT to Include:**
-✗ Repeating what's already in the title or content
-✗ Generic statements like "This is an important step"
-✗ Procedural instructions that are already shown in the content
-
-**Examples:**
-
-For Math Step:
-- title: "Find a common denominator"
-- content: "{2/3} + {1/4} = {8/12} + {3/12} = {11/12}"
-- explanation: "Finding a common denominator of 12 allows us to add fractions by making the pieces the same size."
-
-For Physics Step:
-- title: "Apply Newton's Second Law"
-- content: "F = ma, so [blue:15 N] = [blue:3 kg] × a → a = [red:5 m/s²]"
-- explanation: "We're using the relationship between force, mass, and acceleration to find how quickly the object speeds up."
-
-For Essay Step:
-- title: "Develop Your Argument"
-- content: "Build three body paragraphs exploring [blue:character development], [blue:thematic symbolism], and [blue:narrative structure]..."
-- explanation: "Organizing your analysis into these three focused areas creates a clear, logical progression that strengthens your overall argument about the author's intent."
-
-RESPONSE FORMAT (JSON):
-{
-  "problem": "Extracted problem text",
-  "subject": "Math|Chemistry|Physics|Bible Studies|Language Arts|Geography|General",
-  "difficulty": "K-5|6-8|9-12|College+",
-  "steps": [
-    {
-      "id": "1",
-      "title": "Clear action heading",
-      "content": "Solution step with proper formatting",
-      "explanation": "One concise sentence explaining WHY this step matters or WHAT strategy it employs"
-    }
-  ],
-  "finalAnswer": "Final answer with KEY TERMS highlighted using [red:term] syntax for important concepts, formulas, or vocabulary (e.g., [red:phototropism], [red:auxin], [red:quadratic formula])",
-  "visualAids": [
-    {
-      "type": "physics|geometry|graph|chart|illustration",
-      "stepId": "1",
-      "description": "Detailed description of what to visualize with all measurements and labels"
-    }
-  ]
-}
-
-🎨 **MATCH QUESTION FORMAT IN FINAL ANSWER - CRITICAL DIFFERENTIATION:**
-
-**This is what makes us stand out from other homework apps - final answers should MIRROR the question's format and appearance!**
-
-**1. MULTIPLE CHOICE QUESTIONS - Show ALL Options:**
-- **ALWAYS include ALL answer choices (A, B, C, D, etc.) in the finalAnswer, not just the correct one**
-- Format them EXACTLY as they appear in the question
-- Highlight ONLY the correct answer with [red:]
-- **Example:**
-  - Question has: "A) Mitochondrion, B) Nucleus, C) Ribosome, D) Chloroplast"
-  - finalAnswer MUST BE: "A) Mitochondrion \n B) Nucleus \n C) [red:Ribosome] \n D) Chloroplast"
-  - WRONG: "[red:C) Ribosome]" (missing the other options!)
-- This helps students see WHY other options are wrong by showing the full context
-
-**2. HANDWRITTEN PROBLEMS - Use Handwriting Font:**
-- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper, handwritten numbers/symbols)
-- If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags with colored highlights inside
-- **Example:**
-  - Handwritten math problem: finalAnswer = "[handwritten:[red:x = 7]]" (handwriting font with red highlight)
-  - Typed textbook problem: finalAnswer = "[red:x = 7]" (normal font, just red highlight)
-- **CRITICAL**: You can nest color tags inside handwritten tags: [handwritten:[red:answer]] works perfectly
-- The handwriting font makes the answer feel personal and relatable to the student's own work
-
-**3. MATCH NUMBER FORMAT:**
-- If question uses decimals (0.5, 3.14), use decimals in answer: [red:0.5]
-- If question uses fractions ({1/2}, {3/4}), use fractions in answer: [red:{1/2}]
-- If question uses mixed numbers ({1{1/2}}), use mixed numbers in answer
-
-**4. PRESERVE QUESTION STRUCTURE:**
-- If question has parts labeled (a, b, c) or (1, 2, 3), use the SAME labels in finalAnswer
-- If question is a fill-in-the-blank, format answer to match the blank style
-- If question is a table, consider using a simple text table format
-
-**FINAL ANSWER HIGHLIGHTING - GENERAL RULES:**
-- ALWAYS highlight key technical terms, concepts, or vocabulary in the final answer using [red:term]
-- Examples: [red:phototropism], [red:auxin], [red:mitochondria], [red:Pythagorean theorem], [red:oxidation]
-- For math: highlight the final numerical answer: [red:x = 5] or [red:{3/4}]
-- For science: highlight phenomena, hormones, processes, chemical names
-- For any subject: highlight the most important 2-3 terms that answer the core question
-- **MULTI-PART ANSWERS - PROFESSIONAL FORMATTING:**
-  If the question has multiple parts OR your answer has multiple numbered/lettered items:
-  
-  **🚨 CRITICAL: finalAnswer MUST BE A STRING, NOT AN OBJECT!**
-  - DO NOT create a JSON object like {"a": "...", "b": "...", "c": "..."}
-  - DO use a single string with \n newline separators between parts
-  - Correct format: "a) Part one \n b) Part two \n c) Part three"
-  
-  **CRITICAL RULES for Multi-Part Final Answers:**
-  1. **Each part on its own line** - Use literal \n characters to separate parts
-  2. **Descriptive labels** - Include what each part represents, not just the letter
-  3. **NO periods after equations** - Equations are not sentences
-  4. **Parallel structure** - All parts should follow the same grammatical pattern
-  5. **Complete descriptions** - Each part should be clear and self-contained
-  
-  **PROFESSIONAL FORMAT EXAMPLES:**
-  
-  ✅ EXCELLENT (Physics - descriptive, parallel, no periods):
-  "a) Initial velocity: [red:v₀ = 15 m/s] \n b) Maximum height: [red:h = 11.5 m] \n c) Time of flight: [red:t = 3.1 s]"
-  
-  ✅ EXCELLENT (Math - equation type labeled, consistent structure):
-  "a) Vertex form: [red:y = −2(x − 1)² + 25] \n b) Standard form: [red:y = −2x² + 4x + 23] \n c) Vertex coordinates: [red:(1, 25)] \n d) Direction: The parabola opens [red:downward]"
-  
-  ✅ GOOD (Chemistry - complete descriptions):
-  "a) Balanced equation: [red:2H₂ + O₂ → 2H₂O] \n b) Reaction type: [red:Synthesis reaction] \n c) Moles of product: [red:0.5 mol]"
-  
-  ❌ WRONG (inconsistent - some have context, some don't):
-  "a) [red:y = −2(x − 1)² + 25] \n b) Standard form: [red:y = −2x² + 4x + 23] \n c) Vertex: [red:(1, 25)] \n d) Opens [red:downward]"
-  
-  ❌ WRONG (periods after equations look awkward):
-  "a) Vertex form: [red:y = −2(x − 1)² + 25]. \n b) Standard: [red:y = −2x² + 4x + 23]."
-  
-  ❌ WRONG (all on one line):
-  "a) v = 15 m/s, b) h = 11.5 m, c) t = 3.1 s"
-  
-  ❌ WRONG (too terse, lacks context):
-  "a) [red:−2(x − 1)² + 25] \n b) [red:−2x² + 4x + 23] \n c) [red:(1, 25)] \n d) [red:Downward]"
-
-**CRITICAL: visualAids array is REQUIRED for:**
-- Physics: projectile motion, force diagrams, circuits, kinematics
-- Geometry: shapes, angles, spatial relationships
-- Data: surveys, percentages, comparing quantities, proportions
-- Biology/Chemistry: metabolic cycles (Krebs, Calvin, electron transport), cellular processes, multi-step reactions
-- Leave empty [] ONLY if truly no visual would help
-
-📊 INTELLIGENT VISUAL AIDS - WHEN AND WHAT TYPE TO CREATE 📊
-
-**🚨 ESSENTIAL VISUALS - ALWAYS CREATE for these classic scenarios:**
-
-**PHYSICS - NEARLY MANDATORY:**
-✓ **PROJECTILE MOTION** - Any problem with objects launched at angles (catapults, projectiles, balls thrown)
-   → Show parabolic trajectory, launch angle, velocity components, max height, range
-   → Tag: [DIAGRAM NEEDED: type=physics - Projectile motion showing parabolic arc from launch point at [angle]° with initial velocity [v₀], marking maximum height at apex, horizontal range, and ground level. Label velocity components, trajectory path, and key measurements.]
-
-✓ **FORCE DIAGRAMS** - Any problem analyzing forces on an object (friction, tension, normal force)
-   → Show object with all force vectors (magnitude + direction), coordinate system
-   → Tag: [DIAGRAM NEEDED: type=physics - Free body diagram of [object] with force vectors: [list all forces with magnitudes and directions]. Include coordinate axes.]
-
-✓ **KINEMATICS** - Motion problems with acceleration, velocity, position over time
-   → Show motion diagram with position/velocity/acceleration vectors at key moments
-   → Tag: [DIAGRAM NEEDED: type=physics - Motion diagram showing [object] at key time points with velocity and acceleration vectors. Mark initial and final positions.]
-
-✓ **CIRCUITS** - Any electrical circuit problem
-   → Show circuit schematic with components, current flow, voltage labels
-   → Tag: [DIAGRAM NEEDED: type=physics - Circuit diagram with [components] connected in [series/parallel], showing current direction and voltage labels.]
-
-**GEOMETRY - NEARLY MANDATORY:**
-✓ Any problem with shapes, angles, areas, perimeters
-✓ Spatial relationships between multiple geometric objects
-✓ 3D geometry or perspective views
-
-**DATA VISUALIZATION - NEARLY MANDATORY:**
-✓ **SURVEYS & PERCENTAGES** - Any problem asking about percentages, surveys, or preferences
-   → **MUST CREATE** a pie chart or bar chart comparing categories
-   → Examples triggering this: "survey of students", "percentage of...", "what fraction preferred", "poll results"
-   → Tag: [DIAGRAM NEEDED: type=chart - Pie chart showing [category names] with percentages: [list each category with its percentage]. Use distinct colors for each segment and label with both category name and percentage.]
-   → EXAMPLE: For "survey of 200 students: Math 60, Science 50, English 40, History 30, Art 20" → ADD: [DIAGRAM NEEDED: type=chart - Pie chart showing subject preferences: Math 30%, Science 25%, English 20%, History 15%, Art 10%. Use distinct colors for each segment with labels.]
-
-✓ **COMPARING QUANTITIES** - Problems comparing multiple values, populations, or measurements
-   → Show bar chart or comparison chart
-   → Tag: [DIAGRAM NEEDED: type=chart - Bar chart comparing [categories] with values: [list values]. Include labeled axes and value labels on each bar.]
-
-✓ **PROPORTIONS & RATIOS** - Problems involving parts of a whole
-   → Show pie chart or stacked bar chart
-   → Tag: [DIAGRAM NEEDED: type=chart - Visual representation showing proportions of [total] divided into [parts with values/percentages].]
-
-**BIOLOGY & CHEMISTRY - NEARLY MANDATORY:**
-✓ **METABOLIC CYCLES & PATHWAYS** - The Krebs cycle, citric acid cycle, Calvin cycle, electron transport chain
-   → **MUST CREATE** a process illustration showing the cycle with inputs, outputs, and intermediate steps
-   → Tag: [DIAGRAM NEEDED: type=illustration - [Cycle name] showing circular pathway with all intermediate compounds, enzymes (if mentioned), inputs (substrates entering), outputs (products leaving), and energy molecules (ATP, NADH, FADH₂, etc.). Label each step in sequence with arrows showing direction of flow.]
-   → EXAMPLE: "Krebs cycle" → ADD: [DIAGRAM NEEDED: type=illustration - Krebs (citric acid) cycle showing circular pathway starting with Acetyl-CoA + Oxaloacetate forming Citrate, then proceeding through Isocitrate, α-Ketoglutarate, Succinyl-CoA, Succinate, Fumarate, Malate, and back to Oxaloacetate. Mark inputs (Acetyl-CoA), outputs (2 CO₂), and energy molecules produced (3 NADH, 1 FADH₂, 1 ATP/GTP) at appropriate steps. Use arrows to show cycle direction.]
-
-✓ **CELLULAR PROCESSES** - Photosynthesis, cellular respiration, protein synthesis, DNA replication
-   → Show multi-stage process with labeled inputs, outputs, and intermediate steps
-   → Tag: [DIAGRAM NEEDED: type=illustration - [Process name] showing all stages, key molecules/structures involved, inputs, outputs, and energy flow. Label each major step.]
-
-✓ **CHEMICAL REACTIONS & MECHANISMS** - Multi-step organic reactions, redox reactions, equilibrium systems
-   → Show reaction pathway with structures, electron flow, intermediates
-   → Tag: [DIAGRAM NEEDED: type=illustration - Reaction mechanism showing reactants, intermediates, and products with electron flow arrows and key conditions.]
-
-**SCREENING CRITERIA - For other cases, create visuals when they SIGNIFICANTLY enhance understanding:**
-
-Consider creating a visual aid when:
-✓ The problem involves spatial relationships that are hard to describe in words alone
-✓ Lower grade levels (K-5, 6-8) - visuals help younger students grasp concepts better
-✓ Complex multi-step processes benefit from a visual roadmap
-✓ The visual would clarify confusion, not just repeat what words already convey
-
-**TYPES OF VISUALS:**
-
-1. **GEOMETRIC DIAGRAMS** - For shapes, angles, spatial relationships
-   - Tag: [DIAGRAM NEEDED: type=geometry - detailed description with ALL dimensions, labels, spatial relationships]
-
-2. **GRAPHS & COORDINATE PLANES** - For plotting, functions, data visualization
-   - Tag: [DIAGRAM NEEDED: type=graph - equation/function with axes, labels, key points]
-
-3. **CHARTS & DATA VISUALIZATION** - For comparing quantities, showing proportions
-   - Tag: [DIAGRAM NEEDED: type=chart - data values, labels, chart type (bar/pie/line)]
-
-4. **PHYSICS DIAGRAMS** - For forces, motion, circuits, energy
-   - Tag: [DIAGRAM NEEDED: type=physics - physical setup, forces/components, labels]
-
-5. **PROCESS ILLUSTRATIONS** - For sequential steps or transformations
-   - Tag: [DIAGRAM NEEDED: type=illustration - what's shown, key elements, relationships]
-
-**WHEN NOT TO CREATE VISUALS:**
-✗ Pure algebraic manipulation where symbols are clear enough
-✗ Simple word problems without spatial/physical elements
-✗ When the description in words is already perfectly clear
-
-**PLACEMENT:** Visual aids can appear in ANY step where they'd be most helpful, not just Step 1. Place them where understanding would benefit most.
-
-**FORMAT EXAMPLE:**
-"[DIAGRAM NEEDED: type=geometry - Rectangle PQRS with horizontal base PQ = 6 units at bottom, vertical height PS on left side. Isosceles triangle OPQ with base PQ (6 units) on bottom edge of rectangle, vertex O above PQ, equal sides OP and OQ forming triangle inside rectangle. Label all corners P, Q, R, S clockwise, and point O at triangle apex.]"
-
-**DECISION FRAMEWORK:**
-Ask yourself: "Would a student understand this BETTER with a visual, or is it already clear?"
-- If visual is essential for understanding → CREATE IT
-- If visual would be nice but not necessary → SKIP IT
-- If visual would just repeat what's already clear → SKIP IT
-
-CRITICAL MATHEMATICAL FORMATTING RULES:
-
-**FRACTIONS - ABSOLUTELY MANDATORY VERTICAL FORMAT:**
-- ALWAYS use {num/den} for ALL fractions at ALL stages - NEVER use inline format like "a/b", (a/b), or decimals
-- Simple fractions: {5/6}, {3/4}, {12/7}
-- Complex fractions: {12/{3d - 1}}, {{-b ± √{b^2^ - 4ac}}/{2a}}, {{x + 5}/{x - 2}}
-- ALWAYS simplify fractions before presenting: {12/8} -> {3/2}
-- For improper fractions in FINAL ANSWER ONLY, show both reduced fraction AND mixed number: {7/3} = 2{1/3} or {17/5} = 3{2/5}
-- NEVER convert to decimals at ANY step unless user explicitly requests decimal form
-- Arithmetic with fractions stays as fractions: {2/3} + {1/4} = {8/12} + {3/12} = {11/12}
-- **CRITICAL: When finding common denominators, EXPLICITLY STATE what the common denominator is and SHOW the conversion:**
-  - GOOD: "Find a common denominator of [blue:5]: {12/5}h - 2h. Convert 2h to fifths: [blue:2h = {10/5}h]. This gives us: [blue:{12/5}h - {10/5}h] = [red:{2/5}h]"
-  - BAD: "Simplify by finding a common denominator: {12/5}h - {10/5}h = {2/5}h" (doesn't explain what the denominator is or show conversion)
-
-**COLOR HIGHLIGHTING - CLARITY FOR EVERY OPERATION:**
-- [blue:term] = the specific value/variable/operation being applied in THIS step
-- [red:result] = the outcome or simplified result
-- Use highlighting to show EXACTLY what changes: "Multiply by [blue:5]: 3x = 15 -> [blue:5] × 3x = [blue:5] × 15 -> 15x = [red:75]"
-- When substituting: "Substitute [blue:d = 1]: {12/{3([blue:1]) - 1}} = {12/[red:2]} = [red:6]"
-- Multiple operations: use blue for operation, red for result, keep unhighlighted text as context
-
-**ALGEBRAIC EQUATIONS - SHOW EVERY TRANSFORMATION:**
-- Always use vertical fractions: {12/{3d - 1}} = d + 5
-- Show progression with arrows: equation_before -> equation_after
-- Quadratic formula MUST be: x = {{-b ± √{b^2^ - 4ac}}/{2a}} with full braces on numerator
-- Example substitution: a=[blue:3], b=[blue:14], c=[blue:-17]
-  x = {{-[blue:14] ± √{[blue:14]^2^ - 4([blue:3])([blue:-17])}}/{2([blue:3])}}
-  x = {{-14 ± √{196 + 204}}/{6}}
-  x = {{-14 ± √400}/{6}}
-  x = {{-14 ± 20}/{6}}
-  Two solutions: x = {{-14 + 20}/{6}} = {6/6} = [red:1] OR x = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]
-
-**SQUARE ROOTS, EXPONENTS, AND SPECIAL SYMBOLS:**
-- Square roots: √16 = 4, √{25} = 5, √{b^2^ - 4ac}
-- Exponents: x^2^, 3^4^ = 81, (2x)^3^ = 8x^3^
-- Plus-minus: ±
-- Nested: √{x^2^ + y^2^}
-
-**STEP CLARITY - EACH STEP TELLS A STORY:**
-- Title: Concise action verb phrase ("Multiply both sides by (3d - 1)", "Apply quadratic formula", "Simplify the fraction")
-- Content: Show WHAT you're doing, WHY, and the RESULT
-- Before and after: Show equation before operation, highlight what changes, show result
-- Example full step:
-  Title: "Clear the fraction by multiplying both sides"
-  Content: "Multiply both sides by [blue:(3d - 1)] to eliminate the fraction:
-  [blue:(3d - 1)] × {12/{3d - 1}} = [blue:(3d - 1)] × (d + 5)
-  -> 12 = [red:(d + 5)(3d - 1)]"
-
-**COMPLETE WORKED EXAMPLE - SOLVING {12/{3d - 1}} = d + 5:**
-
-Step 1 Title: "Rewrite as a fraction equation"
-Content: "{12/{3d - 1}} = d + 5"
-
-Step 2 Title: "Clear the fraction by multiplying both sides"
-Content: "Multiply both sides by [blue:(3d - 1)]:
-[blue:(3d - 1)] × {12/{3d - 1}} = [blue:(3d - 1)] × (d + 5)
--> 12 = [red:(d + 5)(3d - 1)]"
-
-Step 3 Title: "Expand the right side"
-Content: "Expand [blue:(d + 5)(3d - 1)]:
-12 = d([blue:3d]) + d([blue:-1]) + 5([blue:3d]) + 5([blue:-1])
-12 = 3d^2^ - d + 15d - 5
--> 12 = [red:3d^2^ + 14d - 5]"
-
-Step 4 Title: "Set to standard quadratic form"
-Content: "Subtract [blue:12] from both sides:
-12 [blue:- 12] = 3d^2^ + 14d - 5 [blue:- 12]
--> 0 = [red:3d^2^ + 14d - 17]"
-
-Step 5 Title: "Apply the quadratic formula"
-Content: "For 3d^2^ + 14d - 17 = 0, use d = {{-b ± √{b^2^ - 4ac}}/{2a}}
-where a=[blue:3], b=[blue:14], c=[blue:-17]
-
-Discriminant: Δ = [blue:14]^2^ - 4([blue:3])([blue:-17]) = 196 + 204 = [red:400]
-
-d = {{-14 ± √400}/{6}} = {{-14 ± 20}/{6}}
-
-Two solutions:
-d = {{-14 + 20}/{6}} = {6/6} = [red:1]
-d = {{-14 - 20}/{6}} = {-34/6} = {-17/3} = [red:-5{2/3}]"
-
-**CHEMISTRY/PHYSICS:**
-- Subscripts: H_2_O, v_0_, x_n_
-- Superscripts: Ca^2+^, x^3^
-- Units: 5 m/s^2^, 3.2 × 10^-5^ mol
-
-Grade-appropriate language based on difficulty level.`;
-          
-          // Make OpenAI API call with constructed system message and image
-          // NOTE: Do NOT use response_format: json_object with images - OpenAI returns {} silently
-          console.log('⏱️ [TIMING] Starting GPT-4o Vision analysis...');
-          const visionStart = Date.now();
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-              {
-                role: "system",
-                content: systemMessage
-              },
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: analysisImageUriForVision,
-                      detail: "high"
-                    }
-                  }
-                ]
-              }
-            ],
-            // response_format removed - incompatible with image_url content
-            max_tokens: 8192,
-          });
-          console.log(`⏱️ [TIMING] GPT-4o Vision completed in ${Date.now() - visionStart}ms`);
-          
-          let content = response.choices[0]?.message?.content || "{}";
-          
-          // 🐛 DEBUG: Log raw GPT-4o response
-          console.log('\n🔍 === GPT-4o RAW RESPONSE DEBUG (IMAGE) ===');
-          console.log('Response exists:', !!response);
-          console.log('Choices exists:', !!response.choices);
-          console.log('Choices length:', response.choices?.length);
-          console.log('Message content length:', content?.length);
-          console.log('Raw content (first 500 chars):', content.substring(0, 500));
-          console.log('Raw content (last 200 chars):', content.substring(Math.max(0, content.length - 200)));
-          console.log('=== END RAW RESPONSE ===\n');
-          
-          // Extract JSON from markdown code blocks if present (since we can't force json_object with images)
-          const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-          if (jsonMatch) {
-            content = jsonMatch[1];
-            console.log('📝 Extracted JSON from markdown code block');
-          }
-          
-          const parsed = JSON.parse(content);
-          
-          // Validate parsed result has required fields
-          if (!parsed || typeof parsed !== 'object') {
-            console.error('❌ GPT-4o returned invalid JSON: parsed is not an object');
-            throw new Error('GPT-4o returned invalid response structure');
-          }
-          
-          if (!parsed.problem || !parsed.subject || !parsed.difficulty || !parsed.steps || !Array.isArray(parsed.steps)) {
-            console.error('❌ GPT-4o response missing required fields:', {
-              hasProblem: !!parsed.problem,
-              hasSubject: !!parsed.subject,
-              hasDifficulty: !!parsed.difficulty,
-              hasSteps: !!parsed.steps,
-              stepsIsArray: Array.isArray(parsed.steps),
-              actualKeys: Object.keys(parsed)
-            });
-            throw new Error('GPT-4o response missing required fields (problem, subject, difficulty, or steps array)');
-          }
-          
-          return parsed;
         } catch (error: any) {
-          console.error('OpenAI API error:', error);
-          if (isRateLimitError(error)) {
-            throw error;
-          }
           throw new AbortError(error);
         }
       },
@@ -4553,7 +3712,7 @@ Grade-appropriate language based on difficulty level.`;
         factor: 2,
       }
     );
-    
+
     // Log AI response for debugging
     console.log('=== AI RESPONSE DEBUG ===');
     console.log('Problem:', result.problem);
@@ -4570,17 +3729,17 @@ Grade-appropriate language based on difficulty level.`;
       });
     }
     console.log('========================\n');
-    
+
     // 🧬 BIOLOGY/CHEMISTRY KEYWORD DETECTION: Ensure visual aids for metabolic cycles
     result = ensureBiologyVisualAids(result.problem || '', result);
-    
+
     // 📐 MEASUREMENT DIAGRAM ENFORCEMENT: Auto-inject diagrams for geometry/measurement problems
     result = applyMeasurementDiagramEnforcement(result.problem ?? '', result);
-    
+
     // ⚡ ASYNC DIAGRAM GENERATION: Generate unique solution ID
     const solutionId = crypto.randomBytes(16).toString('hex');
     const diagrams: DiagramStatus[] = [];
-    
+
     // Collect all diagram requirements from visualAids array
     if (result.visualAids && Array.isArray(result.visualAids)) {
       for (const visualAid of result.visualAids) {
@@ -4593,152 +3752,33 @@ Grade-appropriate language based on difficulty level.`;
         });
       }
     }
-    
-    // Legacy support: Check for old-style [DIAGRAM NEEDED: ...] tags
-    if (result.steps && Array.isArray(result.steps)) {
-      for (const step of result.steps) {
-        if (step.content) {
-          const diagramMatch = step.content.match(/\[DIAGRAM NEEDED:\s*([^\]]+)\]/);
-          if (diagramMatch) {
-            diagrams.push({
-              stepId: step.id,
-              type: 'legacy',
-              description: diagramMatch[1],
-              status: 'pending'
-            });
-          }
-        }
-      }
-    }
-    
-    // Initialize diagram store for this solution
-    if (diagrams.length > 0) {
-      solutionDiagramStore.set(solutionId, {
-        diagrams,
-        timestamp: Date.now(),
-        complete: false
-      });
-      console.log(`📊 Initialized ${diagrams.length} pending diagrams for solution ${solutionId}`);
-    }
-    
-    // CLEANUP: Remove all [DIAGRAM NEEDED] tags - diagrams will load asynchronously
-    if (result.steps && Array.isArray(result.steps)) {
-      for (const step of result.steps) {
-        if (step.content) {
-          let content = step.content;
-          
-          while (true) {
-            const startIndex = content.indexOf('[DIAGRAM NEEDED:');
-            if (startIndex === -1) break;
-            
-            let depth = 1;
-            let endIndex = startIndex + '[DIAGRAM NEEDED:'.length;
-            
-            while (depth > 0 && endIndex < content.length) {
-              if (content[endIndex] === '[') depth++;
-              else if (content[endIndex] === ']') depth--;
-              endIndex++;
-            }
-            
-            content = content.substring(0, startIndex) + content.substring(endIndex);
-          }
-          
-          step.content = content;
-        }
-      }
-    }
-    
-    // ENFORCE PROPER FORMATTING - Convert all fractions to {num/den} format
-    const formattedResult = enforceResponseFormatting(result);
-    const structuredResult = attachStructuredMathContent(formattedResult);
 
-    // 🔒 SYNCHRONOUS VALIDATION - Verify accuracy BEFORE sending to user
-    console.log('🔍 Running synchronous validation...');
-    const validationStart = Date.now();
-    let validationResult;
-    try {
-      validationResult = await validateSolution(result.problem || 'Image-based question', structuredResult);
-    } catch (validationError) {
-      console.error('⚠️ Validation system error (non-blocking):', validationError);
-      // If validator fails, allow solution through with warning
-      validationResult = {
-        validationPassed: true,
-        validationDetails: {
-          verification: {
-            confidence: 50,
-            warnings: ['Validation system unavailable - answer not verified']
-          }
-        }
-      };
-    }
-    
-    const { validationPassed, validationDetails } = validationResult;
-    console.log(`⏱️ [TIMING] Validation completed in ${Date.now() - validationStart}ms`);
-    
-    // Map confidence to verification status
-    const confidence = validationDetails?.confidence ?? 0;
-    let verificationStatus: 'verified' | 'unverified' | 'failed' = 'failed';
-    
-    // CRITICAL: Check BOTH validationPassed and confidence
-    if (!validationPassed) {
-      // Validator explicitly marked as incorrect - always fail
-      verificationStatus = 'failed';
-    } else if (confidence >= 70) {
-      // High confidence and passed validation
-      verificationStatus = 'verified';
-    } else if (confidence >= 40) {
-      // Medium confidence but passed validation
-      verificationStatus = 'unverified';
-    } else {
-      // Low confidence - treat as failed
-      verificationStatus = 'failed';
-    }
-    
-    // 🚫 BLOCK FAILED VERIFICATIONS - Don't send incorrect answers to students
-    if (verificationStatus === 'failed') {
-      console.error(`❌ VERIFICATION FAILED - Blocking response (confidence: ${confidence}%)`);
-      if (validationDetails?.verification?.errors) {
-        console.error('   Errors detected:', validationDetails.verification.errors);
-      }
-      
-      const totalTime = Date.now() - requestStartTime;
-      console.log(`⏱️ [TIMING] === REQUEST BLOCKED AFTER: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
-      
-      return res.status(422).json({
-        error: 'Unable to verify answer accuracy',
-        message: 'Our AI detected potential errors in the solution. Please try rephrasing your question or breaking it into smaller parts.',
-        confidence,
-        details: validationDetails?.verification?.errors || []
-      });
-    }
-    
-    // Add solutionId and verification metadata to response
-    const responseWithId = {
-      ...structuredResult,
-      solutionId: diagrams.length > 0 ? solutionId : undefined,
-      verificationStatus,
-      verificationConfidence: confidence,
-      verificationWarnings: validationDetails?.verification?.warnings || []
-    };
-    
-    if (verificationStatus === 'unverified') {
-      console.warn(`⚠️  Solution verification: unverified (confidence: ${confidence}%)`);
-      if (validationDetails?.verification?.warnings) {
-        console.warn('   Warnings:', validationDetails.verification.warnings);
-      }
-    }
-    
-    // ⚡ RETURN WITH VERIFICATION STATUS (only if verified or unverified, never failed)
+    // Store solution and diagram status
+    solutionStore.set(solutionId, {
+      solution: result,
+      diagrams,
+      timestamp: Date.now()
+    });
+
+    // Return immediately with solution ID for client polling
     const totalTime = Date.now() - requestStartTime;
-    console.log(`✅ Analysis complete - returning solution ${solutionId} (${verificationStatus})`);
-    console.log(`⏱️ [TIMING] === TOTAL REQUEST TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
-    res.json(responseWithId);
-    
-    // Generate diagrams in background if any exist
+    console.log(`⏱️ [TIMING] Total request time: ${totalTime}ms`);
+
+    res.json({
+      ...result,
+      solutionId,
+      processingTime: totalTime
+    });
+
+    // Start async diagram generation in background
     if (diagrams.length > 0) {
-      const hostname = req.get('host');
-      void generateDiagramsInBackground(solutionId, diagrams, structuredResult.steps, hostname);
+      console.log(`🎨 Starting async generation of ${diagrams.length} diagram(s)...`);
+      generateDiagramsAsync(solutionId, diagrams, req.get('host') || 'localhost:5000');
     }
+
+    // Start async validation in background
+    startAsyncValidation(solutionId, result);
+
   } catch (error: any) {
     console.error('❌ Error analyzing image:', error);
     console.error('Error details:', {
