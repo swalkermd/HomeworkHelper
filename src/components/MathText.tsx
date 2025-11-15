@@ -280,7 +280,7 @@ function renderComplexPart(
             styles.fractionContainer, 
             { 
               marginHorizontal: baseFontSize * 0.12,
-              transform: [{ translateY: -baseFontSize * 0.34 }]
+              transform: [{ translateY: -baseFontSize * 0.52 }]
             }
           ]}
         > 
@@ -291,7 +291,7 @@ function renderComplexPart(
                 fontSize: fractionFontSize,
                 color: fractionColor,
                 fontWeight: fractionWeight,
-                lineHeight: fractionFontSize * 1.1,
+                lineHeight: fractionFontSize * 1.0,
               },
               handwritingStyle,
             ]}
@@ -304,7 +304,7 @@ function renderComplexPart(
               {
                 backgroundColor: fractionColor,
                 height: lineThickness,
-                marginVertical: baseFontSize * 0.08,
+                marginVertical: baseFontSize * 0.04,
               },
             ]}
           />
@@ -315,7 +315,7 @@ function renderComplexPart(
                 fontSize: fractionFontSize,
                 color: fractionColor,
                 fontWeight: fractionWeight,
-                lineHeight: fractionFontSize * 1.1,
+                lineHeight: fractionFontSize * 1.0,
               },
               handwritingStyle,
             ]}
@@ -382,15 +382,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'baseline',
-    width: '100%',
     flexShrink: 1,
   },
   cluster: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     alignItems: 'baseline',
     flexShrink: 1,
-    width: '100%',
   },
   inlineText: {
     flexShrink: 1,

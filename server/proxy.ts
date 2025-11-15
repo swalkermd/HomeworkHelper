@@ -3497,7 +3497,7 @@ app.post('/api/analyze-image', async (req, res) => {
 The OCR text has been extracted by Mistral's specialized OCR engine (94.29% accuracy on complex math equations).
 Trust this text for all numbers, decimals, variables, operators, and equation structure.
 
-${problemNumber ? `Focus on problem #${problemNumber} in the text below.` : 'If multiple problems exist, solve the most prominent one.'}
+${problemNumber ? `🎯 CRITICAL: Focus ONLY on problem #${problemNumber}. Read the ENTIRE multi-line problem including all parts (a, b, c) and conditions. Do not stop at the first line.` : 'If multiple problems exist, solve the most prominent one.'}
 
 **OCR-EXTRACTED TEXT:**
 \`\`\`
@@ -3621,7 +3621,7 @@ ${ocrText}
 
 ⚠️ CRITICAL: You MUST respond with valid JSON only.
 
-${problemNumber ? `Focus on problem #${problemNumber} in the image.` : 'If multiple problems exist, solve the most prominent one.'}
+${problemNumber ? `🎯 CRITICAL: Solve ONLY problem #${problemNumber}. Read the COMPLETE problem text including ALL lines, parts (a/b/c), and conditions. Multi-line problems must be read in full.` : 'If multiple problems exist, solve the most prominent one.'}
 
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
