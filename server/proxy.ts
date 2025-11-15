@@ -3566,20 +3566,18 @@ app.post('/api/analyze-image', async (req, res) => {
           const visionStart = Date.now();
 
           // OpenAI GPT-4o Vision - Analyzing image with detailed math equation OCR
-          // Build system message for GPT-4o Vision analysis
-          let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
+          // Build system message based on whether image was successfully cropped
+          let systemMessage: string;
 
-${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
-You MUST solve ONLY problem #${problemNumber}.
-- The image may contain MULTIPLE problems.
-- You must IGNORE all other problems.
-- Look for problem markers like "#${problemNumber}", "Problem ${problemNumber}", "${problemNumber}.", "${problemNumber})"
-- Read the ENTIRE multi-line problem #${problemNumber} including all parts (a, b, c) and conditions.
-- Do NOT stop at the first line.
-- Do NOT solve any other problem number.
-- In your "problem" field, include ONLY the text for problem #${problemNumber}.
-- If you cannot clearly identify problem #${problemNumber}, respond with an error in your JSON indicating "Problem #${problemNumber} not found in the image."
-🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.'}
+          if (problemLocated) {
+            // CROPPED IMAGE: Simpler prompt since image contains only the target problem
+            systemMessage = `You are an expert educational AI tutor. This image has been cropped to show ONLY problem #${problemNumber}.
+
+⚠️ CRITICAL: You MUST respond with valid JSON only.
+
+🎯 **IMAGE CONTENT:**
+This cropped image contains ONLY problem #${problemNumber}. You do NOT need to search for it - it's the only problem visible.
+Analyze the ENTIRE problem including all parts (a, b, c, etc.) and any conditions shown.
 
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
@@ -3632,18 +3630,87 @@ You MUST solve ONLY problem #${problemNumber}.
 - BAD Answer: "The ratio can be expressed as two to three to four based on the proportion given..."
 
 🖊️ **HANDWRITTEN PROBLEMS - Use Handwriting Font in Final Answer:**
-- **You have access to BOTH the OCR text AND the original image** - examine the image to detect handwriting
-- **Detect if the question image appears to be handwritten** (look for irregular letters, pen/pencil marks, notebook paper, handwritten numbers/symbols)
+- Examine the image to detect if it's handwritten (look for irregular letters, pen/pencil marks, notebook paper)
 - If handwritten: Wrap the ENTIRE finalAnswer text in [handwritten:...] tags with colored highlights inside
-- **Example:**
-  - Handwritten math problem: finalAnswer = "[handwritten:[red:x = 7]]" (handwriting font with red highlight)
-  - Typed textbook problem: finalAnswer = "[red:x = 7]" (normal font, just red highlight)
-- **CRITICAL**: You can nest color tags inside handwritten tags: [handwritten:[red:answer]] works perfectly
-- The handwriting font makes the answer feel personal and relatable to the student's own work`;
-              
-              console.log('⏱️ [TIMING] Starting GPT-4o analysis (with image for handwriting detection)...');
-              const gptStart = Date.now();
-              const response = await openai.chat.completions.create({
+- **Example:** finalAnswer = "[handwritten:[red:x = 7]]" for handwritten, or "[red:x = 7]" for typed
+- You can nest color tags inside handwritten tags: [handwritten:[red:answer]]
+
+RESPONSE FORMAT (JSON):
+{
+  "problem": "Extracted problem text for #${problemNumber}",
+  "subject": "Math|Chemistry|Physics|etc",
+  "difficulty": "K-5|6-8|9-12|College+",
+  "steps": [...],
+  "finalAnswer": "Final answer with [red:highlights]"
+}`;
+          } else {
+            // UNCROPPED IMAGE: Need to search for and identify the specific problem
+            systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
+
+⚠️ CRITICAL: You MUST respond with valid JSON only.
+
+${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
+You MUST solve ONLY problem #${problemNumber}.
+- The image contains MULTIPLE problems.
+- You must IDENTIFY and ISOLATE problem #${problemNumber}.
+- Look for problem markers: "#${problemNumber}", "Problem ${problemNumber}", "${problemNumber}.", "${problemNumber})"
+- Read the ENTIRE multi-line problem #${problemNumber} including all parts (a, b, c) and conditions.
+- Do NOT stop at the first line of the problem.
+- Do NOT solve any other problem number.
+- In your "problem" field, extract ONLY the text for problem #${problemNumber}.
+- If you cannot clearly identify problem #${problemNumber}, respond with error: "Problem #${problemNumber} not found in image"
+🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : 'Solve the most prominent problem in the image.'}
+
+🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
+- If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
+- If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
+- For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
+- CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
+- **ALWAYS use LaTeX \\frac{num}{den} or slash notation num/den for fractions**
+- **DO NOT use raw text newlines between numerator and denominator** (the system renders fractions vertically automatically)
+
+🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
+- Use [blue:value] for the number/operation being applied (e.g., "Multiply by [blue:8]")
+- Use [red:result] for the outcome (e.g., "= [red:24]")
+- **CRITICAL:** Include operators WITH the number when showing multiplication/division operations
+  - CORRECT: "[blue:8 ×] {1/8}(3d - 2) = [blue:8 ×] {1/4}(d + 5)"
+  - WRONG: "[blue:8] × {1/8}" (operator outside the tag causes line breaks)
+- NEVER skip color highlighting - it's essential for student understanding!
+- **CRITICAL:** Keep all text (including punctuation) on the SAME LINE as color tags.
+
+🎯 **MULTI-STEP PROBLEMS - MANDATORY OVERVIEW IN STEP 1:**
+For any problem requiring multiple steps (math, physics, chemistry, multi-part analysis), Step 1 MUST be a simple overview:
+- **Title:** Identify the problem type (e.g., "Identify Problem Type and Approach")
+- **Content:** Write 2-3 SHORT sentences explaining:
+  1. What type of problem this is
+  2. The general approach we'll use
+  3. Optional: What our goal is
+- **Explanation:** Brief note about why this approach makes sense
+
+📊 **RATIO FILL-IN-THE-BLANK PROBLEMS:**
+- Recognize ratio patterns: "ratio of A to B", "_ : _ : _"
+- Format clearly: "Box 1: [red:3], Box 2: [red:5]" or "Ratio: [red:3]:[red:5]:[red:7]"
+- Directly state the answer, don't use prose like "the ratio can be expressed as..."
+
+🖊️ **HANDWRITTEN PROBLEMS:**
+- Examine the image to detect if it's handwritten
+- If handwritten: Wrap finalAnswer in [handwritten:...] tags
+- Example: "[handwritten:[red:x = 7]]" for handwritten, or "[red:x = 7]" for typed
+
+RESPONSE FORMAT (JSON):
+{
+  "problem": "Extracted problem text",
+  "subject": "Math|Chemistry|Physics|etc",
+  "difficulty": "K-5|6-8|9-12|College+",
+  "steps": [...],
+  "finalAnswer": "Final answer with [red:highlights]"
+}`;
+          }
+
+          // Make OpenAI API call with the constructed system message
+          console.log('⏱️ [TIMING] Starting GPT-4o Vision analysis...');
+          const gptStart = Date.now();
+          const response = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [
                   {
@@ -3655,12 +3722,15 @@ You MUST solve ONLY problem #${problemNumber}.
                     content: [
                       {
                         type: "text",
-                        text: `Please analyze the OCR-extracted problem text above and provide a complete step-by-step solution in JSON format. I'm also providing the original image so you can detect if it's handwritten and format the final answer accordingly.`
+                        text: problemLocated
+                          ? `Analyze this cropped image containing ONLY problem #${problemNumber}. Provide a complete step-by-step solution in JSON format. The image shows the entire problem - read all parts carefully.`
+                          : `Analyze this homework image and provide a complete step-by-step solution in JSON format. ${problemNumber ? `Remember: You must solve ONLY problem #${problemNumber}.` : ''}`
                       },
                       {
                         type: "image_url",
                         image_url: {
-                          url: analysisImageUri
+                          url: analysisImageUri,
+                          detail: "high" // High detail for accurate math equation OCR
                         }
                       }
                     ]
