@@ -25,6 +25,51 @@ import path from 'path';
 import crypto from 'crypto';
 import { parseMathContent } from '../src/utils/mathParser';
 
+interface OcrBoundingBox {
+  text: string;
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+  pageIndex: number;
+  pageWidth?: number | null;
+  pageHeight?: number | null;
+}
+
+interface ProblemBoundingRegion {
+  combinedText: string;
+  boundingBox: {
+    top: number;
+    left: number;
+    bottom: number;
+    right: number;
+    pageWidth?: number | null;
+    pageHeight?: number | null;
+    pageIndex: number;
+  };
+}
+
+type SharpModule = any;
+
+let sharpModulePromise: Promise<SharpModule | null> | null = null;
+
+async function loadSharpModule(): Promise<SharpModule | null> {
+  if (!sharpModulePromise) {
+    sharpModulePromise = import('sharp')
+      .then((module) => {
+        const resolved = (module as any).default ?? module;
+        return resolved as SharpModule;
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn('⚠️ Sharp module unavailable; image cropping will be skipped.', message);
+        return null;
+      });
+  }
+
+  return sharpModulePromise;
+}
+
 const app = express();
 const PORT = 5000;
 
@@ -763,14 +808,14 @@ function detectStemFromText(text: string): boolean {
  * 
  * Returns extracted markdown text and confidence score.
  */
-async function extractTextWithMistral(imageUri: string): Promise<{ text: string; confidence: number }> {
+async function extractTextWithMistral(imageUri: string): Promise<{ text: string; confidence: number; boundingBoxes: OcrBoundingBox[] }> {
   if (!mistral) {
     throw new Error('Mistral client not initialized');
   }
-  
+
   try {
     console.log('🔍 Using Mistral OCR for superior STEM text extraction...');
-    
+
     // Mistral OCR expects either imageUrl or documentBase64
     const response = await mistral.ocr.process({
       model: 'mistral-ocr-latest',
@@ -778,30 +823,334 @@ async function extractTextWithMistral(imageUri: string): Promise<{ text: string;
         type: 'image_url',
         imageUrl: imageUri
       },
-      includeImageBase64: false
+      includeImageBase64: false,
+      bboxAnnotationFormat: {
+        type: 'json_schema',
+        jsonSchema: {
+          name: 'HomeworkBoundingBoxAnnotation',
+          description: 'Text extracted from each bounding box region of the worksheet.',
+          schemaDefinition: {
+            type: 'object',
+            properties: {
+              text: {
+                type: 'string',
+                description: 'Exact OCR text contained within this bounding box.'
+              }
+            },
+            required: ['text'],
+            additionalProperties: true
+          }
+        }
+      },
+      documentAnnotationFormat: {
+        type: 'json_schema',
+        jsonSchema: {
+          name: 'HomeworkDocumentAnnotation',
+          description: 'Structured text content for the entire worksheet image.',
+          schemaDefinition: {
+            type: 'object',
+            properties: {
+              text: {
+                type: 'string',
+                description: 'Combined OCR text for the full document.'
+              }
+            },
+            required: ['text'],
+            additionalProperties: true
+          }
+        }
+      }
     });
-    
+
     if (!response.pages || response.pages.length === 0) {
       throw new Error('Mistral OCR returned no pages');
     }
-    
+
     // Extract markdown from first page
     const extractedText = response.pages[0].markdown || '';
-    
+
+    const boundingBoxes: OcrBoundingBox[] = [];
+
+    for (const page of response.pages) {
+      const pageWidth = page.dimensions?.width ?? null;
+      const pageHeight = page.dimensions?.height ?? null;
+      if (page.images && Array.isArray(page.images)) {
+        for (const image of page.images) {
+          const annotationText = parseMistralBoundingBoxAnnotation(image.imageAnnotation);
+          boundingBoxes.push({
+            text: annotationText,
+            top: image.topLeftY ?? 0,
+            left: image.topLeftX ?? 0,
+            bottom: image.bottomRightY ?? image.topLeftY ?? 0,
+            right: image.bottomRightX ?? image.topLeftX ?? 0,
+            pageIndex: page.index ?? 0,
+            pageWidth,
+            pageHeight
+          });
+        }
+      }
+    }
+
     // Mistral OCR has ~94% accuracy, but we can estimate confidence
     // based on text quality (non-empty, reasonable length)
     const confidence = extractedText.trim().length > 0 ? 0.94 : 0.0;
-    
+
     console.log(`✅ Mistral OCR extracted ${extractedText.length} characters (confidence: ${(confidence * 100).toFixed(1)}%)`);
     console.log('📝 Extracted text preview:', extractedText.substring(0, 200));
-    
+
     return {
       text: extractedText,
-      confidence
+      confidence,
+      boundingBoxes
     };
   } catch (error) {
     console.error('❌ Mistral OCR error:', error);
     throw error;
+  }
+}
+
+function parseMistralBoundingBoxAnnotation(annotation?: string | null): string {
+  if (!annotation) {
+    return '';
+  }
+
+  const trimmed = annotation.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object') {
+      if (typeof parsed.text === 'string') {
+        return parsed.text;
+      }
+      if (Array.isArray(parsed.lines)) {
+        return parsed.lines.join('\n');
+      }
+      if (typeof parsed.content === 'string') {
+        return parsed.content;
+      }
+    }
+  } catch (error) {
+    // Annotation was not JSON - fall back to raw string
+  }
+
+  return trimmed;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function matchesProblemStart(problemNumber: string, text: string): boolean {
+  if (!problemNumber || !text) {
+    return false;
+  }
+
+  const normalizedProblem = problemNumber.trim().toLowerCase();
+  if (!normalizedProblem) {
+    return false;
+  }
+
+  const lowerText = text.trim().toLowerCase();
+  if (!lowerText) {
+    return false;
+  }
+
+  const escaped = escapeRegExp(normalizedProblem);
+  const patterns: RegExp[] = [
+    new RegExp(`^(?:problem\\s+)?#?${escaped}(?=\\b|[).:-])`),
+    new RegExp(`^(?:problem\\s+)?#?${escaped}\\b`)
+  ];
+
+  const numericValue = Number.parseInt(normalizedProblem, 10);
+  if (!Number.isNaN(numericValue)) {
+    patterns.push(new RegExp(`^(?:problem\\s+)?#?${numericValue}\\s*[).:-]`));
+    patterns.push(new RegExp(`^(?:problem\\s+)?#?${numericValue}\\b`));
+    patterns.push(new RegExp(`^#?${numericValue}\\b`));
+  }
+
+  return patterns.some((pattern) => pattern.test(lowerText));
+}
+
+function extractLeadingProblemNumber(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const match = trimmed.match(/^(?:problem\s+)?#?(\d{1,3})(?=\s|[).:-])/i);
+  if (match) {
+    return Number.parseInt(match[1], 10);
+  }
+
+  return null;
+}
+
+function isDivider(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return true;
+  }
+
+  if (/^[-=_]{3,}$/u.test(trimmed.replace(/\s+/g, ''))) {
+    return true;
+  }
+
+  return false;
+}
+
+function extractProblemBoundingRegion(problemNumber: string, boxes: OcrBoundingBox[]): ProblemBoundingRegion | null {
+  if (!problemNumber || boxes.length === 0) {
+    return null;
+  }
+
+  const relevantBoxes = boxes
+    .filter((box) => box.text && box.text.trim().length > 0)
+    .sort((a, b) => {
+      if (a.pageIndex !== b.pageIndex) {
+        return a.pageIndex - b.pageIndex;
+      }
+      if (a.top !== b.top) {
+        return a.top - b.top;
+      }
+      return a.left - b.left;
+    });
+
+  if (relevantBoxes.length === 0) {
+    return null;
+  }
+
+  const startIndex = relevantBoxes.findIndex((box) => matchesProblemStart(problemNumber, box.text));
+  if (startIndex === -1) {
+    return null;
+  }
+
+  const collected: OcrBoundingBox[] = [relevantBoxes[startIndex]];
+  const referencePage = collected[0].pageIndex;
+  const targetNumber = extractLeadingProblemNumber(relevantBoxes[startIndex].text) ?? Number.parseInt(problemNumber, 10);
+
+  for (let i = startIndex + 1; i < relevantBoxes.length; i++) {
+    const candidate = relevantBoxes[i];
+
+    if (candidate.pageIndex !== referencePage) {
+      break;
+    }
+
+    if (isDivider(candidate.text)) {
+      break;
+    }
+
+    const candidateNumber = extractLeadingProblemNumber(candidate.text);
+    if (candidateNumber !== null && !Number.isNaN(targetNumber)) {
+      if (candidateNumber > targetNumber) {
+        break;
+      }
+
+      if (candidateNumber === targetNumber && matchesProblemStart(problemNumber, candidate.text)) {
+        collected.push(candidate);
+        continue;
+      }
+
+      if (candidateNumber !== targetNumber) {
+        break;
+      }
+    }
+
+    collected.push(candidate);
+  }
+
+  if (collected.length === 0) {
+    return null;
+  }
+
+  let top = Number.POSITIVE_INFINITY;
+  let left = Number.POSITIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+
+  for (const box of collected) {
+    top = Math.min(top, box.top);
+    left = Math.min(left, box.left);
+    bottom = Math.max(bottom, box.bottom);
+    right = Math.max(right, box.right);
+  }
+
+  if (!Number.isFinite(top) || !Number.isFinite(bottom) || !Number.isFinite(left) || !Number.isFinite(right)) {
+    return null;
+  }
+
+  const pageHeight = collected[0].pageHeight ?? null;
+  const expandedTop = Math.max(0, top - 12);
+  const expandedBottom = pageHeight != null ? Math.min(pageHeight, bottom + 12) : bottom + 12;
+
+  const combinedText = collected.map((box) => box.text.trim()).join('\n');
+
+  return {
+    combinedText,
+    boundingBox: {
+      top: expandedTop,
+      left,
+      bottom: expandedBottom,
+      right,
+      pageWidth: collected[0].pageWidth ?? null,
+      pageHeight: collected[0].pageHeight ?? null,
+      pageIndex: referencePage
+    }
+  };
+}
+
+async function cropImageToBoundingBox(imageDataUri: string, region: ProblemBoundingRegion['boundingBox']): Promise<string | null> {
+  if (!imageDataUri || !imageDataUri.startsWith('data:')) {
+    console.warn('⚠️ Cannot crop image: image URI is not a data URI');
+    return null;
+  }
+
+  const match = imageDataUri.match(/^data:(.+);base64,(.*)$/);
+  if (!match) {
+    console.warn('⚠️ Cannot crop image: data URI is malformed');
+    return null;
+  }
+
+  const [, mimeType, base64Data] = match;
+
+  try {
+    const sharpModule = await loadSharpModule();
+    if (!sharpModule) {
+      return null;
+    }
+
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    const metadata = await sharpModule(imageBuffer).metadata();
+
+    const imageWidth = metadata.width;
+    const imageHeight = metadata.height;
+
+    if (!imageWidth || !imageHeight) {
+      console.warn('⚠️ Unable to read image dimensions for cropping');
+      return null;
+    }
+
+    const scaleX = region.pageWidth ? imageWidth / region.pageWidth : 1;
+    const scaleY = region.pageHeight ? imageHeight / region.pageHeight : 1;
+
+    const left = Math.max(0, Math.floor(region.left * scaleX));
+    const top = Math.max(0, Math.floor(region.top * scaleY));
+    const right = Math.min(imageWidth, Math.ceil(region.right * scaleX));
+    const bottom = Math.min(imageHeight, Math.ceil(region.bottom * scaleY));
+
+    const width = Math.max(1, right - left);
+    const height = Math.max(1, bottom - top);
+
+    const croppedBuffer = await sharpModule(imageBuffer)
+      .extract({ left, top, width, height })
+      .toBuffer();
+
+    return `data:${mimeType};base64,${croppedBuffer.toString('base64')}`;
+  } catch (error) {
+    console.warn('⚠️ Failed to crop image to problem bounding box:', error);
+    return null;
   }
 }
 
@@ -2604,32 +2953,61 @@ app.post('/api/analyze-image', async (req, res) => {
           // STRATEGY: Always try Mistral OCR first (superior accuracy)
           // Then decide based on content whether to use text analysis or vision
           
+          let analysisImageUriForVision = imageUri;
+
           if (mistral) {
             try {
               const startTime = Date.now();
-              
+
               // Step 1: Extract text using Mistral's superior OCR
               console.log('⏱️ [TIMING] Starting Mistral OCR...');
-              const { text: rawOcrText, confidence: ocrConfidence } = await extractTextWithMistral(imageUri);
+              const {
+                text: rawOcrText,
+                confidence: ocrConfidence,
+                boundingBoxes
+              } = await extractTextWithMistral(imageUri);
               console.log(`⏱️ [TIMING] Mistral OCR completed in ${Date.now() - startTime}ms`);
-              
+
               if (rawOcrText && rawOcrText.trim().length > 0) {
+                let focusedOcrText = rawOcrText;
+
+                if (problemNumber && boundingBoxes.length > 0) {
+                  const region = extractProblemBoundingRegion(problemNumber, boundingBoxes);
+                  if (region) {
+                    if (region.combinedText.trim().length > 0) {
+                      focusedOcrText = region.combinedText;
+                    }
+
+                    const cropped = await cropImageToBoundingBox(imageUri, region.boundingBox);
+                    if (cropped) {
+                      analysisImageUriForVision = cropped;
+                      console.log('✂️ Cropped image to selected problem bounding box.');
+                    } else {
+                      console.log('⚠️ Cropped image unavailable, using full image for analysis.');
+                    }
+                  } else {
+                    console.log('⚠️ Unable to locate problem-specific bounding boxes. Using full OCR text.');
+                  }
+                } else if (problemNumber) {
+                  console.log('⚠️ Mistral OCR did not return bounding boxes for targeted selection. Using full OCR text.');
+                }
+
                 // Step 2: Analyze the extracted text to determine if it's STEM content (BEFORE correction)
                 const stemCheckStart = Date.now();
-                const isStemContent = detectStemFromText(rawOcrText);
+                const isStemContent = detectStemFromText(focusedOcrText);
                 console.log(`⏱️ [TIMING] STEM detection completed in ${Date.now() - stemCheckStart}ms`);
-                
+
                 // Step 3: Apply post-OCR correction ONLY for STEM content (optimization: saves 6-8s on non-STEM)
-                let ocrText = rawOcrText;
+                let ocrText = focusedOcrText;
                 if (isStemContent) {
                   console.log('⏱️ [TIMING] Starting OCR correction (STEM content)...');
                   const correctionStart = Date.now();
-                  ocrText = await correctOcrText(rawOcrText);
+                  ocrText = await correctOcrText(focusedOcrText);
                   console.log(`⏱️ [TIMING] OCR correction completed in ${Date.now() - correctionStart}ms`);
                 } else {
                   console.log('⏱️ [OPTIMIZATION] Skipping OCR correction for non-STEM content');
                 }
-                
+
                 if (isStemContent) {
                   console.log('🔬 STEM content detected → Using Mistral OCR + OpenAI text analysis');
                   // HYBRID PATH 1: Mistral OCR + OpenAI Text Analysis (for STEM)
@@ -2730,7 +3108,7 @@ ${ocrText}
                       {
                         type: "image_url",
                         image_url: {
-                          url: imageUri
+                          url: analysisImageUriForVision
                         }
                       }
                     ]
@@ -3266,7 +3644,7 @@ Grade-appropriate language based on difficulty level.`;
                   {
                     type: "image_url",
                     image_url: {
-                      url: imageUri,
+                      url: analysisImageUriForVision,
                       detail: "high"
                     }
                   }
