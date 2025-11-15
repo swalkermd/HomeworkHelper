@@ -175,24 +175,34 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
     if (!currentSolution?.solutionId || (verificationStatus !== 'pending' && verificationStatus !== 'invalid_pending')) return;
 
     console.log('🔍 Starting verification polling for solution:', currentSolution.solutionId);
-    
+
     const MAX_POLL_DURATION = 2 * 60 * 1000;
     const POLL_INTERVAL = 3000;
     const startTime = Date.now();
-    
+    let consecutiveErrors = 0;
+    const MAX_CONSECUTIVE_ERRORS = 5;
+
     const pollInterval = setInterval(async () => {
       try {
         const elapsedTime = Date.now() - startTime;
         if (elapsedTime > MAX_POLL_DURATION) {
-          console.warn('⏱️ Verification polling timeout');
+          console.warn('⏱️ Verification polling timeout after 2 minutes');
           clearInterval(pollInterval);
           setVerificationStatus('unverified');
           return;
         }
-        
+
         const result = await pollForVerification(currentSolution.solutionId!);
-        
-        if (result && result.status && result.status !== 'pending' && result.status !== 'invalid_pending') {
+
+        // Reset error counter on successful poll
+        consecutiveErrors = 0;
+
+        if (!result) {
+          console.warn('⚠️ Verification not found - may still be initializing');
+          return; // Continue polling
+        }
+
+        if (result.status && result.status !== 'pending' && result.status !== 'invalid_pending') {
           console.log('✅ Verification complete:', result.status);
           setVerificationStatus(result.status);
           clearInterval(pollInterval);
@@ -201,6 +211,13 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
         }
       } catch (error) {
         console.error('Error polling verification:', error);
+        consecutiveErrors++;
+
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          console.error(`❌ Verification polling failed ${MAX_CONSECUTIVE_ERRORS} times - stopping`);
+          clearInterval(pollInterval);
+          setVerificationStatus('unverified');
+        }
       }
     }, POLL_INTERVAL);
 

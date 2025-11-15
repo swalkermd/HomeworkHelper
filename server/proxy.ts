@@ -2456,14 +2456,35 @@ async function runVerificationPipeline(
   solution: any
 ): Promise<void> {
   console.log(`🔄 Starting async verification pipeline for solution ${solutionId}...`);
-  
-  // Initialize as pending
-  verificationStore.set(solutionId, {
-    status: 'pending',
-    confidence: 0,
-    warnings: [],
-    timestamp: Date.now()
+
+  // Safety timeout - ensure verification completes within 3 minutes
+  const VERIFICATION_TIMEOUT = 3 * 60 * 1000; // 3 minutes
+  const timeoutPromise = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      const currentStatus = verificationStore.get(solutionId);
+      if (currentStatus && (currentStatus.status === 'pending' || currentStatus.status === 'invalid_pending')) {
+        console.warn(`⏱️ Verification timeout for ${solutionId} - marking as unverified`);
+        verificationStore.set(solutionId, {
+          status: 'unverified',
+          confidence: 0,
+          warnings: ['Verification timed out after 3 minutes'],
+          timestamp: Date.now()
+        });
+      }
+      resolve();
+    }, VERIFICATION_TIMEOUT);
   });
+
+  // Initialize as pending (this may be redundant if already set before pipeline starts, but ensures state)
+  const existingStatus = verificationStore.get(solutionId);
+  if (!existingStatus || existingStatus.status === 'pending' || existingStatus.status === 'invalid_pending') {
+    verificationStore.set(solutionId, {
+      status: 'pending',
+      confidence: 0,
+      warnings: [],
+      timestamp: Date.now()
+    });
+  }
   
   try {
     // 🚨 CHECK FOR INVALID SOLUTION FLAG - Regenerate with WolframAlpha if needed
@@ -3441,11 +3462,26 @@ CRITICAL SIZE LIMIT: Your ENTIRE JSON response must be under 2,000 characters. T
     }
     console.log(`⏱️ [TIMING] === TOTAL REQUEST TIME: ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s) ===`);
     res.json(responseWithId);
-    
+
+    // Initialize verification store immediately so frontend can poll
+    verificationStore.set(solutionId, {
+      status: invalidSolutionDetected ? 'invalid_pending' : 'pending',
+      confidence: 0,
+      warnings: [],
+      timestamp: Date.now()
+    });
+
     // 🔄 START ASYNC VERIFICATION PIPELINE (non-blocking)
     void runVerificationPipeline(solutionId, question, structuredResult)
       .catch(err => {
         console.error(`⚠️ Verification pipeline error for ${solutionId}:`, err);
+        // Ensure verification is marked as unverified on error
+        verificationStore.set(solutionId, {
+          status: 'unverified',
+          confidence: 0,
+          warnings: ['Verification system encountered an error'],
+          timestamp: Date.now()
+        });
       });
 
     // Generate diagrams in background if any exist
@@ -3551,7 +3587,17 @@ app.post('/api/analyze-image', async (req, res) => {
 The OCR text has been extracted by Mistral's specialized OCR engine (94.29% accuracy on complex math equations).
 Trust this text for all numbers, decimals, variables, operators, and equation structure.
 
-${problemNumber ? `🎯 CRITICAL: Focus ONLY on problem #${problemNumber}. Read the ENTIRE multi-line problem including all parts (a, b, c) and conditions. Do not stop at the first line.` : 'If multiple problems exist, solve the most prominent one.'}
+${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
+You MUST solve ONLY problem #${problemNumber}.
+- The OCR text below may contain MULTIPLE problems.
+- You must IGNORE all other problems.
+- Look for problem markers like "#${problemNumber}", "Problem ${problemNumber}", "${problemNumber}.", "${problemNumber})"
+- Read the ENTIRE multi-line problem #${problemNumber} including all parts (a, b, c) and conditions.
+- Do NOT stop at the first line.
+- Do NOT solve any other problem number.
+- In your "problem" field, include ONLY the text for problem #${problemNumber}.
+- If you cannot clearly identify problem #${problemNumber}, respond with an error in your JSON indicating "Problem #${problemNumber} not found in the provided text."
+🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.'}
 
 **OCR-EXTRACTED TEXT:**
 \`\`\`
@@ -3659,7 +3705,23 @@ ${ocrText}
               if (!parsed.problem || !parsed.subject || !parsed.difficulty || !parsed.steps || !Array.isArray(parsed.steps)) {
                 throw new Error('OpenAI response missing required fields (problem, subject, difficulty, or steps array)');
               }
-              
+
+              // Validate that the solution addresses the requested problem number
+              if (problemNumber) {
+                const problemText = parsed.problem.toLowerCase();
+                const hasTargetNumber =
+                  problemText.includes(`#${problemNumber}`) ||
+                  problemText.includes(`problem ${problemNumber}`) ||
+                  problemText.includes(`${problemNumber}.`) ||
+                  problemText.includes(`${problemNumber})`);
+
+                if (!hasTargetNumber) {
+                  console.warn(`⚠️ Solution may not target requested problem #${problemNumber}`);
+                  console.warn(`   Problem text: ${parsed.problem.substring(0, 100)}...`);
+                  // Log warning but don't block - GPT may have found the problem without explicit numbering
+                }
+              }
+
               console.log('✅ Hybrid OCR complete: Mistral OCR + OpenAI analysis');
               return parsed;
             }
@@ -3675,7 +3737,17 @@ ${ocrText}
 
 ⚠️ CRITICAL: You MUST respond with valid JSON only.
 
-${problemNumber ? `🎯 CRITICAL: Solve ONLY problem #${problemNumber}. Read the COMPLETE problem text including ALL lines, parts (a/b/c), and conditions. Multi-line problems must be read in full.` : 'If multiple problems exist, solve the most prominent one.'}
+${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
+You MUST solve ONLY problem #${problemNumber}.
+- The image may contain MULTIPLE problems.
+- You must IGNORE all other problems.
+- Look for problem markers like "#${problemNumber}", "Problem ${problemNumber}", "${problemNumber}.", "${problemNumber})"
+- Read the ENTIRE multi-line problem #${problemNumber} including all parts (a, b, c) and conditions.
+- Do NOT stop at the first line.
+- Do NOT solve any other problem number.
+- In your "problem" field, include ONLY the text for problem #${problemNumber}.
+- If you cannot clearly identify problem #${problemNumber}, respond with an error in your JSON indicating "Problem #${problemNumber} not found in the image."
+🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.'}
 
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
