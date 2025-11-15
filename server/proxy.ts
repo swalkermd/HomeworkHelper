@@ -558,13 +558,13 @@ async function wolframAlphaVerification(
             // Normalize and compare answers - be conservative to avoid false positives/negatives
             const normalizedProposed = proposedAnswer.toLowerCase()
               .replace(/\s+/g, '')
-              .replace(/[,_]/g, '')
+              .replace(/[,_{}]/g, '')
               .replace(/meters?/g, 'm')
               .replace(/seconds?/g, 's');
             
             const normalizedWolfram = wolframAnswer.toLowerCase()
               .replace(/\s+/g, '')
-              .replace(/[,_]/g, '')
+              .replace(/[,_{}]/g, '')
               .replace(/meters?/g, 'm')
               .replace(/seconds?/g, 's');
             
@@ -679,13 +679,13 @@ async function wolframAlphaVerification(
       // Normalize both answers for comparison - be conservative
       const normalizedProposed = proposedSolution.finalAnswer.toLowerCase()
         .replace(/\s+/g, '')
-        .replace(/[,_]/g, '')
+        .replace(/[,_{}]/g, '')
         .replace(/meters?/g, 'm')
         .replace(/seconds?/g, 's');
       
       const normalizedWolfram = wolframAnswer.toLowerCase()
         .replace(/\s+/g, '')
-        .replace(/[,_]/g, '')
+        .replace(/[,_{}]/g, '')
         .replace(/meters?/g, 'm')
         .replace(/seconds?/g, 's');
       
