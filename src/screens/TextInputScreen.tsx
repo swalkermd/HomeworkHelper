@@ -14,11 +14,13 @@ type TextInputScreenProps = {
 export default function TextInputScreen({ navigation }: TextInputScreenProps) {
   const [question, setQuestion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const setCurrentSolution = useHomeworkStore((state) => state.setCurrentSolution);
 
   const handleSubmit = async () => {
     if (!question.trim() || isLoading) return;
 
+    setErrorMessage(null);
     setIsLoading(true);
     try {
       console.log('📤 Submitting question...');
@@ -30,7 +32,7 @@ export default function TextInputScreen({ navigation }: TextInputScreenProps) {
     } catch (error) {
       console.error('❌ Error analyzing question:', error);
       const userMessage = getUserFriendlyErrorMessage(error);
-      alert(userMessage);
+      setErrorMessage(userMessage);
     } finally {
       setIsLoading(false);
     }
@@ -47,7 +49,12 @@ export default function TextInputScreen({ navigation }: TextInputScreenProps) {
         <TextInput
           style={styles.input}
           value={question}
-          onChangeText={setQuestion}
+          onChangeText={(value) => {
+            setQuestion(value);
+            if (errorMessage) {
+              setErrorMessage(null);
+            }
+          }}
           placeholder="Enter your homework question here..."
           placeholderTextColor={colors.textSecondary}
           multiline
@@ -65,6 +72,10 @@ export default function TextInputScreen({ navigation }: TextInputScreenProps) {
             <Text style={styles.submitButtonText}>Solve!</Text>
           )}
         </TouchableOpacity>
+
+        {errorMessage && (
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -111,5 +122,11 @@ const styles = StyleSheet.create({
     lineHeight: typography.titleLarge.lineHeight,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  errorText: {
+    marginTop: spacing.lg,
+    color: colors.error,
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
   },
 });

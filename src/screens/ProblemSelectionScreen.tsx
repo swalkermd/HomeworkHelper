@@ -15,6 +15,7 @@ type ProblemSelectionScreenProps = {
 export default function ProblemSelectionScreen({ navigation }: ProblemSelectionScreenProps) {
   const [problemNumber, setProblemNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const currentImage = useHomeworkStore((state) => state.currentImage);
   const setCurrentSolution = useHomeworkStore((state) => state.setCurrentSolution);
   const { width, height } = useWindowDimensions();
@@ -35,6 +36,7 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
     }
 
     console.log('✅ Starting analysis...');
+    setErrorMessage(null);
     setIsLoading(true);
     
     try {
@@ -61,7 +63,7 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
       console.error('❌ Error analyzing image:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
       const userMessage = getUserFriendlyErrorMessage(error);
-      alert(userMessage);
+      setErrorMessage(userMessage);
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +110,12 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
             isLandscape && styles.inputLandscape
           ]}
           value={problemNumber}
-          onChangeText={setProblemNumber}
+          onChangeText={(value) => {
+            setProblemNumber(value);
+            if (errorMessage) {
+              setErrorMessage(null);
+            }
+          }}
           placeholder="e.g., 1, 2, 3..."
           placeholderTextColor={colors.textSecondary}
           keyboardType="default"
@@ -129,6 +136,12 @@ export default function ProblemSelectionScreen({ navigation }: ProblemSelectionS
             <Text style={styles.analyzeButtonText}>Solve!</Text>
           )}
         </TouchableOpacity>
+
+        {errorMessage && (
+          <Text style={[styles.errorText, isLandscape && styles.errorTextLandscape]}>
+            {errorMessage}
+          </Text>
+        )}
 
         <TouchableOpacity
           style={[
@@ -242,5 +255,15 @@ const styles = StyleSheet.create({
     lineHeight: typography.titleLarge.lineHeight,
     fontWeight: '600',
     color: colors.textSecondary,
+  },
+  errorText: {
+    marginTop: spacing.lg,
+    color: colors.error,
+    fontSize: typography.bodyMedium.fontSize,
+    lineHeight: typography.bodyMedium.lineHeight,
+  },
+  errorTextLandscape: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

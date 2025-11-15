@@ -62,6 +62,14 @@ export function getUserFriendlyErrorMessage(error: unknown): string {
     return 'Too many requests. Please wait a moment and try again.';
   }
 
+  if (errorMessage.includes('unable to verify answer accuracy')) {
+    return 'We could not verify that answer. Try retaking the photo with a clearer view or typing the problem manually.';
+  }
+
+  if (errorMessage.includes('422')) {
+    return 'The problem could not be verified. Please check the steps and try again with a clearer photo.';
+  }
+
   // API-specific errors
   if (errorMessage.includes('api configuration error')) {
     return 'App configuration error. Please contact support.';

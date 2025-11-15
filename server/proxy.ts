@@ -1101,6 +1101,91 @@ function extractProblemBoundingRegion(problemNumber: string, boxes: OcrBoundingB
   };
 }
 
+function looksLikeProblemHeader(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  if (/^(?:problem\s+)?#?\d{1,3}\s*[).:-]/u.test(normalized)) {
+    return true;
+  }
+
+  if (/^(?:problem\s+)?#?\d{1,3}\b/u.test(normalized)) {
+    const remainder = normalized.replace(/^(?:problem\s+)?#?\d{1,3}\b\s*/u, '');
+    return remainder.length > 0;
+  }
+
+  return false;
+}
+
+function extractProblemTextFallback(problemNumber: string, rawText: string): string | null {
+  const normalizedProblem = problemNumber?.trim();
+  if (!normalizedProblem || !rawText) {
+    return null;
+  }
+
+  const targetNumber = Number.parseInt(normalizedProblem, 10);
+  const lines = rawText.replace(/\r/g, '').split('\n');
+  if (lines.length === 0) {
+    return null;
+  }
+
+  const trimmedLines = lines.map((line) => line.trim());
+  let startIndex = trimmedLines.findIndex((line) => matchesProblemStart(normalizedProblem, line));
+
+  if (startIndex === -1 && !Number.isNaN(targetNumber)) {
+    const altPattern = new RegExp(`(^|\\s)(?:problem\\s*)?#?${targetNumber}(?=\\s|[).:-])`, 'i');
+    startIndex = trimmedLines.findIndex((line) => altPattern.test(line));
+  }
+
+  if (startIndex === -1) {
+    return null;
+  }
+
+  const collected: string[] = [];
+  let blankRun = 0;
+  const MAX_LINES = 25;
+
+  for (let i = startIndex; i < trimmedLines.length && collected.length < MAX_LINES; i++) {
+    const trimmed = trimmedLines[i];
+
+    if (!trimmed) {
+      blankRun++;
+      if (collected.length === 0) {
+        continue;
+      }
+      if (blankRun >= 2) {
+        break;
+      }
+      collected.push('');
+      continue;
+    }
+
+    blankRun = 0;
+
+    if (i > startIndex) {
+      const candidateNumber = extractLeadingProblemNumber(trimmed);
+      if (
+        candidateNumber !== null &&
+        candidateNumber !== Number.parseInt(normalizedProblem, 10) &&
+        looksLikeProblemHeader(trimmed)
+      ) {
+        break;
+      }
+    }
+
+    collected.push(trimmedLines[i]);
+
+    if (collected.join('\n').length >= 2000) {
+      break;
+    }
+  }
+
+  const combined = collected.join('\n').trim();
+  return combined.length > 0 ? combined : null;
+}
+
 async function cropImageToBoundingBox(imageDataUri: string, region: ProblemBoundingRegion['boundingBox']): Promise<string | null> {
   if (!imageDataUri || !imageDataUri.startsWith('data:')) {
     console.warn('⚠️ Cannot crop image: image URI is not a data URI');
@@ -2990,6 +3075,16 @@ app.post('/api/analyze-image', async (req, res) => {
                   }
                 } else if (problemNumber) {
                   console.log('⚠️ Mistral OCR did not return bounding boxes for targeted selection. Using full OCR text.');
+                }
+
+                if (problemNumber && focusedOcrText === rawOcrText) {
+                  const fallbackText = extractProblemTextFallback(problemNumber, rawOcrText);
+                  if (fallbackText) {
+                    focusedOcrText = fallbackText;
+                    console.log('🛟 Applied text-based fallback segmentation for problem selection.');
+                  } else {
+                    console.log('⚠️ Text-based fallback could not isolate the requested problem.');
+                  }
                 }
 
                 // Step 2: Analyze the extracted text to determine if it's STEM content (BEFORE correction)
