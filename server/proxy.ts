@@ -3531,17 +3531,42 @@ app.post('/api/analyze-image', async (req, res) => {
     let result = await pRetry(
       async () => {
         try {
-          // SIMPLIFIED PURE GPT-4o VISION STRATEGY:
-          // Single Vision call analyzes the full image and solves the requested problem
-          // No locate/crop step - GPT-4o handles problem identification internally
+          // STRATEGY: When problemNumber specified, use locate→crop for accuracy
+          // Otherwise analyze full image directly
+          let analysisImageUri = imageUri;
+          let usedCrop = false;
           
-          console.log(`⏱️ [TIMING] Starting GPT-4o Vision analysis on full image...`);
+          if (problemNumber && openai) {
+            console.log(`🎯 Attempting to locate and crop problem #${problemNumber}...`);
+            try {
+              const visionStartTime = Date.now();
+              const problemCoords = await locateProblemWithVision(imageUri, problemNumber);
+              console.log(`⏱️ [TIMING] GPT-4o Vision locator completed in ${Date.now() - visionStartTime}ms`);
+              
+              if (problemCoords) {
+                const cropStartTime = Date.now();
+                const croppedImage = await cropImageWithNormalizedCoords(imageUri, problemCoords);
+                console.log(`⏱️ [TIMING] Image cropping completed in ${Date.now() - cropStartTime}ms`);
+                
+                if (croppedImage) {
+                  analysisImageUri = croppedImage;
+                  usedCrop = true;
+                  console.log('✅ [METRICS] Problem located and cropped - using isolated image');
+                }
+              }
+            } catch (cropError) {
+              console.warn('⚠️ Locate/crop failed, falling back to full image:', cropError);
+            }
+          }
+          
+          console.log(`⏱️ [TIMING] Starting GPT-4o Vision analysis on ${usedCrop ? 'CROPPED' : 'FULL'} image...`);
           const visionStart = Date.now();
 
           // Build system message with EXPLICIT JSON SCHEMA requirements
+          // If we cropped, don't ask GPT-4o to find the problem number again
           let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
 
-${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
+${problemNumber && !usedCrop ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM TARGETING 🚨🚨🚨
 You MUST solve ONLY problem #${problemNumber}.
 - The image may contain MULTIPLE problems.
 - You must IGNORE all other problems.
@@ -3550,7 +3575,7 @@ You MUST solve ONLY problem #${problemNumber}.
 - Do NOT stop at the first line.
 - Do NOT solve any other problem number.
 - In your "problem" field, include ONLY the text for problem #${problemNumber}.
-🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.'}
+🚨🚨🚨 END CRITICAL REQUIREMENT 🚨🚨🚨` : usedCrop ? `This image shows a single problem that has been pre-isolated. Solve the problem shown.` : 'If multiple problems exist, solve the most prominent one.'}
 
 📋 **REQUIRED JSON STRUCTURE:**
 You MUST return a JSON object with these EXACT fields:
@@ -3645,12 +3670,12 @@ You MUST return a JSON object with these EXACT fields:
                     content: [
                       {
                         type: "text",
-                        text: `Analyze the homework problem in this image and provide a complete step-by-step solution in JSON format.${problemNumber ? ` IMPORTANT: Solve ONLY problem #${problemNumber}.` : ''}`
+                        text: `Analyze the homework problem in this image and provide a complete step-by-step solution in JSON format.${problemNumber && !usedCrop ? ` IMPORTANT: Solve ONLY problem #${problemNumber}.` : ''}`
                       },
                       {
                         type: "image_url",
                         image_url: {
-                          url: imageUri
+                          url: analysisImageUri
                         }
                       }
                     ]
@@ -3679,7 +3704,8 @@ You MUST return a JSON object with these EXACT fields:
               }
 
               // Validate that the solution addresses the requested problem number
-              if (problemNumber) {
+              // Skip validation if we used crop (problem number may not be in cropped text)
+              if (problemNumber && !usedCrop) {
                 const problemText = parsed.problem.toLowerCase();
                 const hasTargetNumber =
                   problemText.includes(`#${problemNumber}`) ||
@@ -3692,6 +3718,8 @@ You MUST return a JSON object with these EXACT fields:
                   console.warn(`   Problem text: ${parsed.problem.substring(0, 100)}...`);
                   // Log warning but don't block - GPT may have found the problem without explicit numbering
                 }
+              } else if (usedCrop) {
+                console.log(`✅ Skipping problem number validation (used cropped image)`);
               }
 
               console.log('✅ OpenAI Vision analysis complete');
@@ -3748,13 +3776,6 @@ You MUST return a JSON object with these EXACT fields:
       }
     }
 
-    // Store solution and diagram status
-    solutionStore.set(solutionId, {
-      solution: result,
-      diagrams,
-      timestamp: Date.now()
-    });
-
     // Return immediately with solution ID for client polling
     const totalTime = Date.now() - requestStartTime;
     console.log(`⏱️ [TIMING] Total request time: ${totalTime}ms`);
@@ -3765,14 +3786,32 @@ You MUST return a JSON object with these EXACT fields:
       processingTime: totalTime
     });
 
+    // Initialize verification store
+    verificationStore.set(solutionId, {
+      status: 'pending',
+      confidence: 0,
+      warnings: [],
+      timestamp: Date.now()
+    });
+
+    // Start async verification in background
+    void runVerificationPipeline(solutionId, result.problem || '', result)
+      .catch(err => {
+        console.error(`⚠️ Verification pipeline error for ${solutionId}:`, err);
+        verificationStore.set(solutionId, {
+          status: 'unverified',
+          confidence: 0,
+          warnings: ['Verification system encountered an error'],
+          timestamp: Date.now()
+        });
+      });
+
     // Start async diagram generation in background
     if (diagrams.length > 0) {
+      const hostname = req.get('host');
       console.log(`🎨 Starting async generation of ${diagrams.length} diagram(s)...`);
-      generateDiagramsAsync(solutionId, diagrams, req.get('host') || 'localhost:5000');
+      void generateDiagramsInBackground(solutionId, diagrams, result.steps, hostname);
     }
-
-    // Start async validation in background
-    startAsyncValidation(solutionId, result);
 
   } catch (error: any) {
     console.error('❌ Error analyzing image:', error);
