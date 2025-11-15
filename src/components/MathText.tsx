@@ -26,6 +26,13 @@ const SUBSCRIPT_MAP: { [key: string]: string } = {
   '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎',
 };
 
+function stripColorTags(text: string): string {
+  return text.replace(/\[(?:red|blue|green|yellow|orange|purple):[^\]]*\]/g, (match) => {
+    const colonIndex = match.indexOf(':');
+    return match.substring(colonIndex + 1, match.length - 1);
+  });
+}
+
 export default function MathText({
   content,
   structuredContent,
@@ -296,7 +303,7 @@ function renderComplexPart(
               handwritingStyle,
             ]}
           >
-            {part.numerator}
+            {stripColorTags(part.numerator || '')}
           </Text>
           <View
             style={[
@@ -320,7 +327,7 @@ function renderComplexPart(
               handwritingStyle,
             ]}
           >
-            {part.denominator}
+            {stripColorTags(part.denominator || '')}
           </Text>
         </View>
       );
