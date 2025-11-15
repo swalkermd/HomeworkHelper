@@ -3678,57 +3678,48 @@ app.post('/api/analyze-image', async (req, res) => {
   const requestStartTime = Date.now();
   try {
     const { imageUri, problemNumber } = req.body;
-    console.log('🎯 Starting hybrid OCR analysis...');
+    console.log('🎯 Starting GPT-4o Vision analysis...');
     console.log('⏱️ [TIMING] Request received at:', new Date().toISOString());
     
     let result = await pRetry(
       async () => {
         try {
-          // NEW HYBRID STRATEGY (when problemNumber is provided):
-          // 1. GPT-4o Vision locates the problem → returns coordinates
-          // 2. Crop image to that region
-          // 3. Mistral OCR extracts text from cropped image (superior symbol accuracy)
-          // 4. GPT-4o analyzes Mistral text to solve
+          // PURE GPT-4o VISION STRATEGY:
+          // 1. If problemNumber: GPT-4o Vision locates problem → crop → GPT-4o Vision solves from cropped image
+          // 2. If no problemNumber: GPT-4o Vision solves from full image
+          // 3. Optimized prompts for maximum OCR accuracy (decimals, fractions, symbols)
           
-          let analysisImageUriForVision = imageUri;
-          let croppedImageForOcr: string | null = null;
-          let usedVisionLocator = false;
+          let analysisImageUri = imageUri;
+          let problemLocated = false;
 
-          // Try new hybrid approach if problem number is specified
+          // Step 1: Locate and crop if problem number is specified
           if (problemNumber && openai) {
-            console.log('🎯 NEW HYBRID FLOW: GPT-4o locator → crop → Mistral OCR → GPT-4o solver');
+            console.log(`🎯 OPENAI-ONLY FLOW: GPT-4o locates problem #${problemNumber} → crop → GPT-4o solves`);
             const visionStartTime = Date.now();
             
-            // Step 1: Use GPT-4o Vision to locate the problem
             const problemCoords = await locateProblemWithVision(imageUri, problemNumber);
             console.log(`⏱️ [TIMING] GPT-4o Vision locator completed in ${Date.now() - visionStartTime}ms`);
             
             if (problemCoords) {
-              // Step 2: Crop image to problem region
               const cropStartTime = Date.now();
-              croppedImageForOcr = await cropImageWithNormalizedCoords(imageUri, problemCoords);
+              const croppedImage = await cropImageWithNormalizedCoords(imageUri, problemCoords);
               console.log(`⏱️ [TIMING] Image cropping completed in ${Date.now() - cropStartTime}ms`);
               
-              if (croppedImageForOcr) {
-                usedVisionLocator = true;
-                analysisImageUriForVision = croppedImageForOcr; // Use cropped image for Vision fallback if needed
-                console.log('✅ [METRICS] Vision locator SUCCESS - problem isolated and cropped');
+              if (croppedImage) {
+                analysisImageUri = croppedImage;
+                problemLocated = true;
+                console.log('✅ [METRICS] Problem located and cropped successfully');
               } else {
-                console.log('⚠️ [METRICS] Vision locator PARTIAL - coords found but crop failed, falling back to legacy Mistral bounding boxes');
+                console.log('⚠️ [METRICS] Cropping failed - using full image');
               }
             } else {
-              console.log('⚠️ [METRICS] Vision locator MISS - problem not found, falling back to legacy Mistral bounding boxes');
+              console.log('⚠️ [METRICS] Problem not found by Vision locator - using full image');
             }
           }
 
-          if (mistral) {
-            try {
-              const startTime = Date.now();
-
-              // Step 3: Extract text using Mistral's superior OCR
-              // Use cropped image if available (from vision locator), otherwise full image
-              const imageForOcr = croppedImageForOcr || imageUri;
-              console.log(`⏱️ [TIMING] Starting Mistral OCR on ${croppedImageForOcr ? 'CROPPED' : 'FULL'} image...`);
+          // Step 2: GPT-4o Vision directly analyzes the image (cropped or full)
+          console.log(`⏱️ [TIMING] Starting GPT-4o Vision analysis on ${problemLocated ? 'CROPPED' : 'FULL'} image...`);
+          const visionStart = Date.now();
               const {
                 text: rawOcrText,
                 confidence: ocrConfidence,
