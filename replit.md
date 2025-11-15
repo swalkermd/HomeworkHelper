@@ -37,3 +37,31 @@ The application uses a proxy server architecture (port 5000) that centralizes AP
 - **Icons:** `expo-vector-icons`.
 - **Concurrency & Retries:** `p-limit`, `p-retry`.
 - **Cross-Platform Base64:** `base-64`.
+
+## Known Issues & Limitations
+
+### OCR Problem Selection (Bounding Box Detection)
+**Status**: Partially functional  
+**Issue**: When users photograph a page with multiple problems and select a specific problem number, the bounding box detection often fails with `⚠️ Unable to locate problem-specific bounding boxes`. This causes the system to send the entire page's OCR text to GPT-4o Vision, which then picks a random problem instead of the user-selected one.
+
+**Root Cause**: The main branch OCR improvements merged bounding-box aggregation and dynamic image cropping using the Sharp library, but the bounding box detection logic may not be robust enough to consistently identify individual problems on densely-packed homework pages.
+
+**Impact**: Users cannot reliably select specific problems from multi-problem images. The system may solve a different problem than requested.
+
+**Workaround**: Crop images to show only one problem before uploading, or verify the AI selected the correct problem before trusting the solution.
+
+### Validation Error UX (Infinite Spinner on 422 Errors)
+**Status**: Functional but poor UX  
+**Issue**: When validation detects errors in a solution and returns a 422 status, the frontend error handling works correctly in the code (error is caught, `setIsLoading(false)` runs in finally block, alert message generated), but users report seeing an infinite loading spinner.
+
+**Root Cause**: Web browsers may block `alert()` calls or users may dismiss the alert while the loading state persists. The alert-based error notification is not robust enough for production use.
+
+**Impact**: When solutions fail validation (e.g., missing steps for absolute value equations), users see a spinning loader indefinitely with no clear error message.
+
+**Current Behavior**: 
+- Validation runs asynchronously after solution generation
+- 422 errors block response with message "Unable to verify answer accuracy"
+- Alert should appear but may be blocked or dismissed
+- Loading state should clear but visual feedback is insufficient
+
+**Recommended Fix**: Replace `alert()` with a proper error UI component (toast notification, error banner, or modal dialog) that provides clear visual feedback and cannot be accidentally dismissed while leaving the spinner visible.
