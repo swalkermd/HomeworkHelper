@@ -1,0 +1,15 @@
+Starting project at C:\Users\swalk\HomeworkHelper
+Starting Metro Bundler
+Waiting on http://localhost:5173
+Logs for your project will appear below.
+Web .\index.ts ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 69.4% (35/42)
+Web .\index.ts ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.5% (669/821)
+Web Bundled 7854ms index.ts (1154 modules)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 54ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 50ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+^C

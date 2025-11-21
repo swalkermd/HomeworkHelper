@@ -28,12 +28,12 @@ function getApiBaseUrl(): string {
     return `http://${host}:5000/api`;
   }
   
-  // 3. Check environment variable (works in Expo builds)
-  // Note: Must be prefixed with EXPO_PUBLIC_ to be accessible
-  // @ts-ignore - env vars are injected at build time
-  const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
+  // 3. Check runtime global in case an Expo public env var was injected manually
+  const envApiUrl = typeof globalThis !== 'undefined'
+    ? (globalThis as Record<string, unknown>).EXPO_PUBLIC_API_URL
+    : undefined;
   if (envApiUrl) {
-    return envApiUrl;
+    return String(envApiUrl);
   }
   
   // 4. Configuration error - throw descriptive error instead of returning placeholder
@@ -51,7 +51,7 @@ Current state:
   - Platform: ${Platform.OS}
   - Constants.expoConfig.extra.apiUrl: ${Constants.expoConfig?.extra?.apiUrl || 'NOT SET'}
   - Constants.expoConfig.hostUri: ${Constants.expoConfig?.hostUri || 'NOT SET'}
-  - process.env.EXPO_PUBLIC_API_URL: ${process.env.EXPO_PUBLIC_API_URL || 'NOT SET'}
+  - globalThis.EXPO_PUBLIC_API_URL: ${envApiUrl || 'NOT SET'}
   - Production build: ${!!Constants.manifest2?.runtimeVersion}
 
 Please configure the API URL before building for production.

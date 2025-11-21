@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, TextStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { colors } from '../constants/theme';
 import { clusterizeParsedParts } from '../utils/mathFormatter';
@@ -12,6 +12,7 @@ interface MathTextProps {
   fontSize?: number;
   color?: string;
   isOnGreenBackground?: boolean;
+  fontWeight?: TextStyle['fontWeight'];
 }
 
 const SUPERSCRIPT_MAP: { [key: string]: string } = {
@@ -39,6 +40,7 @@ export default function MathText({
   fontSize = 14,
   color = colors.textPrimary,
   isOnGreenBackground = false,
+  fontWeight = '500',
 }: MathTextProps) {
   const parsedContent = structuredContent && structuredContent.length > 0
     ? structuredContent
@@ -50,8 +52,8 @@ export default function MathText({
   // If no fractions/images, use nested Text for proper inline flow (prevents unwanted line breaks)
   if (!hasComplexElements) {
     return (
-      <Text style={{ fontSize, color, lineHeight: fontSize * LINE_HEIGHT_MULTIPLIER }}>
-        {renderInlineContent(parsedContent, fontSize, color, isOnGreenBackground)}
+      <Text style={{ fontSize, color, fontWeight, lineHeight: fontSize * LINE_HEIGHT_MULTIPLIER }}>
+        {renderInlineContent(parsedContent, fontSize, color, fontWeight, isOnGreenBackground)}
       </Text>
     );
   }
@@ -64,7 +66,7 @@ export default function MathText({
     <View style={styles.lineContainer}>
       {partClusters.map((cluster, clusterIndex) => (
         <View key={`cluster-${clusterIndex}`} style={styles.cluster}>
-          {renderCluster(cluster.parts, clusterIndex, fontSize, color, isOnGreenBackground)}
+          {renderCluster(cluster.parts, clusterIndex, fontSize, color, fontWeight, isOnGreenBackground)}
         </View>
       ))}
     </View>
@@ -76,6 +78,7 @@ function renderCluster(
   clusterIndex: number,
   baseFontSize: number,
   baseColor: string,
+  baseFontWeight: TextStyle['fontWeight'],
   isOnGreenBg: boolean,
 ): React.ReactNode[] {
   const elements: React.ReactNode[] = [];
@@ -94,6 +97,7 @@ function renderCluster(
           {
             fontSize: baseFontSize,
             color: baseColor,
+            fontWeight: baseFontWeight,
             lineHeight: baseFontSize * LINE_HEIGHT_MULTIPLIER,
           },
         ]}
@@ -109,13 +113,13 @@ function renderCluster(
     if (part.type === 'fraction' || part.type === 'image') {
       flushInline();
       elements.push(
-        renderComplexPart(part, `cluster-${clusterIndex}-complex-${partIndex}`, baseFontSize, baseColor, isOnGreenBg),
+        renderComplexPart(part, `cluster-${clusterIndex}-complex-${partIndex}`, baseFontSize, baseColor, baseFontWeight, isOnGreenBg),
       );
       return;
     }
 
     currentInline.push(
-      renderInlineSpan(part, `cluster-${clusterIndex}-text-${partIndex}`, baseFontSize, baseColor, isOnGreenBg),
+      renderInlineSpan(part, `cluster-${clusterIndex}-text-${partIndex}`, baseFontSize, baseColor, baseFontWeight, isOnGreenBg),
     );
   });
 
@@ -128,10 +132,11 @@ function renderInlineContent(
   parts: MathNode[],
   baseFontSize: number,
   baseColor: string,
+  baseFontWeight: TextStyle['fontWeight'],
   isOnGreenBg: boolean,
 ): React.ReactNode[] {
   return parts.map((part, index) =>
-    renderInlineSpan(part, `inline-${index}`, baseFontSize, baseColor, isOnGreenBg),
+    renderInlineSpan(part, `inline-${index}`, baseFontSize, baseColor, baseFontWeight, isOnGreenBg),
   );
 }
 
@@ -140,6 +145,7 @@ function renderInlineSpan(
   key: string,
   baseFontSize: number,
   baseColor: string,
+  baseFontWeight: TextStyle['fontWeight'],
   isOnGreenBg: boolean,
 ): React.ReactNode {
   const handwritingStyle = part.isHandwritten
@@ -267,6 +273,7 @@ function renderComplexPart(
   key: string,
   baseFontSize: number,
   baseColor: string,
+  baseFontWeight: TextStyle['fontWeight'],
   isOnGreenBg: boolean,
 ): React.ReactNode {
   const handwritingStyle = part.isHandwritten
@@ -276,7 +283,7 @@ function renderComplexPart(
   switch (part.type) {
     case 'fraction': {
       const fractionColor = part.color ? getHighlightColor(part.color) : baseColor;
-      const fractionWeight = part.color ? '600' : 'normal';
+      const fractionWeight: TextStyle['fontWeight'] = part.color ? '700' : (baseFontWeight || '500');
       const fractionFontSize = baseFontSize * 0.82;
       const lineThickness = Math.max(1, Math.round(baseFontSize / 14));
 

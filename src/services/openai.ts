@@ -3,13 +3,29 @@ import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
 
-// Request timeout configuration (longer for production to handle cold starts)
-// Production: 120s (Autoscale cold start + 4-stage pipeline: OCR → correction → detection → analysis)
-// Development: 45s (warm server, faster response)
+// Request timeout configuration (match production so dev users don’t hit premature aborts)
+// Default: 120s (Autoscale cold start + 4-stage pipeline: OCR → correction → detection → analysis)
+// Override by setting EXPO_PUBLIC_API_TIMEOUT_MS
 // Check hostname instead of API_URL since API_URL is just "/api" for web
 const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
 const IS_PRODUCTION = hostname.includes('replit.app') || hostname.includes('repl.co') || hostname.includes('replit.dev');
-const API_REQUEST_TIMEOUT_MS = IS_PRODUCTION ? 120000 : 45000;
+const DEFAULT_TIMEOUT_MS = 120000;
+const getExpoPublicValue = (key: string): string | undefined => {
+  if (typeof globalThis === 'undefined') {
+    return undefined;
+  }
+  const maybeValue = (globalThis as Record<string, unknown>)[key];
+  return typeof maybeValue === 'string' ? maybeValue : undefined;
+};
+
+const API_REQUEST_TIMEOUT_MS = (() => {
+  const envTimeoutRaw = getExpoPublicValue('EXPO_PUBLIC_API_TIMEOUT_MS');
+  const envTimeout = envTimeoutRaw ? Number(envTimeoutRaw) : Number.NaN;
+  if (!Number.isNaN(envTimeout) && envTimeout > 0) {
+    return envTimeout;
+  }
+  return DEFAULT_TIMEOUT_MS;
+})();
 console.log('⏱️ API timeout configured:', API_REQUEST_TIMEOUT_MS / 1000, 'seconds', IS_PRODUCTION ? '(production)' : '(development)', '| hostname:', hostname);
 
 function buildApiError(response: Response, fallbackMessage: string, errorData: any): Error {

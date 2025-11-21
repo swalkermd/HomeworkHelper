@@ -24,6 +24,13 @@ import path from 'path';
 import crypto from 'crypto';
 import { parseMathContent } from '../src/utils/mathParser';
 
+function sanitizeEnvValue(value?: string | null): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return value.replace(/\s+/g, '').trim() || undefined;
+}
+
 interface OcrBoundingBox {
   text: string;
   top: number;
@@ -48,9 +55,260 @@ interface ProblemBoundingRegion {
   };
 }
 
+interface TargetedOcrResult {
+  transcription: string | null;
+  diagnostics: string[];
+  boundingBox?: {
+    top: number;
+    left: number;
+    bottom: number;
+    right: number;
+  };
+  croppedImageUri?: string | null;
+}
+
 type SharpModule = any;
 
 let sharpModulePromise: Promise<SharpModule | null> | null = null;
+
+function extractStandaloneVariables(text: string): Set<string> {
+  const matches = text?.match(/\b([a-zA-Z])\b/g) ?? [];
+  return new Set(matches.map((token) => token.toLowerCase()));
+}
+
+function normalizeOcrProblemText(text: string, allowedVariables?: Set<string>): string {
+  if (!text) {
+    return text;
+  }
+  // Reuse the main formatter so OCR problems follow the exact same math rules.
+  let formatted = enforceProperFormatting(text, 'ocr-problem');
+  if (allowedVariables && allowedVariables.size > 0) {
+    const sanitized = formatted.replace(/\b([a-zA-Z])\b/g, (match, letter: string) => {
+      return allowedVariables.has(letter.toLowerCase()) ? match : '';
+    });
+    if (sanitized !== formatted) {
+      console.log(`🔍 Removed unexpected variables; allowed: ${[...allowedVariables].join(', ')}`);
+      formatted = sanitized.replace(/\s{2,}/g, ' ').trim();
+    }
+  }
+  return formatted;
+}
+
+function extractTeXTokenForFrac(text: string, startIndex: number): { token: string; nextIndex: number } {
+  let i = startIndex;
+  const isWhitespace = (ch: string) => /\s/.test(ch);
+
+  while (i < text.length && isWhitespace(text[i])) {
+    i++;
+  }
+
+  if (i >= text.length) {
+    return { token: '', nextIndex: i };
+  }
+
+  if (text[i] === '{') {
+    let depth = 1;
+    let j = i + 1;
+    while (j < text.length && depth > 0) {
+      if (text[j] === '{') depth++;
+      else if (text[j] === '}') depth--;
+      j++;
+    }
+    return { token: text.slice(i + 1, j - 1), nextIndex: j };
+  }
+
+  if (text[i] === '\\') {
+    let j = i + 1;
+    while (j < text.length && /[a-zA-Z]/.test(text[j])) {
+      j++;
+    }
+    let token = text.slice(i, j);
+    if (j < text.length && (text[j] === '(' || text[j] === '{')) {
+      const open = text[j];
+      const close = open === '(' ? ')' : '}';
+      let depth = 1;
+      let k = j + 1;
+      while (k < text.length && depth > 0) {
+        if (text[k] === open) depth++;
+        else if (text[k] === close) depth--;
+        k++;
+      }
+      token += text.slice(j, k);
+      j = k;
+    }
+    return { token, nextIndex: j };
+  }
+
+  let j = i;
+  while (j < text.length && !isWhitespace(text[j]) && text[j] !== '{' && text[j] !== '}') {
+    j++;
+  }
+  return { token: text.slice(i, j), nextIndex: j };
+}
+
+function convertLooseFractions(text: string): string {
+  let result = '';
+  for (let i = 0; i < text.length;) {
+    const fracMatch = text.slice(i).match(/^\\[dt]?frac/);
+    if (fracMatch) {
+      i += fracMatch[0].length;
+      const numerator = extractTeXTokenForFrac(text, i);
+      const denominator = extractTeXTokenForFrac(text, numerator.nextIndex);
+      if (numerator.token && denominator.token) {
+        result += `{${numerator.token}/${denominator.token}}`;
+        i = denominator.nextIndex;
+        continue;
+      }
+      result += fracMatch[0];
+      i = numerator.nextIndex;
+      continue;
+    }
+    result += text[i];
+    i++;
+  }
+  return result;
+}
+
+function extractDelimitedContent(
+  text: string,
+  startIndex: number,
+  openChar: string,
+  closeChar: string,
+): { content: string; nextIndex: number } {
+  if (text[startIndex] !== openChar) {
+    return { content: '', nextIndex: startIndex };
+  }
+
+  let depth = 1;
+  let j = startIndex + 1;
+  while (j < text.length && depth > 0) {
+    if (text[j] === openChar) depth++;
+    else if (text[j] === closeChar) depth--;
+    j++;
+  }
+
+  return { content: text.slice(startIndex + 1, j - 1), nextIndex: j };
+}
+
+function convertSqrtExpressions(text: string): string {
+  let result = '';
+  for (let i = 0; i < text.length;) {
+    const sqrtMatch = text.slice(i).match(/^\\+sqrt/);
+    if (sqrtMatch) {
+      i += sqrtMatch[0].length;
+
+      // Optional root index inside square brackets - skip but preserve expression
+      if (text[i] === '[') {
+        const { nextIndex } = extractDelimitedContent(text, i, '[', ']');
+        i = nextIndex;
+      }
+
+      let radicand = '';
+      if (text[i] === '{') {
+        const extracted = extractDelimitedContent(text, i, '{', '}');
+        radicand = extracted.content;
+        i = extracted.nextIndex;
+      } else {
+        let j = i;
+        while (
+          j < text.length &&
+          !/\s/.test(text[j]) &&
+          !/[+\-*/=,)]/.test(text[j])
+        ) {
+          j++;
+        }
+        radicand = text.slice(i, j);
+        i = j;
+      }
+
+      radicand = radicand.trim();
+      if (radicand) {
+        result += `√(${radicand})`;
+      } else {
+        result += '√';
+      }
+      continue;
+    }
+
+    result += text[i];
+    i++;
+  }
+  return result;
+}
+
+const INLINE_FRACTION_PATTERN = /([\p{L}\p{N}√^_]+(?:\([^()]+\))?)\s*\/\s*([\p{L}\p{N}√^_]+(?:\([^()]+\))?)/gu;
+
+function fixStackedDecimals(text: string): string {
+  let updated = text;
+  // Cases like "5.\n85" -> "5.85"
+  updated = updated.replace(/(\d+)\.\s*\n+\s*(\d+)/g, '$1.$2');
+  // Cases like "5\n.85" -> "5.85"
+  updated = updated.replace(/(\d+)\s*\n+\s*\.(\d+)/g, '$1.$2');
+  // Cases like ".\n85" -> ".85"
+  updated = updated.replace(/\.\s*\n+\s*(\d+)/g, '.$1');
+  return updated;
+}
+
+const UNIT_TOKENS = [
+  'g', 'gram', 'grams',
+  'mol', 'mole', 'moles',
+  'm', 'meter', 'meters',
+  's', 'sec', 'second', 'seconds',
+  'l', 'liter', 'liters',
+  'kg', 'cm', 'mm', 'km',
+  'pa', 'atm', 'n', 'j',
+  'molarity', 'volume',
+];
+
+function convertStackedUnits(text: string): string {
+  const unitPattern = new RegExp(`\\b(${UNIT_TOKENS.join('|')})\\s*\\n+\\s*(${UNIT_TOKENS.join('|')})\\b`, 'gi');
+  return text.replace(unitPattern, (_, top: string, bottom: string) => {
+    const normalizedTop = top.trim();
+    const normalizedBottom = bottom.trim();
+    return `${normalizedTop}/${normalizedBottom}`;
+  });
+}
+
+function convertStackedQuantityFractions(text: string): string {
+  return text.replace(/(\d+(?:\.\d+)?\s*[A-Za-z%°\/]+)\s*\n+\s*(\d+(?:\.\d+)?\s*[A-Za-z%°\/]+)/g, (_match, numerator, denominator) => {
+    return `{${numerator.trim()}/${denominator.trim()}}`;
+  });
+}
+
+function convertInlineSlashFractions(text: string): string {
+  if (!text.includes('/')) {
+    return text;
+  }
+
+  // First, wrap slash fractions even when wrapped in color tags
+  text = text.replace(/\[(red|blue|green|yellow|orange|purple):([^\]]+)\]\s*\/\s*\[(red|blue|green|yellow|orange|purple):([^\]]+)\]/gi, (_m, c1, num, c2, den) => {
+    return `{[${c1}:${num}]/[${c2}:${den}]}`;
+  });
+  text = text.replace(/\[(red|blue|green|yellow|orange|purple):([^\]]+)\]\s*\/\s*([A-Za-z0-9_]+)/gi, (_m, c1, num, den) => {
+    return `{[${c1}:${num}]/${den}}`;
+  });
+  text = text.replace(/([A-Za-z0-9_]+)\s*\/\s*\[(red|blue|green|yellow|orange|purple):([^\]]+)\]/gi, (_m, num, c2, den) => {
+    return `{${num}/[${c2}:${den}]}`;
+  });
+  // Wrap common parenthesized expressions over numbers (e.g., (tower + rod)/120)
+  text = text.replace(/(\([^()]+\))\s*\/\s*(\d+(?:\.\d+)?)/g, (_m, num, den) => `{${num.trim()}/${den}}`);
+  text = text.replace(/(\d+(?:\.\d+)?)\s*\/\s*(\([^()]+\))/g, (_m, num, den) => `{${num}/${den.trim()}}`);
+
+  return text.replace(INLINE_FRACTION_PATTERN, (match, numerator, denominator, offset, fullText) => {
+    const before = offset > 0 ? fullText[offset - 1] : '';
+    const after = offset + match.length < fullText.length ? fullText[offset + match.length] : '';
+
+    if (before === '{' && after === '}') {
+      return match;
+    }
+
+    if (!numerator || !denominator) {
+      return match;
+    }
+
+    return `{${numerator}/${denominator}}`;
+  });
+}
 
 async function loadSharpModule(): Promise<SharpModule | null> {
   if (!sharpModulePromise) {
@@ -73,24 +331,25 @@ const app = express();
 const PORT = 5000;
 
 // Resolve OpenAI configuration with backwards compatibility for legacy env vars
-const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-const openaiBaseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL;
+const openaiApiKey = sanitizeEnvValue(process.env.OPENAI_API_KEY);
+const openaiBaseURL = process.env.OPENAI_BASE_URL || process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
 
 // Resolve Gemini configuration
-const geminiApiKey = process.env.GEMINI_API_KEY;
+const geminiApiKey = sanitizeEnvValue(process.env.GEMINI_API_KEY);
 
 // Resolve WolframAlpha configuration
-const wolframAlphaAppId = process.env.WOLFRAM_ALPHA_APP_ID;
+const wolframAlphaAppId = sanitizeEnvValue(process.env.WOLFRAM_ALPHA_APP_ID);
 
 // WolframAlpha API endpoints
-const WOLFRAM_SHORT_ANSWER_API = 'http://api.wolframalpha.com/v1/result';
-const WOLFRAM_FULL_RESULTS_API = 'http://api.wolframalpha.com/v2/query';
+const WOLFRAM_SHORT_ANSWER_API = 'https://api.wolframalpha.com/v1/result';
+const WOLFRAM_FULL_RESULTS_API = 'https://api.wolframalpha.com/v2/query';
+const WOLFRAM_NUMERIC_TOLERANCE = 0.1; // allow small rounding differences
 
 // OpenAI API timeout - prevent indefinite hanging
 const OPENAI_TIMEOUT_MS = 45000; // 45 seconds (well under 120s client timeout)
 
 if (!openaiApiKey) {
-  console.warn('⚠️ OpenAI API key not configured. Set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY.');
+  console.warn('⚠️ OpenAI API key not configured. Set OPENAI_API_KEY.');
 }
 
 if (!geminiApiKey) {
@@ -115,7 +374,7 @@ app.get('/api/config-check', (req, res) => {
     apis: {
       openai: openaiConfigured
         ? 'configured ✅'
-        : 'missing ❌ (set AI_INTEGRATIONS_OPENAI_API_KEY or OPENAI_API_KEY)'
+        : 'missing ❌ (set OPENAI_API_KEY)'
     },
     ocrMode: openaiConfigured
       ? 'OpenAI GPT-4o Vision with detailed math equation OCR'
@@ -184,7 +443,6 @@ async function generateDiagramsInBackground(
   solutionId: string,
   diagrams: DiagramStatus[],
   steps: any[],
-  hostname?: string
 ): Promise<void> {
   console.log(`🎨 Starting background generation of ${diagrams.length} diagrams for solution ${solutionId}`);
   
@@ -206,7 +464,7 @@ async function generateDiagramsInBackground(
       
       console.log(`🎨 Generating diagram ${index + 1}/${diagrams.length}: ${diagramDescription}`);
       
-      const imageUrl = await generateDiagram(diagramDescription, hostname);
+      const imageUrl = await generateDiagram(diagramDescription);
       
       if (imageUrl) {
         solutionData.diagrams[index].status = 'ready';
@@ -436,17 +694,23 @@ function extractAnswerParts(finalAnswer: string, steps: any[]): Map<string, stri
 
 // Helper function to parse fractions and numbers
 function parseNumericValue(str: string): number | null {
-  // Remove common formatting
-  const cleaned = str.replace(/[,_\s]/g, '');
-  
-  // Remove any units (letters, compound units like m/s, m^2, etc.)
-  // Match the numeric part at the beginning, before any letters or unit symbols
-  const numericPart = cleaned.match(/^([-+]?\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?)/);
-  if (!numericPart) {
+  if (!str) {
     return null;
   }
+
+  // Strip color tags like [red:...]
+  let cleaned = str.replace(/\[[^\]:]+:([^\]]+)\]/g, '$1');
+  // Remove common formatting
+  cleaned = cleaned.replace(/[,_\s]/g, '');
+  cleaned = cleaned.replace(/[()]/g, '');
+  cleaned = cleaned.replace(/[A-Za-z=]/g, ''); // drop variable names/equals, keep signs/digits/slash
   
-  const numStr = numericPart[1];
+  // Find the first numeric token (fraction or decimal/int) anywhere in the string
+  const tokenMatch = cleaned.match(/[-+]?\d+(?:\.\d+)?(?:\/[-+]?\d+(?:\.\d+)?)?/);
+  if (!tokenMatch) {
+    return null;
+  }
+  const numStr = tokenMatch[0];
   
   // Try fraction first (e.g., "1/2", "3/4")
   const fractionMatch = numStr.match(/^([-+]?\d+(?:\.\d+)?)\/([-+]?\d+(?:\.\d+)?)$/);
@@ -461,6 +725,20 @@ function parseNumericValue(str: string): number | null {
   // Try regular number
   const num = parseFloat(numStr);
   return isNaN(num) ? null : num;
+}
+
+function sanitizeForWolfram(text: string): string {
+  if (!text) {
+    return '';
+  }
+  return text
+    .replace(/\{([^}]+)\}/g, '$1')   // unwrap vertical fraction braces for simpler parsing
+    .replace(/°/g, ' degrees ')
+    .replace(/∠/g, ' angle ')
+    .replace(/×/g, ' * ')
+    .replace(/÷/g, ' / ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // WolframAlpha verification - uses computational engine for ground truth
@@ -525,7 +803,8 @@ async function wolframAlphaVerification(
         }
         
         try {
-          const wolframUrl = `http://api.wolframalpha.com/v1/result?appid=${encodeURIComponent(wolframAlphaAppId)}&i=${encodeURIComponent(subQuestion)}`;
+          const safeQuestion = sanitizeForWolfram(subQuestion);
+          const wolframUrl = `${WOLFRAM_SHORT_ANSWER_API}?appid=${encodeURIComponent(wolframAlphaAppId)}&i=${encodeURIComponent(safeQuestion)}`;
           const response = await fetch(wolframUrl, { 
             method: 'GET',
             headers: { 'User-Agent': 'HomeworkHelper/1.0' },
@@ -573,7 +852,7 @@ async function wolframAlphaVerification(
               const wolframNum = parseNumericValue(normalizedWolfram);
               
               if (proposedNum !== null && wolframNum !== null) {
-                if (Math.abs(proposedNum - wolframNum) < 0.0001) {
+                if (Math.abs(proposedNum - wolframNum) <= WOLFRAM_NUMERIC_TOLERANCE) {
                   verifiedParts++;
                   console.log(`  ✓ Part (${label}) numerically equivalent (${proposedNum} ≈ ${wolframNum})`);
                 } else {
@@ -588,7 +867,8 @@ async function wolframAlphaVerification(
               }
             }
           } else {
-            console.warn(`  ⚠️ Part (${label}): WolframAlpha returned ${response.status} - inconclusive`);
+            const errorBody = await response.text().catch(() => '');
+            console.warn(`  ⚠️ Part (${label}): WolframAlpha returned ${response.status} - inconclusive`, errorBody);
             inconclusiveParts++;
           }
         } catch (partError) {
@@ -637,14 +917,16 @@ async function wolframAlphaVerification(
     
     // Single-answer problem - verify the whole answer
     try {
-      const wolframUrl = `http://api.wolframalpha.com/v1/result?appid=${encodeURIComponent(wolframAlphaAppId)}&i=${encodeURIComponent(originalQuestion)}`;
+      const safeQuestion = sanitizeForWolfram(originalQuestion);
+      const wolframUrl = `${WOLFRAM_SHORT_ANSWER_API}?appid=${encodeURIComponent(wolframAlphaAppId)}&i=${encodeURIComponent(safeQuestion)}`;
       const response = await fetch(wolframUrl, {
         method: 'GET',
         headers: { 'User-Agent': 'HomeworkHelper/1.0' }
       });
       
       if (!response.ok) {
-        console.warn(`⚠️ WolframAlpha API returned ${response.status}`);
+        const errorBody = await response.text().catch(() => '');
+        console.warn(`⚠️ WolframAlpha API returned ${response.status}`, errorBody);
         return {
           isValid: true,
           errors: [],
@@ -697,7 +979,7 @@ async function wolframAlphaVerification(
       const wolframNum = parseNumericValue(normalizedWolfram);
       
       if (proposedNum !== null && wolframNum !== null) {
-        if (Math.abs(proposedNum - wolframNum) < 0.0001) {
+        if (Math.abs(proposedNum - wolframNum) <= WOLFRAM_NUMERIC_TOLERANCE) {
           console.log(`✅ WolframAlpha verification: NUMERICALLY EQUIVALENT (${proposedNum} ≈ ${wolframNum})`);
           return {
             isValid: true,
@@ -773,7 +1055,8 @@ async function wolframAlphaSolveAndExplain(originalQuestion: string): Promise<an
     });
     
     if (!response.ok) {
-      console.warn(`⚠️ WolframAlpha API returned ${response.status}`);
+      const errorBody = await response.text().catch(() => '');
+      console.warn(`⚠️ WolframAlpha API returned ${response.status}`, errorBody);
       // If step-by-step isn't available (premium feature), try simple result
       return await wolframAlphaSimpleSolve(originalQuestion);
     }
@@ -828,6 +1111,8 @@ async function wolframAlphaSimpleSolve(originalQuestion: string): Promise<any | 
     });
     
     if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      console.warn('⚠️ WolframAlpha simple answer endpoint returned non-200', errorBody);
       return null;
     }
     
@@ -945,6 +1230,24 @@ function isInvalidSolution(solution: any): { isInvalid: boolean; reason: string 
   // Handle case where finalAnswer exists but is not a string
   if (typeof solution.finalAnswer !== 'string') {
     return { isInvalid: true, reason: 'Final answer is not a string (got ' + typeof solution.finalAnswer + ')' };
+  }
+
+  const trimmedFinal = solution.finalAnswer.trim();
+  if (trimmedFinal.length === 0 || /^[\s.,;:!?-]+$/.test(trimmedFinal)) {
+    return { isInvalid: true, reason: 'Final answer contains no meaningful content' };
+  }
+
+  // Check 6: Measurement answers should not be negative
+  const measurementUnits = /\b(cm|mm|m|meter|meters|km|kilometer|kilometers|in|inch|inches|ft|foot|feet|yd|yard|yards|mile|miles|unit|units)\b/i;
+  const measurementKeywords = ['length', 'distance', 'perimeter', 'circumference', 'radius', 'diameter', 'side', 'segment', 'line', 'height', 'width'];
+  const hasMeasurementContext =
+    measurementUnits.test(trimmedFinal) ||
+    measurementKeywords.some((keyword) => trimmedFinal.toLowerCase().includes(keyword));
+  if (hasMeasurementContext) {
+    const negativeNumberPattern = /(^|[^0-9])-\s*\d+(\.\d+)?/;
+    if (negativeNumberPattern.test(trimmedFinal)) {
+      return { isInvalid: true, reason: 'Negative measurement detected in final answer' };
+    }
   }
   
   const cleanAnswer = solution.finalAnswer.replace(/[^\w\d]/g, '');
@@ -1573,19 +1876,20 @@ async function correctOcrText(rawText: string): Promise<string> {
 Input will be raw OCR text. Clean and correct it using logic and heuristics while keeping meaning exact.
 
 Rules:
-- Preserve equations, symbols, and layout.
+- Preserve equations, symbols, layout, and the author's original notation style.
 - Fix common OCR errors:
-  • Replace ".5" → "0.5", "5 ." → "5.0"
-  • Convert "O"↔"0", "l"↔"1", "S"↔"5" using context
-  • Detect and separate variables from numbers (e.g., "3x" not "3×")
-  • Add missing negative signs or decimals if context implies them
-- Use normal math syntax or LaTeX (e.g., x², √, ½) when clear.
+  - Replace ".5" with "0.5", "5 ." with "5.0"
+  - Convert "O"<->"0", "l"<->"1", "S"<->"5" using context
+  - Detect and separate variables from numbers (e.g., "3x" not "3 x")
+  - Add missing negative signs or decimals if context implies them
+- Use the same notation as the source (fractions with '/', decimals with '.', etc.).
+- NEVER introduce LaTeX commands (like \\frac, \\sqrt, superscript braces, etc.) unless they already appear in the source.
 - Maintain balanced parentheses, operators, and exponents.
 - No commentary or explanations—return only corrected text.
 
-If any token looks uncertain or inconsistent, pick the version that best preserves mathematical sense.`;
+If any token looks uncertain or inconsistent, pick the version that best preserves mathematical sense while remaining faithful to the printed notation.`
 
-    const response = await openai.chat.completions.create({
+const response = await openai.chat.completions.create({
       model: "gpt-4o-mini", // Use mini for cost efficiency on correction task
       messages: [
         {
@@ -1613,6 +1917,153 @@ If any token looks uncertain or inconsistent, pick the version that best preserv
   }
 }
 
+async function performTargetedProblemOcr(imageUri: string, problemNumber: string): Promise<TargetedOcrResult | null> {
+  if (!problemNumber || !openai) {
+    return null;
+  }
+
+  const diagnostics: string[] = [];
+  let normalizedBox: TargetedOcrResult['boundingBox'] | undefined;
+  let workingImage = imageUri;
+  let croppedImageUri: string | null = null;
+
+  try {
+    const located = await locateProblemWithVision(imageUri, problemNumber);
+    if (located) {
+      normalizedBox = located;
+      diagnostics.push(
+        `Locator bounding box: top ${(located.top * 100).toFixed(1)}%, left ${(located.left * 100).toFixed(1)}%, bottom ${(located.bottom * 100).toFixed(1)}%, right ${(located.right * 100).toFixed(1)}%`
+      );
+      const cropped = await cropImageWithNormalizedCoords(imageUri, located);
+      if (cropped) {
+        workingImage = cropped;
+        croppedImageUri = cropped;
+        diagnostics.push('Image cropped to located problem region for OCR');
+      } else {
+        diagnostics.push('Cropping failed, falling back to full image for OCR');
+      }
+    } else {
+      diagnostics.push('Problem locator could not find the requested number; using full image for OCR');
+    }
+  } catch (error) {
+    diagnostics.push(`Problem locator error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.warn('⚠️ Vision locator failed before OCR:', error);
+  }
+
+  try {
+    console.log(`[OCR] Running targeted transcription for problem #${problemNumber}...`);
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a meticulous OCR transcription engine for math textbooks. 
+Transcribe the requested problem EXACTLY as printed, preserving punctuation, variables, fractions, and line breaks. 
+Do not solve or summarize. Respond using strict JSON as instructed.`
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Transcribe ONLY problem #${problemNumber}. 
+Start at its number/label and include all lines (parts a/b/c, diagrams descriptions, conditions) until the next numbered problem starts.
+You must return the text EXACTLY as printed (same symbols, same fraction style, no LaTeX conversion, no reformatting).
+If #${problemNumber} is missing, respond with {"found":false,"problemNumber":"${problemNumber}","error":"reason","problemsVisible":["list","of","numbers"]}.
+When it is found, respond with {"found":true,"problemNumber":"${problemNumber}","transcription":"full text","problemsVisible":["numbers you can see"]}.`
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: workingImage,
+                detail: "high"
+              }
+            }
+          ]
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 1024,
+    });
+
+    const rawContent = response.choices[0]?.message?.content ?? '{}';
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawContent);
+    } catch (parseError) {
+      diagnostics.push('OCR returned invalid JSON payload');
+      console.error('❌ Targeted OCR returned invalid JSON:', rawContent);
+      return {
+        transcription: null,
+        diagnostics,
+        boundingBox: normalizedBox,
+        croppedImageUri
+      };
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      diagnostics.push('OCR response missing structured fields');
+      return {
+        transcription: null,
+        diagnostics,
+        boundingBox: normalizedBox,
+        croppedImageUri
+      };
+    }
+
+    if (parsed.problemsVisible?.length) {
+      diagnostics.push(`Visible problems: ${parsed.problemsVisible.join(', ')}`);
+    }
+
+    if (!parsed.found) {
+      diagnostics.push(parsed.error ? `OCR: ${parsed.error}` : 'OCR could not locate requested problem');
+      return {
+        transcription: null,
+        diagnostics,
+        boundingBox: normalizedBox,
+        croppedImageUri
+      };
+    }
+
+    let transcription = typeof parsed.transcription === 'string' ? parsed.transcription.trim() : '';
+    if (!transcription) {
+      diagnostics.push('OCR returned empty transcription');
+      return {
+        transcription: null,
+        diagnostics,
+        boundingBox: normalizedBox,
+        croppedImageUri
+      };
+    }
+
+    const corrected = await correctOcrText(transcription);
+    if (corrected && corrected.trim()) {
+      if (corrected.trim() !== transcription) {
+        diagnostics.push('OCR transcription corrected for math/notation consistency');
+      }
+      transcription = corrected.trim();
+    }
+
+    diagnostics.push(`OCR transcription captured (${transcription.length} chars)`);
+    return {
+      transcription,
+      diagnostics,
+      boundingBox: normalizedBox,
+      croppedImageUri
+    };
+  } catch (error) {
+    diagnostics.push(`OCR error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.warn('⚠️ Targeted OCR failed:', error);
+    return {
+      transcription: null,
+      diagnostics,
+      boundingBox: normalizedBox,
+      croppedImageUri
+    };
+  }
+}
+
 // Diagram cache for avoiding regeneration of identical diagrams
 interface DiagramCacheEntry {
   url: string;
@@ -1620,6 +2071,9 @@ interface DiagramCacheEntry {
   size: string;
   visualType: string;
 }
+
+const GEMINI_IMAGE_MODEL = 'gemini-1.5-flash-latest';
+type DiagramSize = '1024x1024';
 
 const diagramCache = new Map<string, DiagramCacheEntry>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
@@ -1631,7 +2085,7 @@ let cacheStats = {
   totalRequests: 0
 };
 
-async function generateDiagram(description: string, hostname?: string): Promise<string> {
+async function generateDiagram(description: string): Promise<string> {
   try {
     // Extract visual type from description if provided
     const typeMatch = description.match(/type=(\w+)/);
@@ -1669,53 +2123,254 @@ async function generateDiagram(description: string, hostname?: string): Promise<
     
     const styleGuide = styleGuides[visualType] || 'Clean educational diagram with clear labels and simple presentation';
     
-    const response = await openai.images.generate({
-      model: "gpt-image-1",
-      prompt: `MANDATORY NUMBER FORMAT: USE PERIODS FOR DECIMALS - WRITE 14.14 NOT 14,14 - WRITE 3.92 NOT 3,92 - WRITE 10.2 NOT 10,2. Educational ${visualType}: ${cleanDescription}. ${styleGuide} White background, black lines, labeled clearly. ABSOLUTE REQUIREMENT: ALL DECIMAL NUMBERS USE PERIOD SEPARATORS (.) - AMERICAN/ENGLISH FORMAT ONLY - NEVER USE COMMAS (,) IN NUMBERS. Examples: 14.14, 3.92, 10.2, 19.6. IMPORTANT: Leave generous margins (at least 10% padding) on all sides - do not place any content or labels near the edges. Center the main content with plenty of space around it. REMINDER: Decimals use PERIODS not commas.`,
-      size: size,
-      n: 1
-    });
+    const diagramPrompt = `MANDATORY NUMBER FORMAT: USE PERIODS FOR DECIMALS - WRITE 14.14 NOT 14,14 - WRITE 3.92 NOT 3,92 - WRITE 10.2 NOT 10,2. Educational ${visualType}: ${cleanDescription}. ${styleGuide} White background, black lines, labeled clearly. ABSOLUTE REQUIREMENT: ALL DECIMAL NUMBERS USE PERIOD SEPARATORS (.) - AMERICAN/ENGLISH FORMAT ONLY - NEVER USE COMMAS (,) IN NUMBERS. Examples: 14.14, 3.92, 10.2, 19.6. IMPORTANT: Leave generous margins (at least 10% padding) on all sides - do not place any content or labels near the edges. Center the main content with plenty of space around it. REMINDER: Decimals use PERIODS not commas.`;
     
-    // Replit AI Integrations returns base64 data by default
-    const b64Data = response.data?.[0]?.b64_json;
-    if (b64Data) {
-      // Save to file instead of returning data URL (data URLs crash React Native Web)
-      const diagramsDir = path.join(process.cwd(), 'public', 'diagrams');
-      if (!fs.existsSync(diagramsDir)) {
-        fs.mkdirSync(diagramsDir, { recursive: true });
-      }
-      
-      // Generate unique filename with type prefix (use cacheKey for consistency)
-      const hash = cacheKey.substring(0, 8);
-      const filename = `${visualType}-${size.replace('x', '-')}-${hash}.png`;
-      const filepath = path.join(diagramsDir, filename);
-      
-      // Convert base64 to buffer and save
-      const buffer = Buffer.from(b64Data, 'base64');
-      fs.writeFileSync(filepath, buffer);
-      
-      // Use request hostname if provided (for production), otherwise fall back to env vars (for dev)
-      const domain = hostname || process.env.REPLIT_DEV_DOMAIN || `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
-      const url = `https://${domain}/diagrams/${filename}`;
-      
-      // Store in cache for future requests
-      diagramCache.set(cacheKey, {
-        url,
-        timestamp: Date.now(),
-        size,
-        visualType
+    try {
+      const response = await openai.images.generate({
+        model: "gpt-image-1",
+        prompt: diagramPrompt,
+        size: size,
+        n: 1
       });
       
-      console.log(`✓ ${visualType} (${size}) saved and cached:`, url);
-      return url;
+      const b64Data = response.data?.[0]?.b64_json;
+      if (b64Data) {
+        return saveDiagramImage(b64Data, visualType, size, cacheKey);
+      }
+      
+      console.log('✗ No image data returned from OpenAI');
+    } catch (openaiError) {
+      console.warn('⚠️ OpenAI image generation failed:', openaiError?.message || openaiError);
+      if (shouldFallbackToGemini(openaiError)) {
+        const fallbackUrl = await generateDiagramWithGemini({
+          cleanDescription,
+          visualType,
+          size,
+          cacheKey,
+          styleGuide,
+          prompt: diagramPrompt
+        });
+        if (fallbackUrl) {
+          return fallbackUrl;
+        }
+      } else {
+        throw openaiError;
+      }
     }
     
-    console.log('✗ No image data returned');
+    if (geminiApiKey) {
+      const fallbackUrl = await generateDiagramWithGemini({
+        cleanDescription,
+        visualType,
+        size,
+        cacheKey,
+        styleGuide,
+        prompt: diagramPrompt
+      });
+      if (fallbackUrl) {
+        return fallbackUrl;
+      }
+    }
+    
+    // Local SVG fallback so users always get a diagram (even without image-model access)
+    const localDiagram = generateLocalPlaceholderDiagram(visualType, cleanDescription, size);
+    if (localDiagram) {
+      return saveDiagramImage(localDiagram, visualType, size, cacheKey, 'svg');
+    }
+    
     return '';
   } catch (error) {
     console.error('Error generating diagram:', error);
     return '';
   }
+}
+
+function shouldFallbackToGemini(error: any): boolean {
+  if (!error) {
+    return false;
+  }
+  const status = error?.status ?? error?.code;
+  const message = (error?.message || '').toString().toLowerCase();
+  if (status === 403) {
+    return true;
+  }
+  return (
+    message.includes('permission denied') ||
+    message.includes('verify organization') ||
+    message.includes('gpt-image-1')
+  );
+}
+
+async function generateDiagramWithGemini(options: {
+  cleanDescription: string;
+  visualType: string;
+  size: DiagramSize;
+  cacheKey: string;
+  styleGuide: string;
+  prompt: string;
+}): Promise<string> {
+  if (!geminiAI) {
+    console.warn('?? Gemini API key not configured; cannot generate diagram fallback.');
+    return '';
+  }
+
+  try {
+    const model = geminiAI.getGenerativeModel({
+      model: GEMINI_IMAGE_MODEL
+    });
+
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: `${options.prompt}
+
+Diagram requirements: ${options.styleGuide}. Focus on: ${options.cleanDescription}`
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: 'image/png',
+        temperature: 0.2
+      }
+    });
+
+    const inlineData =
+      result.response?.candidates?.[0]?.content?.parts?.find(
+        (part: any) => part?.inlineData?.data
+      )?.inlineData?.data;
+
+    if (!inlineData) {
+      console.warn('?? Gemini response did not contain inline image data.');
+      return '';
+    }
+
+    console.log('?? Gemini fallback succeeded.');
+    return saveDiagramImage(inlineData, options.visualType, options.size, options.cacheKey);
+  } catch (error) {
+    console.error('?? Gemini fallback failed:', error);
+    return '';
+  }
+}
+
+function generateLocalPlaceholderDiagram(visualType: string, cleanDescription: string, size: DiagramSize): string {
+  const [width, height] = size.split('x').map((n) => parseInt(n, 10) || 1024);
+
+  // Only build placeholders for common subjects; fallback is physics trajectory sketch or right-triangle trig
+  const lowerDesc = cleanDescription.toLowerCase();
+  const isProjectile = visualType === 'physics' || lowerDesc.includes('projectile');
+  const isTrigTriangle = visualType === 'geometry' || lowerDesc.includes('trigonometry') || lowerDesc.includes('triangle') || lowerDesc.includes('right triangle');
+  if (!isProjectile && !isTrigTriangle) {
+    return '';
+  }
+
+  if (isTrigTriangle) {
+    const angleMatch = cleanDescription.match(/(\d+(?:\.\d+)?)\s*°/);
+    const angle = angleMatch ? angleMatch[1] : 'θ';
+    const baseMatch = cleanDescription.match(/(\d+(?:\.\d+)?)\s*m\b/i);
+    const baseValue = baseMatch ? `${baseMatch[1]} m` : 'base';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 z" fill="#111" />
+    </marker>
+  </defs>
+  <rect width="${width}" height="${height}" fill="white"/>
+  <polygon points="${width * 0.15},${height * 0.75} ${width * 0.8},${height * 0.75} ${width * 0.15},${height * 0.2}" fill="none" stroke="#111" stroke-width="4"/>
+  <rect x="${width * 0.15 - 8}" y="${height * 0.75 - 8}" width="16" height="16" fill="#111"/>
+  <line x1="${width * 0.15}" y1="${height * 0.75}" x2="${width * 0.8}" y2="${height * 0.75}" stroke="#111" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="${width * 0.15}" y1="${height * 0.75}" x2="${width * 0.15}" y2="${height * 0.2}" stroke="#111" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="${width * 0.4}" y="${height * 0.82}" font-size="36" fill="#111">${baseValue}</text>
+  <text x="${width * 0.07}" y="${height * 0.45}" font-size="36" fill="#111" transform="rotate(-90 ${width * 0.07} ${height * 0.45})">height</text>
+  <text x="${width * 0.45}" y="${height * 0.42}" font-size="36" fill="#111">hypotenuse</text>
+  <path d="M ${width * 0.17} ${height * 0.72} A 60 60 0 0 1 ${width * 0.28} ${height * 0.75}" fill="none" stroke="#ef4444" stroke-width="3"/>
+  <text x="${width * 0.19}" y="${height * 0.65}" font-size="34" fill="#ef4444">θ = ${angle}°</text>
+</svg>`;
+    return svg;
+  }
+
+  const angleMatch = cleanDescription.match(/(\d+(?:\.\d+)?)\s*°/);
+  const speedMatch = cleanDescription.match(/(\d+(?:\.\d+)?)\s*(?:m\/s|meters\/s|mps|meters per second)/i);
+  const angle = angleMatch ? angleMatch[1] : '45';
+  const speed = speedMatch ? speedMatch[1] : 'v₀';
+
+  // Arc geometry
+  const sx = width * 0.1;
+  const sy = height * 0.85;
+  const ex = width * 0.9;
+  const ey = height * 0.85;
+  const cx = width * 0.45;
+  const cy = height * 0.25;
+
+  // Apex along quadratic Bezier (min y)
+  const tyNum = sy - cy;
+  const tyDen = sy - 2 * cy + ey;
+  let ty = tyDen !== 0 ? tyNum / tyDen : 0.5;
+  if (ty < 0 || ty > 1 || Number.isNaN(ty)) {
+    ty = 0.5;
+  }
+  const apexX = (1 - ty) ** 2 * sx + 2 * (1 - ty) * ty * cx + ty ** 2 * ex;
+  const apexY = (1 - ty) ** 2 * sy + 2 * (1 - ty) * ty * cy + ty ** 2 * ey;
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 z" fill="#111" />
+    </marker>
+  </defs>
+  <rect width="${width}" height="${height}" fill="white"/>
+  <line x1="${width * 0.08}" y1="${height * 0.85}" x2="${width * 0.92}" y2="${height * 0.85}" stroke="#111" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="${width * 0.1}" y1="${height * 0.9}" x2="${width * 0.1}" y2="${height * 0.08}" stroke="#111" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}" fill="none" stroke="#3b82f6" stroke-width="4"/>
+  <line x1="${apexX}" y1="${apexY}" x2="${apexX}" y2="${sy}" stroke="#ef4444" stroke-width="2" stroke-dasharray="10,8"/>
+  <line x1="${sx}" y1="${sy + 10}" x2="${ex}" y2="${ey + 10}" stroke="#111" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="${width * 0.12}" y="${height * 0.81}" font-size="32" fill="#111">launch</text>
+  <text x="${width * 0.12}" y="${height * 0.97}" font-size="32" fill="#111">x</text>
+  <text x="${width * 0.015}" y="${height * 0.12}" font-size="32" fill="#111">y</text>
+  <text x="${width * 0.32}" y="${height * 0.35}" font-size="38" fill="#ef4444">θ = ${angle}°</text>
+  <text x="${width * 0.32}" y="${height * 0.42}" font-size="38" fill="#ef4444">v₀ = ${speed} m/s</text>
+  <circle cx="${sx}" cy="${sy}" r="10" fill="#111"/>
+  <circle cx="${apexX}" cy="${apexY}" r="10" fill="#ef4444"/>
+  <text x="${apexX + 14}" y="${apexY - 12}" font-size="32" fill="#ef4444">max height</text>
+  <circle cx="${ex}" cy="${ey}" r="10" fill="#111"/>
+  <text x="${(sx + ex) / 2 - 40}" y="${sy + 45}" font-size="32" fill="#111">range</text>
+</svg>`;
+
+  return svg;
+}
+
+function saveDiagramImage(
+  data: string,
+  visualType: string,
+  size: DiagramSize,
+  cacheKey: string,
+  format: 'png' | 'svg' = 'png'
+): string {
+  const diagramsDir = path.join(process.cwd(), 'public', 'diagrams');
+  if (!fs.existsSync(diagramsDir)) {
+    fs.mkdirSync(diagramsDir, { recursive: true });
+  }
+
+  const hash = cacheKey.substring(0, 8);
+  const filename = `${visualType}-${size.replace('x', '-')}-${hash}.${format}`;
+  const filepath = path.join(diagramsDir, filename);
+  const buffer = format === 'svg' ? Buffer.from(data, 'utf-8') : Buffer.from(data, 'base64');
+  fs.writeFileSync(filepath, buffer);
+
+  const apiPath = `/api/diagram-file/${filename}`;
+
+  diagramCache.set(cacheKey, {
+    url: apiPath,
+    timestamp: Date.now(),
+    size,
+    visualType
+  });
+
+  console.log(`🎨 ${visualType} (${size}) saved and cached:`, apiPath);
+  return apiPath;
 }
 
 function isRateLimitError(error: any): boolean {
@@ -1767,10 +2422,30 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
     return `__IMAGE_PLACEHOLDER_${imageTags.length - 1}__`;
   });
   
+  // Remove inline math delimiters while preserving contents
+  formatted = formatted.replace(/\\\(/g, '').replace(/\\\)/g, '');
+  formatted = formatted.replace(/\\\[/g, '').replace(/\\\]/g, '');
+  formatted = formatted.replace(/\$\$/g, '').replace(/\$/g, '');
+  
   // 0A. CRITICAL: Convert LaTeX fractions BEFORE stripping other macros
   // This must happen first to preserve numerator and denominator
   // Handle \frac{num}{den}, \dfrac{num}{den}, and \tfrac{num}{den}
-  formatted = formatted.replace(/\\[dt]?frac\{([^{}]+)\}\{([^{}]+)\}/g, '{$1/$2}');
+  const latexFractionPatterns: Array<[RegExp, string]> = [
+    [/\\[dt]?frac\{([^{}]+)\}\{([^{}]+)\}/g, '{$1/$2}'],
+    [/\\[dt]?frac\s*\(\s*([^\s{}()]+)\s*\)\s*\(\s*([^\s{}()]+)\s*\)/g, '{$1/$2}'],
+    [/\\[dt]?frac\s*([^\s{}]+)\s*([^\s{}]+)/g, '{$1/$2}'],
+  ];
+  latexFractionPatterns.forEach(([pattern, replacement]) => {
+    formatted = formatted.replace(pattern, replacement);
+  });
+  formatted = convertLooseFractions(formatted);
+  formatted = convertSqrtExpressions(formatted);
+  formatted = fixStackedDecimals(formatted);
+  formatted = convertStackedUnits(formatted);
+  formatted = convertStackedQuantityFractions(formatted);
+  formatted = convertInlineSlashFractions(formatted);
+  // Remove any leftover \frac tokens
+  formatted = formatted.replace(/\\[dt]?frac/g, '');
   
   // 0B. Remove LaTeX commands that shouldn't be displayed as text
   // Iteratively strip \command{text} patterns to handle nested commands
@@ -1780,24 +2455,85 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
     // Strip \text{...}, \textbf{...}, \textit{...}, etc. -> keep content only
     formatted = formatted.replace(/\\[a-zA-Z]+\{([^{}]*)\}/g, '$1');
   } while (formatted !== prevFormatted); // Keep going until no more changes
-  
-  // Strip LaTeX spacing and symbols
-  formatted = formatted.replace(/\\,/g, ''); // spacing
-  formatted = formatted.replace(/\\;/g, ''); // spacing
-  formatted = formatted.replace(/\\ /g, ' '); // spacing
-  formatted = formatted.replace(/\\times/g, '×');
-  formatted = formatted.replace(/\\cdot/g, '·');
-  formatted = formatted.replace(/\\Delta/g, 'Δ');
-  formatted = formatted.replace(/\\alpha/g, 'α');
-  formatted = formatted.replace(/\\beta/g, 'β');
-  formatted = formatted.replace(/\\theta/g, 'θ');
-  formatted = formatted.replace(/\\pi/g, 'π');
-  // Remove any remaining standalone backslash commands
-  formatted = formatted.replace(/\\[a-zA-Z]+\b/g, '');
-  
-  // Fix double caret issues (e.g., "m/s^2^" -> "m/s^2")
-  // This happens when LaTeX \text{m/s}^2 is stripped, leaving the ^2 from LaTeX superscript
-  formatted = formatted.replace(/\^\^/g, '^'); // Replace double carets with single
+  formatted = formatted.replace(/\,/g, ''); // spacing
+  formatted = formatted.replace(/\;/g, ''); // spacing
+  formatted = formatted.replace(/\ /g, ' '); // spacing
+    const latexSymbolReplacements: Array<[RegExp, string]> = [
+    [/\times/g, '×'],
+    [/\cdot/g, '·'],
+    [/\angle/g, '∠'],
+    [/\triangle/g, '△'],
+    [/\Delta/g, 'Δ'],
+    [/\alpha/g, 'α'],
+    [/\beta/g, 'β'],
+    [/\theta/g, 'θ'],
+    [/\gamma/g, 'γ'],
+    [/\pi/g, 'π'],
+    [/\sin/g, 'sin'],
+    [/\cos/g, 'cos'],
+    [/\tan/g, 'tan'],
+    [/\csc/g, 'csc'],
+    [/\sec/g, 'sec'],
+    [/\cot/g, 'cot'],
+  ];
+  latexSymbolReplacements.forEach(([pattern, replacement]) => {
+    formatted = formatted.replace(pattern, replacement);
+  });
+  const superscriptMap: Record<string, string> = {
+    '⁰': '0',
+    '¹': '1',
+    '²': '2',
+    '³': '3',
+    '⁴': '4',
+    '⁵': '5',
+    '⁶': '6',
+    '⁷': '7',
+    '⁸': '8',
+    '⁹': '9',
+  };
+  formatted = formatted.replace(/([A-Za-z0-9\}])([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_match, base: string, superscripts: string) => {
+    const normalized = superscripts
+      .split('')
+      .map((char) => superscriptMap[char] ?? '')
+      .join('');
+    return normalized ? `${base}^${normalized}` : base;
+  });
+  formatted = formatted.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, (char: string) => {
+    const normalized = superscriptMap[char];
+    return normalized ? `^${normalized}` : '';
+  });
+  const symbolNormalization: Array<[RegExp, string]> = [
+    [/−/g, '-'],
+    [/–/g, '-'],
+    [/—/g, '-'],
+    [/﹣/g, '-'],
+    [/＋/g, '+'],
+    [/﹢/g, '+'],
+    [/＝/g, '='],
+    [/（/g, '('],
+    [/）/g, ')'],
+  ];
+  symbolNormalization.forEach(([pattern, replacement]) => {
+    formatted = formatted.replace(pattern, replacement);
+  });
+  const subscriptMap: Record<string, string> = {
+    '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4',
+    '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9',
+    '₊': '+', '₋': '-', '₌': '=', '₍': '(', '₎': ')',
+  };
+  formatted = formatted.replace(/[\u2080-\u2089\u208A-\u208E]+/g, (match) =>
+    match.split('').map(char => subscriptMap[char] ?? '').join('')
+  );
+  // Fix accidental Greek pi inside words (e.g., "πeces" -> "pieces") while leaving math tokens alone
+  formatted = formatted.replace(/(^|[^A-Za-z0-9])π([a-z]{2,})/g, '$1pi$2');
+  // Normalize stray angle symbols inside words/phrases
+  formatted = formatted.replace(/\btri∠s?\b/gi, (m) => m.toLowerCase().endsWith('s') ? 'triangles' : 'triangle');
+  formatted = formatted.replace(/\b∠s\b/gi, 'angles');
+  formatted = formatted.replace(/\b∠\b/gi, 'angle');
+  formatted = formatted.replace(/∠(?=[A-Za-z\s])/g, 'angle ');
+  formatted = formatted.replace(/∠/g, 'angle');
+  formatted = formatted.replace(/\bangle\s+s\b/gi, 'angles');
+  formatted = formatted.replace(/\btriangle\s+s\b/gi, 'triangles');
   formatted = formatted.replace(/(\^\d+)\^/g, '$1'); // Remove trailing caret after superscript numbers
   
   // 0C. CRITICAL: Detect and convert vertical fractions BEFORE whitespace normalization
@@ -1808,7 +2544,7 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   // This must be converted to "1/2" before newlines are collapsed to spaces
   // Pattern: math context (=, +, -, ×, etc.) followed by newlines and a fraction-like stack
   formatted = formatted.replace(
-    /([=+\-×÷*\(]\s*)\n+\s*(\d+)\s*\n+\s*(\d+)(?=\s|$)/g,
+    /([=+\-x×÷*\(]\s*)\n+\s*(\d+)\s*\n+\s*(\d+)(?=\s|$)/g,
     '$1$2/$3'
   );
   // Also catch fractions at start of text (no preceding operator)
@@ -1838,8 +2574,25 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   formatted = formatted.replace(/[ \t\u00A0\u202F]+/g, ' ');
   // CRITICAL: Remove ALL whitespace (including Unicode) before punctuation (but not newlines)
   formatted = formatted.replace(/[ \t\u00A0\u202F]+([.,!?;:])/g, '$1');
+  // Repair decimals split by whitespace after cleanup
+  formatted = formatted.replace(/(\d+)\.\s+(\d+)/g, '$1.$2');
+  formatted = formatted.replace(/(\d+)\s+\.\s+(\d+)/g, '$1.$2');
+  formatted = formatted.replace(/(\d+)\s*\n\s*(\d+)/g, '$1$2'); // rejoin numbers split by newline
+  formatted = formatted.replace(/(\d+)\s+\/\s+(s)/gi, '$1/$2'); // fix m / s
+  formatted = formatted.replace(/(m)\s+\/\s*(s\^?2?)/gi, '$1/$2');
+  formatted = formatted.replace(/(\d+)\s*\/\s*(\d+)/g, '{$1/$2}'); // force simple numeric fractions to vertical
   // Trim leading/trailing whitespace
   formatted = formatted.trim();
+  // Repair occasional glued tokens from aggressive whitespace scrubbing
+  formatted = formatted.replace(/([A-Za-z])sinto\b/gi, '$1 into');
+  formatted = formatted.replace(/([A-Za-z])sindependent\b/gi, '$1 independent');
+  formatted = formatted.replace(/([A-Za-z])susing\b/gi, '$1 using');
+  formatted = formatted.replace(/([A-Za-z])swith\b/gi, '$1 with');
+  formatted = formatted.replace(/\btimesin\b/gi, 'time in');
+  formatted = formatted.replace(/\bheightand\b/gi, 'height and');
+  formatted = formatted.replace(/\brangeand\b/gi, 'range and');
+  formatted = formatted.replace(/\bsolution(s?)in\b/gi, 'solution$1 in');
+  formatted = formatted.replace(/\bproblems?involves\b/gi, 'problem involves');
   
   // Debug logging - show sample before/after for content with punctuation issues
   if (debugLabel && originalText.includes(',')) {
@@ -1888,7 +2641,9 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
       
       // Check if we're at an algebraic fraction pattern
       // Match: alphanumeric/alphanumeric (e.g., 3x/4y, x/4, 12/5)
-      const fractionMatch = text.substring(i).match(/^([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/);
+    const fractionMatch = text
+      .substring(i)
+      .match(/^([\p{L}0-9_]+(?:\([^)]+\))?)\/([\p{L}0-9_]+(?:\([^)]+\))?)/u);
       if (fractionMatch) {
         const num = fractionMatch[1];
         const den = fractionMatch[2];
@@ -1970,6 +2725,110 @@ function enforceProperFormatting(text: string | null | undefined, debugLabel: st
   }
   
   return formatted;
+}
+
+function ensureColorHighlights(text: string | null | undefined, debugLabel: string = ''): string {
+  if (!text) {
+    return '';
+  }
+
+  let updated = text;
+  const hasBlue = /\[blue:/i.test(updated);
+  const hasRed = /\[red:/i.test(updated);
+
+  // Match fractions, radicals, and numeric tokens for auto-highlighting
+  const candidateRegex = /(\{[^}]+\/[^}]+\}|√\([^\[]+\)|-?\d+(?:\.\d+)?)/gu;
+  const colorTags = ['blue', 'red', 'green', 'yellow', 'orange', 'purple'];
+  const subSuperscriptRegex = /[\u2070-\u209F]/;
+
+  const isInsideColorTag = (content: string, index: number): boolean => {
+    const openIndex = content.lastIndexOf('[', index);
+    if (openIndex === -1) {
+      return false;
+    }
+    const closeIndex = content.indexOf(']', openIndex);
+    if (closeIndex === -1 || closeIndex < index) {
+      return false;
+    }
+    const colonIndex = content.indexOf(':', openIndex);
+    if (colonIndex === -1 || colonIndex > closeIndex) {
+      return false;
+    }
+    const tag = content.slice(openIndex + 1, colonIndex).toLowerCase();
+    return colorTags.includes(tag) && index >= openIndex && index <= closeIndex;
+  };
+
+  const extendSegmentEnd = (content: string, initialEnd: number, baseSegment: string): number => {
+    let end = initialEnd;
+    const suffix = content.slice(end);
+    const unitMatch = suffix.match(/^(\s*(?:°|%|[a-zA-Z]+(?:\s*\/\s*[a-zA-Z]+)*))/);
+    if (unitMatch && /\d/.test(baseSegment)) {
+      const addition = unitMatch[0];
+      if (/[a-zA-Z°%]/.test(addition)) {
+        end += addition.length;
+      }
+    }
+    return end;
+  };
+
+  const applyHighlight = (content: string, match: RegExpExecArray, color: 'blue' | 'red'): string => {
+    const start = match.index ?? 0;
+    let end = start + match[0].length;
+    end = extendSegmentEnd(content, end, match[0]);
+    const segment = content.slice(start, end);
+    return `${content.slice(0, start)}[${color}:${segment}]${content.slice(end)}`;
+  };
+
+  const isSymbolicContext = (content: string, startIndex: number, value: string): boolean => {
+    const prevChar = startIndex > 0 ? content[startIndex - 1] : '';
+    if (prevChar === '^' || prevChar === '_') {
+      return true;
+    }
+    return subSuperscriptRegex.test(value);
+  };
+
+  const findFirstMatch = (content: string): RegExpExecArray | null => {
+    candidateRegex.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = candidateRegex.exec(content)) !== null) {
+      if (!isInsideColorTag(content, match.index ?? 0) && !isSymbolicContext(content, match.index ?? 0, match[0])) {
+        return match;
+      }
+    }
+    return null;
+  };
+
+  const findLastMatch = (content: string): RegExpExecArray | null => {
+    candidateRegex.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let lastMatch: RegExpExecArray | null = null;
+    while ((match = candidateRegex.exec(content)) !== null) {
+      if (!isInsideColorTag(content, match.index ?? 0) && !isSymbolicContext(content, match.index ?? 0, match[0])) {
+        lastMatch = match;
+      }
+    }
+    return lastMatch;
+  };
+
+  if (!hasBlue) {
+    const firstMatch = findFirstMatch(updated);
+    if (firstMatch) {
+      updated = applyHighlight(updated, firstMatch, 'blue');
+    }
+  }
+
+  if (!hasRed) {
+    const lastMatch = findLastMatch(updated);
+    if (lastMatch) {
+      updated = applyHighlight(updated, lastMatch, 'red');
+    }
+  }
+
+  if (debugLabel && (updated !== text)) {
+    console.log(`🎯 Color highlights enforced for [${debugLabel}]`);
+  }
+
+  return updated;
 }
 
 // Deterministic measurement diagram classifier
@@ -2071,27 +2930,32 @@ function enforceResponseFormatting(response: any): any {
   // Fix all step content, titles, and explanations (with fallback)
   if (formatted.steps && Array.isArray(formatted.steps)) {
     formatted.steps = formatted.steps.map((step: any, index: number) => {
-      // Provide a default explanation if missing (should never happen, but ensures type safety)
       const defaultExplanation = "This step is part of solving the problem.";
       const explanation = step.explanation ? enforceProperFormatting(step.explanation, `step${index+1}-explanation`) : defaultExplanation;
-      
+
       if (!step.explanation) {
-        console.warn(`⚠️  Step ${index+1} missing explanation - using fallback`);
+        console.warn(`??  Step ${index+1} missing explanation - using fallback`);
       }
-      
+
+      const formattedTitle = step.title ? enforceProperFormatting(step.title, `step${index+1}-title`) : step.title;
+      const formattedContent = step.content ? enforceProperFormatting(step.content, `step${index+1}-content`) : '';
+      const highlightedContent = ensureColorHighlights(formattedContent, `step${index+1}-content`);
+
       return {
         ...step,
-        title: step.title ? enforceProperFormatting(step.title, `step${index+1}-title`) : step.title,
-        content: step.content ? enforceProperFormatting(step.content, `step${index+1}-content`) : step.content,
-        explanation: explanation
+        title: formattedTitle,
+        content: highlightedContent,
+        explanation
       };
     });
   }
   
   // Fix final answer if present
   if (formatted.finalAnswer) {
-    formatted.finalAnswer = enforceProperFormatting(formatted.finalAnswer, 'finalAnswer');
+    const normalizedAnswer = enforceProperFormatting(formatted.finalAnswer, 'finalAnswer');
+    formatted.finalAnswer = ensureColorHighlights(normalizedAnswer, 'finalAnswer');
   }
+
 
   return formatted;
 }
@@ -2558,12 +3422,13 @@ async function runVerificationPipeline(
     
     // Check if this is a math-eligible problem (use currentSolution which may be regenerated)
     const isMath = isMathEligible(originalQuestion, currentSolution.subject || '');
+    let wolframResult: ValidationResult | null = null;
     
     if (isMath && wolframAlphaAppId) {
       console.log(`🧮 Math problem detected - using WolframAlpha for ground truth verification`);
       
       // Attempt 1: WolframAlpha verification (computational ground truth)
-      const wolframResult = await wolframAlphaVerification(originalQuestion, currentSolution);
+      wolframResult = await wolframAlphaVerification(originalQuestion, currentSolution);
       
       if (wolframResult.isValid && wolframResult.confidence >= 70) {
         console.log(`✅ WolframAlpha verification PASSED (confidence: ${wolframResult.confidence}%)`);
@@ -2595,6 +3460,17 @@ async function runVerificationPipeline(
     let verification = await crossModelVerification(originalQuestion, currentSolution);
     
     if (verification.isValid && verification.confidence >= 70) {
+      // If Wolfram was inconclusive/missing, do not mark as verified; treat as unverified with warning
+      if (isMath && (!wolframResult || wolframResult.confidence < 50 || (wolframResult.warnings && wolframResult.warnings.length > 0))) {
+        console.warn(`⚠️ WolframAlpha was unavailable/inconclusive; not marking verified despite AI agreement`);
+        verificationStore.set(solutionId, {
+          status: 'unverified',
+          confidence: verification.confidence,
+          warnings: ['WolframAlpha unavailable or inconclusive', ...(verification.warnings || [])],
+          timestamp: Date.now()
+        });
+        return;
+      }
       console.log(`✅ GPT-4o verification passed (confidence: ${verification.confidence}%)`);
       verificationStore.set(solutionId, {
         status: 'verified',
@@ -2610,6 +3486,16 @@ async function runVerificationPipeline(
     const retryVerification = await crossModelVerification(originalQuestion, currentSolution);
     
     if (retryVerification.isValid && retryVerification.confidence >= 70) {
+      if (isMath && (!wolframResult || wolframResult.confidence < 50 || (wolframResult.warnings && wolframResult.warnings.length > 0))) {
+        console.warn(`⚠️ WolframAlpha was unavailable/inconclusive; not marking verified despite AI agreement (retry)`);
+        verificationStore.set(solutionId, {
+          status: 'unverified',
+          confidence: retryVerification.confidence,
+          warnings: ['WolframAlpha unavailable or inconclusive', ...(retryVerification.warnings || [])],
+          timestamp: Date.now()
+        });
+        return;
+      }
       console.log(`✅ GPT-4o retry passed (confidence: ${retryVerification.confidence}%)`);
       verificationStore.set(solutionId, {
         status: 'verified',
@@ -2775,13 +3661,149 @@ function ensureBiologyVisualAids(question: string, result: any): any {
   return result;
 }
 
+function ensurePhysicsVisualAids(question: string, result: any): any {
+  if (!question || typeof question !== 'string') {
+    return result;
+  }
+
+  if (result.visualAids && result.visualAids.length > 0) {
+    return result;
+  }
+
+  const lowerQuestion = question.toLowerCase();
+  const physicsKeywords = [
+    'projectile',
+    'catapult',
+    'launch',
+    'trajectory',
+    'range',
+    'flight time',
+    'initial velocity',
+    'v0',
+    'parabolic path',
+    'angle of elevation',
+    'free body',
+    'force diagram',
+    'incline plane',
+    'frictionless track',
+  ];
+
+  const hasKeyword = physicsKeywords.some((keyword) => lowerQuestion.includes(keyword));
+  if (!hasKeyword) {
+    return result;
+  }
+
+  console.log('🎯 Auto-injecting physics visual aid');
+  const description = 'Projectile motion diagram showing launch angle, horizontal/vertical velocity components (v0x, v0y), parabolic path, maximum height, and landing range. Label initial speed and angle.';
+  const stepId = result.steps && result.steps.length > 0 ? result.steps[0].id : '1';
+
+  return {
+    ...result,
+    visualAids: [
+      {
+        type: 'physics',
+        stepId,
+        description,
+      },
+    ],
+  };
+}
+
+function ensureConceptualVisualAids(question: string, result: any): any {
+  if (!question || typeof question !== 'string') {
+    return result;
+  }
+
+  if (result.visualAids && result.visualAids.length > 0) {
+    return result;
+  }
+
+  const subject = (result.subject || '').toLowerCase();
+  const questionLower = question.toLowerCase();
+  const heuristics: Array<{ match: boolean; type: string; description: string }> = [
+    {
+      match:
+        subject.includes('geometry') ||
+        subject.includes('trigonometry') ||
+        /triangle|quadrilateral|angle|polygon|circle|arc|perimeter|area|radius|diameter/.test(questionLower),
+      type: 'geometry',
+      description: 'Geometry diagram showing labeled vertices, sides, and angles referenced in the problem with given measurements and unknowns highlighted.',
+    },
+    {
+      match:
+        subject.includes('physics') ||
+        /projectile|trajectory|force|velocity|acceleration|catapult|launch|free body|kinematics/.test(questionLower),
+      type: 'physics',
+      description: 'Physics diagram illustrating the setup with labeled forces, velocity components, and key distances (range, height, time).',
+    },
+    {
+      match:
+        subject.includes('chemistry') ||
+        subject.includes('biology') ||
+        /reaction|cycle|pathway|cell|dna|enzyme|respiration/.test(questionLower),
+      type: 'illustration',
+      description: 'Process illustration showing each stage with arrows indicating flow, labeled reactants/products, and key molecules called out.',
+    },
+    {
+      match:
+        subject.includes('statistics') ||
+        subject.includes('data') ||
+        /survey|distribution|probability|percent|table|chart|mean|median/.test(questionLower),
+      type: 'chart',
+      description: 'Data visualization summarizing the referenced values (bar or line chart) with labeled axes and highlighted comparisons.',
+    },
+    {
+      match:
+        subject.includes('accounting') ||
+        /balance sheet|income statement|ledger|debit|credit|cash flow/.test(questionLower),
+      type: 'illustration',
+      description: 'Accounting visual showing debits and credits (T-accounts or balance sheet layout) with labeled amounts.',
+    },
+    {
+      match: /graph|plot|function|slope|parabola|coordinate|linear/.test(questionLower),
+      type: 'graph',
+      description: 'Coordinate plane graphing the function or relation with labeled axes, intercepts, and notable points.',
+    },
+  ];
+
+  const matched = heuristics.find((rule) => rule.match);
+  const stepId = result.steps && result.steps.length > 0 ? result.steps[0].id : '1';
+
+  if (matched) {
+    return {
+      ...result,
+      visualAids: [
+        {
+          type: matched.type,
+          stepId,
+          description: matched.description,
+        },
+      ],
+    };
+  }
+
+  if (!result.steps || result.steps.length < 2) {
+    return result;
+  }
+
+  return {
+    ...result,
+    visualAids: [
+      {
+        type: 'illustration',
+        stepId,
+        description: 'Conceptual illustration summarizing each major step with annotations showing how the solution progresses.',
+      },
+    ],
+  };
+}
+
 app.post('/api/analyze-text', async (req, res) => {
   const requestStartTime = Date.now();
   try {
     const { question } = req.body;
     console.log('Analyzing text question:', question);
     console.log('⏱️ [TIMING] Request received at:', new Date().toISOString());
-    
     let result = await pRetry(
       async () => {
         try {
@@ -2800,10 +3822,10 @@ app.post('/api/analyze-text', async (req, res) => {
 
 🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
-- If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
+- If the problem uses FRACTIONS (1/2, 3/4), write them as {numerator/denominator} so they render vertically
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
 - CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
-- **ALWAYS use LaTeX \\frac{num}{den} or slash notation num/den for fractions**
+- **NEVER output LaTeX commands like \\frac — always wrap fractions as {numerator/denominator}**
 - **DO NOT use raw text newlines between numerator and denominator** (the system renders fractions vertically automatically)
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
@@ -3382,9 +4404,13 @@ CRITICAL SIZE LIMIT: Your ENTIRE JSON response must be under 2,000 characters. T
     
     // 🧬 BIOLOGY/CHEMISTRY KEYWORD DETECTION: Ensure visual aids for metabolic cycles
     result = ensureBiologyVisualAids(question, result);
+    // 🎯 PHYSICS KEYWORD DETECTION: Ensure diagrams for projectile/force problems
+    result = ensurePhysicsVisualAids(question, result);
     
     // 📐 MEASUREMENT DIAGRAM ENFORCEMENT: Auto-inject diagrams for geometry/measurement problems
     result = applyMeasurementDiagramEnforcement(question, result);
+    // 🌐 GLOBAL CONCEPTUAL VISUALS: Ensure at least one helpful diagram for complex prompts
+    result = ensureConceptualVisualAids(question, result);
     
     // ⚡ ASYNC DIAGRAM GENERATION: Generate unique solution ID
     const solutionId = crypto.randomBytes(16).toString('hex');
@@ -3509,8 +4535,7 @@ CRITICAL SIZE LIMIT: Your ENTIRE JSON response must be under 2,000 characters. T
 
     // Generate diagrams in background if any exist
     if (diagrams.length > 0) {
-      const hostname = req.get('host');
-      void generateDiagramsInBackground(solutionId, diagrams, structuredResult.steps, hostname);
+      void generateDiagramsInBackground(solutionId, diagrams, structuredResult.steps);
     }
   } catch (error) {
     console.error('Error analyzing text:', error);
@@ -3521,13 +4546,56 @@ CRITICAL SIZE LIMIT: Your ENTIRE JSON response must be under 2,000 characters. T
 app.post('/api/analyze-image', async (req, res) => {
   const requestStartTime = Date.now();
   try {
-    const { imageUri, problemNumber } = req.body;
+    const { imageUri } = req.body;
+    let problemNumber: string | undefined = typeof req.body?.problemNumber === 'string'
+      ? req.body.problemNumber
+      : undefined;
     console.log('🎯 Starting GPT-4o Vision analysis (single-call approach)...');
     console.log('⏱️ [TIMING] Request received at:', new Date().toISOString());
+    let normalizedProblemNumber: string | null = null;
     if (problemNumber) {
+      const trimmed = problemNumber.trim();
+      if (trimmed.length > 0) {
+        const problemPattern = /^\d{1,3}[a-z]?$/i;
+        if (!problemPattern.test(trimmed)) {
+          console.warn(`⚠️ Invalid problem number provided: "${problemNumber}"`);
+          return res.status(400).json({
+            error: 'Invalid problem number',
+            message: 'Use numeric problems like "22" or "22a" (digits with optional letter).',
+          });
+        }
+        normalizedProblemNumber = trimmed;
+      }
+    }
+    if (normalizedProblemNumber) {
+      problemNumber = normalizedProblemNumber;
       console.log(`📍 Target problem: #${problemNumber}`);
     }
     
+    let targetedOcrResult: TargetedOcrResult | null = null;
+    let ocrTranscription: string | null = null;
+    let ocrDiagnostics: string[] = [];
+    let ocrCroppedImage: string | null = null;
+
+    if (problemNumber) {
+      try {
+        targetedOcrResult = await performTargetedProblemOcr(imageUri, problemNumber);
+        if (targetedOcrResult) {
+          ocrTranscription = targetedOcrResult.transcription;
+          ocrDiagnostics = targetedOcrResult.diagnostics;
+          ocrCroppedImage = targetedOcrResult.croppedImageUri ?? null;
+        }
+
+        if (ocrTranscription) {
+          console.log(`[OCR] Captured transcription for problem #${problemNumber} (${ocrTranscription.length} chars)`);
+        } else {
+          console.warn(`[OCR] No transcription captured for problem #${problemNumber}`);
+        }
+      } catch (ocrError) {
+        console.warn(`[OCR] Targeted OCR pipeline error for problem #${problemNumber}:`, ocrError);
+      }
+    }
+
     let result = await pRetry(
       async () => {
         try {
@@ -3538,9 +4606,7 @@ app.post('/api/analyze-image', async (req, res) => {
           const visionStart = Date.now();
 
           // Build system message with ULTRA-STRONG problem targeting
-          let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
-
-${problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM #${problemNumber} ONLY 🚨🚨🚨
+          const targetedProblemBlock = problemNumber ? `🚨🚨🚨 CRITICAL REQUIREMENT - PROBLEM #${problemNumber} ONLY 🚨🚨🚨
 
 **YOU MUST SOLVE PROBLEM #${problemNumber} AND ONLY PROBLEM #${problemNumber}**
 
@@ -3563,7 +4629,22 @@ STEP 3: TRANSCRIBE ACCURATELY
 **IF YOU CANNOT FIND PROBLEM #${problemNumber}:**
 Return JSON with: {"error": "Problem #${problemNumber} not found in image", "problemsVisible": ["list", "of", "problem", "numbers", "you", "can", "see"]}
 
-🚨🚨🚨 SOLVING THE WRONG PROBLEM IS A CRITICAL FAILURE 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.'}
+🚨🚨🚨 SOLVING THE WRONG PROBLEM IS A CRITICAL FAILURE 🚨🚨🚨` : 'If multiple problems exist, solve the most prominent one.';
+
+          const ocrReferenceBlock = problemNumber && ocrTranscription
+            ? `
+
+OCR REFERENCE FOR PROBLEM #${problemNumber}:
+"""
+${ocrTranscription}
+"""
+- Copy this EXACT text into the "problem" field with no reformatting
+- If the image appears different, trust this transcription as the ground truth`
+            : '';
+
+          let systemMessage = `You are an expert educational AI tutor. Analyze the homework image and provide a step-by-step solution.
+
+${targetedProblemBlock}${ocrReferenceBlock}
 
 📋 **REQUIRED JSON STRUCTURE:**
 You MUST return a JSON object with these EXACT fields:
@@ -3585,12 +4666,12 @@ You MUST return a JSON object with these EXACT fields:
 
 **CRITICAL:** Never use different field names like "stepByStepSolution" - you MUST use the exact field names shown above.
 
-🔢 **NUMBER FORMAT RULE - MATCH THE INPUT:**
+?? **NUMBER FORMAT RULE - MATCH THE INPUT:**
 - If the problem uses DECIMALS (0.5, 2.75), use decimals in your solution
-- If the problem uses FRACTIONS (1/2, 3/4), use fractions {num/den} in your solution
+- If the problem uses FRACTIONS (1/2, 3/4), write them as {numerator/denominator} so they render vertically
 - For fractions: Use mixed numbers when appropriate (e.g., {1{1/2}} for 1½, {2{3/4}} for 2¾)
 - CRITICAL: Match the user's preferred format - don't convert between decimals and fractions
-- **ALWAYS use LaTeX \\frac{num}{den} or slash notation num/den for fractions**
+- **NEVER output LaTeX commands like \frac — always wrap fractions as {numerator/denominator}**
 - **DO NOT use raw text newlines between numerator and denominator** (the system renders fractions vertically automatically)
 
 🎨 **MANDATORY COLOR HIGHLIGHTING IN EVERY STEP:**
@@ -3646,6 +4727,46 @@ You MUST return a JSON object with these EXACT fields:
               
               console.log('⏱️ [TIMING] Calling GPT-4o Vision API...');
               const gptStart = Date.now();
+              const userPromptLines: string[] = [];
+
+              if (problemNumber) {
+                userPromptLines.push(`Analyze the homework worksheet in this image. Find and solve ONLY problem #${problemNumber}. Return complete step-by-step solution in JSON format.`);
+                if (ocrTranscription) {
+                  userPromptLines.push(`Use this OCR transcription as the exact problem statement. Copy it verbatim into the "problem" field:
+"""
+${ocrTranscription}
+"""`);
+                } else {
+                  userPromptLines.push(`If problem #${problemNumber} is not visible, return the error JSON described earlier (include the problem numbers you can see).`);
+                }
+              } else {
+                userPromptLines.push('Analyze the homework problem in this image and provide a complete step-by-step solution in JSON format.');
+              }
+
+              const userContentBlocks: any[] = [
+                {
+                  type: "text",
+                  text: userPromptLines.join('\n\n')
+                }
+              ];
+
+              if (ocrCroppedImage) {
+                userContentBlocks.push({
+                  type: "image_url",
+                  image_url: {
+                    url: ocrCroppedImage,
+                    detail: "high"
+                  }
+                });
+              }
+
+              userContentBlocks.push({
+                type: "image_url",
+                image_url: {
+                  url: imageUri
+                }
+              });
+
               const response = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [
@@ -3655,20 +4776,7 @@ You MUST return a JSON object with these EXACT fields:
                   },
                   {
                     role: "user",
-                    content: [
-                      {
-                        type: "text",
-                        text: problemNumber 
-                          ? `Analyze the homework worksheet in this image. Find and solve ONLY problem #${problemNumber}. Return complete step-by-step solution in JSON format.`
-                          : `Analyze the homework problem in this image and provide a complete step-by-step solution in JSON format.`
-                      },
-                      {
-                        type: "image_url",
-                        image_url: {
-                          url: imageUri
-                        }
-                      }
-                    ]
+                    content: userContentBlocks
                   }
                 ],
                 response_format: { type: "json_object" },
@@ -3735,6 +4843,17 @@ You MUST return a JSON object with these EXACT fields:
     );
 
     // Log AI response for debugging
+      if (ocrTranscription) {
+        console.log(`[OCR] Overriding problem statement with transcription (${ocrTranscription.length} chars)`);
+        const allowedVariables = extractStandaloneVariables(result.problem ?? '');
+        const normalizedProblem = normalizeOcrProblemText(ocrTranscription, allowedVariables);
+        result.problem = normalizedProblem;
+        (result as any).ocrTranscription = normalizedProblem;
+      }
+    if (ocrDiagnostics.length > 0) {
+      (result as any).ocrDiagnostics = ocrDiagnostics;
+    }
+
     console.log('=== AI RESPONSE DEBUG ===');
     console.log('Problem:', result.problem);
     console.log('Subject:', result.subject);
@@ -3753,6 +4872,8 @@ You MUST return a JSON object with these EXACT fields:
 
     // 🧬 BIOLOGY/CHEMISTRY KEYWORD DETECTION: Ensure visual aids for metabolic cycles
     result = ensureBiologyVisualAids(result.problem || '', result);
+    result = ensurePhysicsVisualAids(result.problem || '', result);
+    result = ensureConceptualVisualAids(result.problem || '', result);
 
     // 📐 MEASUREMENT DIAGRAM ENFORCEMENT: Auto-inject diagrams for geometry/measurement problems
     result = applyMeasurementDiagramEnforcement(result.problem ?? '', result);
@@ -3805,11 +4926,10 @@ You MUST return a JSON object with these EXACT fields:
       });
 
     // Start async diagram generation in background
-    if (diagrams.length > 0) {
-      const hostname = req.get('host');
-      console.log(`🎨 Starting async generation of ${diagrams.length} diagram(s)...`);
-      void generateDiagramsInBackground(solutionId, diagrams, result.steps, hostname);
-    }
+      if (diagrams.length > 0) {
+        console.log(`🎨 Starting async generation of ${diagrams.length} diagram(s)...`);
+        void generateDiagramsInBackground(solutionId, diagrams, result.steps);
+      }
 
   } catch (error: any) {
     console.error('❌ Error analyzing image:', error);
@@ -3888,6 +5008,25 @@ app.get('/api/diagrams/:solutionId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching diagrams:', error);
     res.status(500).json({ error: 'Failed to fetch diagrams' });
+  }
+});
+
+app.get('/api/diagram-file/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    if (!/^[\w.-]+$/.test(filename)) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+
+    const filePath = path.join(process.cwd(), 'public', 'diagrams', filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Diagram not found' });
+    }
+
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error('Error serving diagram file:', error);
+    res.status(500).json({ error: 'Failed to serve diagram file' });
   }
 });
 

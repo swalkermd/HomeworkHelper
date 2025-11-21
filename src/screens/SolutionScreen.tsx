@@ -67,6 +67,11 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
   const [diagramsComplete, setDiagramsComplete] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'unverified' | 'invalid_pending' | null>(null);
   const validation = useMemo(() => validateSolutionIntegrity(currentSolution), [currentSolution]);
+  const problemStructured = currentSolution?.problemStructured;
+  const isHandwrittenProblem = useMemo(
+    () => (problemStructured ? problemStructured.some((node) => node.isHandwritten) : false),
+    [problemStructured],
+  );
 
   useEffect(() => {
     if (currentSolution?.solutionId) {
@@ -762,6 +767,7 @@ export default function SolutionScreen({ navigation }: SolutionScreenProps) {
                     content={currentSolution.finalAnswer}
                     structuredContent={currentSolution.finalAnswerStructured}
                     isOnGreenBackground={false}
+                    allowHandwriting={isHandwrittenProblem}
                   />
                 </View>
               </LinearGradient>

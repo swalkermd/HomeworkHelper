@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 z" fill="#111" />
+    </marker>
+  </defs>
+  <rect width="1024" height="1024" fill="white"/>
+  <line x1="81.92" y1="870.4" x2="942.08" y2="870.4" stroke="#111" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="102.4" y1="921.6" x2="102.4" y2="81.92" stroke="#111" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M 102.4 870.4 Q 460.8 256 921.6 870.4" fill="none" stroke="#3b82f6" stroke-width="4"/>
+  <text x="122.88" y="829.44" font-size="32" fill="#111">launch</text>
+  <text x="122.88" y="993.28" font-size="32" fill="#111">x</text>
+  <text x="15.36" y="122.88" font-size="32" fill="#111">y</text>
+  <text x="327.68" y="358.4" font-size="38" fill="#ef4444">θ = 42°</text>
+  <text x="327.68" y="430.08" font-size="38" fill="#ef4444">v₀ = 18 m/s</text>
+  <circle cx="102.4" cy="870.4" r="10" fill="#111"/>
+  <circle cx="512" cy="276.48" r="10" fill="#ef4444"/>
+  <text x="532.48" y="256" font-size="32" fill="#ef4444">max height</text>
+  <circle cx="921.6" cy="870.4" r="10" fill="#111"/>
+  <text x="880.64" y="819.2" font-size="32" fill="#111">range</text>
+</svg>

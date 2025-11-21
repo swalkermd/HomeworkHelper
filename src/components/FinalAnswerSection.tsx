@@ -1,7 +1,7 @@
 // Professional structured layout for multi-part final answers
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TextStyle } from 'react-native';
 import MathText from './MathText';
 import { normalizeSolutionContent } from '../utils/mathFormatter';
 import { parseMathContent } from '../utils/mathParser';
@@ -12,14 +12,76 @@ interface FinalAnswerSectionProps {
   content: string;
   structuredContent?: MathNode[];
   isOnGreenBackground?: boolean;
+  allowHandwriting?: boolean;
 }
 
-export default function FinalAnswerSection({ content, structuredContent, isOnGreenBackground = false }: FinalAnswerSectionProps) {
+function stripHandwrittenTags(text: string): string {
+  if (!text || !text.toLowerCase().includes('[handwritten:')) {
+    return text;
+  }
+
+  const target = '[handwritten:';
+  const lowerTarget = target.toLowerCase();
+  const tagLength = target.length;
+  let result = '';
+
+  for (let i = 0; i < text.length;) {
+    if (text.slice(i, i + tagLength).toLowerCase() === lowerTarget) {
+      let depth = 1;
+      let j = i + tagLength;
+      const innerStart = j;
+
+      while (j < text.length && depth > 0) {
+        if (text[j] === '[') depth++;
+        else if (text[j] === ']') depth--;
+        j++;
+      }
+
+      const innerContent = stripHandwrittenTags(text.slice(innerStart, j - 1));
+      result += innerContent;
+      i = j;
+      continue;
+    }
+
+    result += text[i];
+    i++;
+  }
+
+  return result;
+}
+
+function normalizeHandwritingNodes(nodes: MathNode[] | undefined, allowHandwriting: boolean): MathNode[] | undefined {
+  if (!nodes) {
+    return nodes;
+  }
+  if (allowHandwriting) {
+    return nodes;
+  }
+  return nodes.map(node => ({ ...node, isHandwritten: false }));
+}
+
+export default function FinalAnswerSection({
+  content,
+  structuredContent,
+  isOnGreenBackground = false,
+  allowHandwriting = true,
+}: FinalAnswerSectionProps) {
+  const sanitizedContent = allowHandwriting ? content : stripHandwrittenTags(content);
+  const sanitizedStructuredContent = normalizeHandwritingNodes(structuredContent, allowHandwriting);
+
   // Normalize content into structured blocks
-  const blocks = normalizeSolutionContent(content);
+  const blocks = normalizeSolutionContent(sanitizedContent);
 
   // Check if we have multi-part answer (more than one block with labels)
   const isMultiPart = blocks.length > 1 && blocks.some(block => block.label);
+  const heroFontSize = isMultiPart ? 18 : 26;
+  const heroFontWeight: TextStyle['fontWeight'] = isMultiPart ? '600' : '700';
+
+  const containerStyles = [
+    styles.container,
+    styles.heroContainer,
+    isOnGreenBackground && styles.heroContainerOnGreen,
+  ];
 
   // Preserve structured content if provided, split by newlines to maintain formatting
   const derivedStructuredBlocks = React.useMemo(() => {
@@ -29,21 +91,15 @@ export default function FinalAnswerSection({ content, structuredContent, isOnGre
     
     // Always parse from block strings to ensure proper alignment with labels
     return blocks.map(block => {
-      // If we have structured content, try to use it for this specific block
-      // Otherwise fall back to parsing the string
-      if (structuredContent && structuredContent.length > 0) {
-        // For now, parse from string to ensure consistency
-        // Future: implement smarter partitioning of structured content
-        return parseMathContent(block.content);
-      }
-      return parseMathContent(block.content);
+      const parsed = parseMathContent(block.content);
+      return normalizeHandwritingNodes(parsed, allowHandwriting) || [];
     });
-  }, [blocks, isMultiPart, structuredContent]);
+  }, [allowHandwriting, blocks, isMultiPart]);
 
   if (isMultiPart) {
     // Render as structured multi-part layout
     return (
-      <View style={styles.container}>
+      <View style={containerStyles}>
         {blocks.map((block, index) => (
           <View 
             key={index} 
@@ -66,7 +122,8 @@ export default function FinalAnswerSection({ content, structuredContent, isOnGre
               <MathText
                 content={block.content}
                 structuredContent={derivedStructuredBlocks[index]}
-                fontSize={16}
+                fontSize={heroFontSize}
+                fontWeight={heroFontWeight}
                 color={isOnGreenBackground ? colors.textPrimary : colors.textPrimary}
                 isOnGreenBackground={isOnGreenBackground}
               />
@@ -79,11 +136,12 @@ export default function FinalAnswerSection({ content, structuredContent, isOnGre
   
   // Single block - render normally
   return (
-    <View style={styles.container}>
+    <View style={containerStyles}>
       <MathText
-        content={blocks[0]?.content || content}
-        structuredContent={structuredContent}
-        fontSize={16}
+        content={blocks[0]?.content || sanitizedContent}
+        structuredContent={sanitizedStructuredContent}
+        fontSize={heroFontSize}
+        fontWeight={heroFontWeight}
         color={isOnGreenBackground ? colors.textPrimary : colors.textPrimary}
         isOnGreenBackground={isOnGreenBackground}
       />
@@ -95,6 +153,14 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'column',
     paddingVertical: 4,
+  },
+  heroContainer: {
+    width: '100%',
+    paddingVertical: 6,
+  },
+  heroContainerOnGreen: {
+    borderRadius: 12,
+    paddingHorizontal: 4,
   },
   partRow: {
     flexDirection: 'row',
@@ -111,10 +177,11 @@ const styles = StyleSheet.create({
     paddingTop: 3,
   },
   label: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: colors.primary,
-    letterSpacing: 0.2,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   labelOnGreen: {
     color: colors.textPrimary,
